@@ -206,6 +206,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-VERSION-CHECK-NO-GIT-64](TOOLKIT-VERSION-CHECK-NO-GIT-64.md): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
+- [TRACK-FIXED-CLOSES-UMBRELLA-HOME-69](TRACK-FIXED-CLOSES-UMBRELLA-HOME-69.md): The tracker's fix command marks a work item done when any one of its bugs is fixed
 - [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
 - [TRACK-NEW-REGISTER-BEFORE-TODO-68](TRACK-NEW-REGISTER-BEFORE-TODO-68.md): A fault filed through the tracker intake stays without its planning item while the register renders, and an item made by hand in that time makes the intake refuse its own item as a duplicate

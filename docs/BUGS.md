@@ -1,6 +1,6 @@
 # Bug tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev3._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev4._
 
 The one bug tracker of AmiWind: every bug, its current status, its dated events
 and how it was closed. How tracking works, the report template, the closure
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-2244 bugs: 1312 open, 808 fixed, 124 closed.
+2245 bugs: 1313 open, 808 fixed, 124 closed.
 
 ### Persisting, not resolved
 
@@ -39,6 +39,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](bugs/BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started (reported 8 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 7 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 7 times, open)
 - [TRACKER-REGISTER-SIZE-33](bugs/TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit (reported 7 times, open)
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](bugs/BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages (reported 6 times, fixed)
 - [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 6 times, open)
@@ -48,7 +49,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [HUD-STATS-29](bugs/HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full (reported 6 times, open)
 - [REGISTER-WRITE-EINVAL-67](bugs/REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry (reported 6 times, open)
 - [SMOKE-MUSIC-REREAD-FLAKY-57](bugs/SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes (reported 6 times, open)
-- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 6 times, open)
 - [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification (reported 6 times, open)
 - [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): NPCs that move or fight have no walk, run or attack animation: Fargoth and other Seyda Neen villagers glitch toward the player (reported 5 times, fixed)
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](bugs/BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle (reported 5 times, fixed)
@@ -254,12 +254,13 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Three tables: the open bugs, the fixed ones and the closed ones. Each row links the bug's report page.
 
-#### Open (1312)
+#### Open (1313)
 
 Open bugs, most recently noticed first.
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [TRACK-FIXED-CLOSES-UMBRELLA-HOME-69](bugs/TRACK-FIXED-CLOSES-UMBRELLA-HOME-69.md) | The tracker's fix command marks a work item done when any one of its bugs is fixed | medium | v0.0.69-dev3 | open | - | - | - | Reported in v0.0.69-dev3; cause unknown. |
 | [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md) | On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start | medium | v0.0.68 | open (fixed in source) | - | - | - | Reported in v0.0.68; cause unknown. |
 | [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](bugs/TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md) | Tests of the Solstheim test route stop the gate when the version is a release | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [SOL-SEA-INVISIBLE-BLOCKER-68](bugs/SOL-SEA-INVISIBLE-BLOCKER-68.md) | An object in Solstheim's eastern waters is not drawn but still stops a player walking on the water | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
@@ -278,7 +279,7 @@ Open bugs, most recently noticed first.
 | [PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68](bugs/PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68.md) | The public progress snapshot accepts a build's raw tracker data without readiness counts and writes rooms 0 of 0 and no build history | medium | v0.0.68-dev11 | open | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
 | [TRIBUNAL-STAGE-UNDERUSED-68](bugs/TRIBUNAL-STAGE-UNDERUSED-68.md) | The builder's Tribunal stage uses fewer than half of the cores it is given | low | v0.0.67 (v0.0.68) | open | - | - | - | Reported in v0.0.67; cause unknown. |
 | [README-STATUS-STALE-SCATTERED-68](bugs/README-STATUS-STALE-SCATTERED-68.md) | The main page's status section is stuck at the previous release and several of its claims no longer match the bug tracker | medium | v0.0.68-dev11 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
-| [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](bugs/MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md) | A video started by a script can always be skipped, also the ones the original plays to the end without a skip | low | v0.0.68-dev11 | open | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
+| [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](bugs/MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md) | A video started by a script can always be skipped, also the ones the original plays to the end without a skip | low | v0.0.68-dev11 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
 | [GC-RUN-WALK-ONE-CORE-68](bugs/GC-RUN-WALK-ONE-CORE-68.md) | The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume) | low | v0.0.68-dev11 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
 | [DIALOGUE-COMPANION-SHARE-MISSING-68](bugs/DIALOGUE-COMPANION-SHARE-MISSING-68.md) | Missing: the talk window has no Companion Share entry for a companion, and there is no share window | medium | v0.0.68-dev11 | open | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
 | [CACHE-KEY-LOOKUP-NO-USE-68](bugs/CACHE-KEY-LOOKUP-NO-USE-68.md) | Reuse keys read by lookup (CHIM units, CHIMport cells, ocean) record no use, so the collector cannot age them | low | v0.0.68-dev11 | open | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
@@ -2526,6 +2527,7 @@ Every dated event of every bug, newest first, from the entries' own data (report
 
 ##### 25 November 2026
 
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev3: Seen again on v0.0.69-dev3: an 18 s stage was flagged as 3.7 times its recorded 5 s.
 - [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: a 28 s stage was flagged as 5.8 times its recorded 5 s.
 - [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
@@ -2533,6 +2535,7 @@ Every dated event of every bug, newest first, from the entries' own data (report
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: a 16 s stage was flagged as 3.4 times its recorded 5 s.
 - [VERSION-BUMP-TOOLKIT-HEADER-67](bugs/VERSION-BUMP-TOOLKIT-HEADER-67.md): seen again in v0.0.69-dev1: Opening v0.0.69, the Toolkit header and the previous-release and size-baseline pins were again left on the old release; the checks caught it late, at the Toolkit check and the delivery smoke.
 - [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md): fixed in source: a gated commit, v0.0.69-dev2 (7dfbbe60); gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69: With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged.
+- [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](bugs/MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md): fixed in source: a gated commit, v0.0.69-dev3 (c7af072f); gate 13203 of the planning item MWSCRIPT-IN-PLAY-PARITY-68: A video a script starts follows its skip argument: with 0 it plays to its end and no key ends it; skippable videos, the startup logo and the debug video stay skippable.
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): fixed in source: a gated commit, v0.0.69-dev1 (1021cef6); gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68: A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image).
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): shipped: a development snapshot, v0.0.69-dev1 (bbcef677a); the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b: the place marker rule is in the published snapshot
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): confirmed in play: an emulator session, v0.0.69-dev1 (1021cef6b); a map check session: a short walk into Raven Rock, then the world map zoomed in: Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk
@@ -8302,6 +8305,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [TOOLKIT-VERSION-CHECK-NO-GIT-64](bugs/TOOLKIT-VERSION-CHECK-NO-GIT-64.md): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build (open, medium)
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](bugs/TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content (open, medium)
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](bugs/TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page (open, low)
+- [TRACK-FIXED-CLOSES-UMBRELLA-HOME-69](bugs/TRACK-FIXED-CLOSES-UMBRELLA-HOME-69.md): The tracker's fix command marks a work item done when any one of its bugs is fixed (open, medium)
 - [TRACK-FIXED-STEPS-WHOLE-HOME-68](bugs/TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit (open, medium)
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](bugs/TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many (open, high)
 - [TRACK-NEW-REGISTER-BEFORE-TODO-68](bugs/TRACK-NEW-REGISTER-BEFORE-TODO-68.md): A fault filed through the tracker intake stays without its planning item while the register renders, and an item made by hand in that time makes the intake refuse its own item as a duplicate (open, medium)

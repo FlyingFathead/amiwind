@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.69-dev3 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -43,13 +43,14 @@ original's, with the disposition bar, the speaker's services and the name on the
 [changelog](docs/CHANGELOG.md). The release before it, **v0.0.67: Tribunal Introduced**, brought Tribunal and Mournhold
 into the game ([its notes](docs/releases/notes/RELEASE-v0.0.67.md)).
 
-The snapshot in development is **v0.0.69-dev3**, the third of v0.0.69: a video a script plays to its end can no longer
-be skipped ([its notes](docs/releases/notes/RELEASE-v0.0.69-dev3.md)). The ones before it:
+The snapshot in development is **v0.0.69-dev4**, the fourth of v0.0.69: the box shown when a load runs out of memory
+names the place instead of the map file ([its notes](docs/releases/notes/RELEASE-v0.0.69-dev4.md)). The ones before it:
+[v0.0.69-dev3](docs/releases/notes/RELEASE-v0.0.69-dev3.md) plays story videos to their end,
 [v0.0.69-dev2](docs/releases/notes/RELEASE-v0.0.69-dev2.md) finds a usable screen mode on more graphics card setups, and
 [v0.0.69-dev1](docs/releases/notes/RELEASE-v0.0.69-dev1.md) shows a place on the world map as soon as any of its own
 cells is explored. The emulator presets are
-[`AmiWind-v0.0.69-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev3-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.69-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev3-WinUAE.uae), both with 32 MB of Fast RAM.
+[`AmiWind-v0.0.69-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev4-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.69-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev4-WinUAE.uae), both with 32 MB of Fast RAM.
 
 ## What already works
 

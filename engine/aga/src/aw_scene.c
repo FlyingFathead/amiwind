@@ -744,6 +744,48 @@ static void place_name(char *out,int size) {
     const char *slash=strrchr(cl.levelname,'/');
     copy_name(out,size,slash?slash+1+(slash[1]==' '):cl.levelname);
 }
+/* LF5-BOX-DESTINATION-MAP-NAME-68: the place's name a map FILE gives (its worldspawn's message, the part after the last
+ * "/" as place_name above takes it), for a load that names only the map (a saved game, a start, a typed map, the game
+ * code's changelevel): the box then says "Balmora", not the file's "balmora". The rule between the markers reads only
+ * the entity text: tests/test_load_place_name.py compiles it on its own. 0 (OUT "") without a message. */
+/* AW-PLACE-TITLE-RULE-BEGIN */
+static int worldspawn_place(const char *text,char *out,int size){
+    const char *end=strchr(text,'}'),*p=text,*q,*s,*slash;int n;
+    if(size<1)return 0;
+    out[0]=0;
+    if(!end)return 0;
+    while((p=strstr(p,"\"message\""))!=NULL && p<end){
+        p+=9;
+        while(*p==' ' || *p=='\t')p++;
+        if(*p!='"')continue;
+        q=strchr(++p,'"');
+        if(!q || q>end)return 0;
+        for(slash=NULL,s=p;s<q;s++)if(*s=='/')slash=s;
+        if(slash)p=slash+1+(slash[1]==' ');
+        n=(int)(q-p);
+        if(n<=0)return 0;
+        if(n>=size)n=size-1;
+        memcpy(out,p,n);out[n]=0;
+        return 1;
+    }
+    return 0;
+}
+/* AW-PLACE-TITLE-RULE-END */
+static int map_place(const char *map,char *out,int size){
+    static char text[1024];char path[MAX_QPATH+24];FILE *f=NULL;unsigned char h[12];long base,at,len;int n=0;
+    if(size>0)out[0]=0;
+    if(!map || !*map || !map_valid(map) || AW_SceneMapSize(map,path,sizeof(path))<124)return 0;
+    if(COM_FOpenFile(path,&f)<0 || !f)return 0;
+    base=ftell(f);
+    if(fread(h,1,12,f)==12){
+        at=(long)h[4]|((long)h[5]<<8)|((long)h[6]<<16)|((long)h[7]<<24);
+        len=(long)h[8]|((long)h[9]<<8)|((long)h[10]<<16)|((long)h[11]<<24);
+        if(at>=124 && len>0 && !fseek(f,base+at,SEEK_SET))
+            n=(int)fread(text,1,len<(long)sizeof(text)-1?(size_t)len:sizeof(text)-1,f);
+    }
+    fclose(f);text[n<0?0:n]=0;
+    return worldspawn_place(text,out,size);
+}
 /* Where the player is now, into E (here_*). */
 static void error_here(aw_loaderr_t *e) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
@@ -949,7 +991,12 @@ void AW_SceneLoadFailed(const char *why) {
             return;
         }
         error_count(why);
-        error_begin(&lerr,AW_LOADERR_ERROR,map_loading_name,"");cause_from_message(&lerr,why);
+        {
+            char place[64];   /* LF5-BOX-DESTINATION-MAP-NAME-68: the map's own place name, not its file label */
+            map_place(map_loading_name,place,sizeof(place));
+            error_begin(&lerr,AW_LOADERR_ERROR,map_loading_name,place);
+        }
+        cause_from_message(&lerr,why);
         /* in play (a save loaded from the game's menu, a changelevel) the chain from the last good position; with no
          * game in play (the main menu) the load menu names the error, as before */
         back=play_spot;back.valid=back.valid && play_now;

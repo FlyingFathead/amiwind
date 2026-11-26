@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.69-dev3 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026](#v0069-dev4-fourth-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev3: third snapshot of v0.0.69, 25 November 2026](#v0069-dev3-third-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev2: second snapshot of v0.0.69, 25 November 2026](#v0069-dev2-second-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev1: first snapshot of v0.0.69, 25 November 2026](#v0069-dev1-first-snapshot-of-v0069-25-november-2026)
@@ -223,6 +224,21 @@ _Last updated with AmiWind v0.0.69-dev3 (25 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026
+
+The fourth development snapshot of v0.0.69 ([release notes](releases/notes/RELEASE-v0.0.69-dev4.md)), the next small
+item of the Known lists. Emulator presets: `AmiWind-v0.0.69-dev4-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev4-WinUAE.uae`,
+both with 32 MB of Fast RAM. The change is covered by tests and the gate of its commit; it has not been seen in play yet.
+
+**Fixed**
+
+- The box shown when a load runs out of memory names the place, read from the map itself as the screen's place name
+  shows it, instead of the map file's label (LF5-BOX-DESTINATION-MAP-NAME-68).
+
+**Known**
+
+- The open items of v0.0.69-dev3 stand ([its Known list](releases/notes/RELEASE-v0.0.69-dev3.md#known-in-this-build)).
 
 ## v0.0.69-dev3: third snapshot of v0.0.69, 25 November 2026
 

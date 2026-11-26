@@ -373,7 +373,7 @@ family links to its list in the register.
 | [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 6 of 16 | The boot check and engine start-up report problems clearly and never stop the game silently. |
 | [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 227 of 311 | QuakeC entities, saves and game state. |
 | [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 90 of 177 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
-| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 73 of 138 | Receipts, packaging, development tools and the tracker itself. |
+| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 74 of 139 | Receipts, packaging, development tools and the tracker itself. |
 
 <!-- END GENERATED FAMILIES -->
 

@@ -20,6 +20,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev3 (c7af072f) | 2026-11-25 | gate 13203 of the planning item MWSCRIPT-IN-PLAY-PARITY-68 | A video a script starts follows its skip argument: with 0 it plays to its end and no key ends it; skippable videos, the startup logo and the debug video stay skippable. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-23: reported in v0.0.68-dev11
+- 2026-11-25: fixed in source: a gated commit, v0.0.69-dev3 (c7af072f); gate 13203 of the planning item MWSCRIPT-IN-PLAY-PARITY-68: A video a script starts follows its skip argument: with 0 it plays to its end and no key ends it; skippable videos, the startup logo and the debug video stay skippable.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
