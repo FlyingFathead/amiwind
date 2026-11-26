@@ -96,6 +96,8 @@ class PlaceTitleWiringTests(unittest.TestCase):
     def test_the_box_prefers_the_place_to_the_map(self):
         box = (ROOT / 'engine/aga/src/aw_loaderr.c').read_text(encoding='utf-8')
         self.assertIn('e->place[0]?e->place:e->map[0]?e->map:"?"', box)
+        # and the map file beside the name (the maintainer, v0.0.69-dev5: both the map file id and the name)
+        self.assertIn('put(&t,", map ");put_clean(&t,e->map);', box)
 
 
 if __name__ == '__main__':

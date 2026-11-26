@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.69: in development, fourth snapshot 25 November 2026](#v0069-in-development-fourth-snapshot-25-november-2026)
+- [v0.0.69: in development, fifth snapshot 26 November 2026](#v0069-in-development-fifth-snapshot-26-november-2026)
 - [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
@@ -120,7 +120,10 @@ _Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.69: in development, fourth snapshot 25 November 2026
+## v0.0.69: in development, fifth snapshot 26 November 2026
+
+The fifth snapshot, [v0.0.69-dev5](releases/notes/RELEASE-v0.0.69-dev5.md), names the place and its map file together
+in the failed-load box.
 
 The fourth snapshot, [v0.0.69-dev4](releases/notes/RELEASE-v0.0.69-dev4.md), takes the next small item: the box shown when
 a load runs out of memory names the place instead of the map file.

@@ -44,12 +44,13 @@ static void boxes(void){
     /* MEMORY-EMERGENCY-PURGE-64, the maintainer's text: the place, the memory figures in KiB, the code; refused before
      * leaving, where he is; after the way back, OK returns him to the place he came in from */
     e=make(AW_LOADERR_MEMORY,"vivec_city","Vivec");e.need=3*1024*1024+1;e.have=512*1024;
-    assert(!strcmp(box(&e),"Not enough memory to load Vivec (needs 3073 KiB, 512 KiB available). Code LF5.\n"
+    assert(!strcmp(box(&e),"Not enough memory to load Vivec, map vivec_city (needs 3073 KiB, 512 KiB available). Code LF5.\n"
                            "You are in Seyda Neen."));
     e.way=AW_WAY_BACK;strcpy(e.back_map,"balmora");
-    assert(!strcmp(box(&e),"Not enough memory to load Vivec (needs 3073 KiB, 512 KiB available). Code LF5.\n"
+    assert(!strcmp(box(&e),"Not enough memory to load Vivec, map vivec_city (needs 3073 KiB, 512 KiB available). Code LF5.\n"
                            "OK returns you to Seyda Neen, where you came in."));
     e.place[0]=0;assert(!strncmp(box(&e),"Not enough memory to load vivec_city (needs",43));   /* no name: the map */
+    strcpy(e.place,"vivec_city");assert(!strncmp(box(&e),"Not enough memory to load vivec_city (needs",43));   /* the same: once */
     strcpy(e.place,"Vivec");
     e.here_place[0]=e.here_map[0]=0;e.here_ok=0;   /* the console's block, before the way back has arrived */
     assert(strstr(box(&e),"\nOK returns you to balmora, where you came in."));

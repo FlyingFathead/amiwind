@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.68-dev3 at 2026-11-21 03:29 +0200: Room batching took 21 seconds while running and was judged against a 5 second figure from a run that only reused it.
 - Reported with v0.0.68-dev4 at 2026-11-21 22:52 +0200: Seen again on a full palette re-bake: the slow-stage check flagged three stages that re-baked all their units, each compared against a time recorded from a run that reused its units.
@@ -11,6 +11,7 @@
 - Reported with v0.0.69-dev1 at 2026-11-25 13:32 +0200: Seen again on v0.0.69-dev1: a 16 s stage was flagged as 3.4 times its recorded 5 s.
 - Reported with v0.0.69-dev2 at 2026-11-25 17:21 +0200: Seen again on v0.0.69-dev2: a 28 s stage was flagged as 5.8 times its recorded 5 s.
 - Reported with v0.0.69-dev3 at 2026-11-25 20:41 +0200: Seen again on v0.0.69-dev3: an 18 s stage was flagged as 3.7 times its recorded 5 s.
+- Reported with v0.0.69-dev4 at 2026-11-25 23:18 +0200: Seen again on v0.0.69-dev4: a 16 s stage was flagged as 3.2 times its recorded 5 s.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -48,13 +49,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-25 13:32 +0200: seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: a 16 s stage was flagged as 3.4 times its recorded 5 s.
 - 2026-11-25 17:21 +0200: seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: a 28 s stage was flagged as 5.8 times its recorded 5 s.
 - 2026-11-25 20:41 +0200: seen again in v0.0.69-dev3: Seen again on v0.0.69-dev3: an 18 s stage was flagged as 3.7 times its recorded 5 s.
+- 2026-11-25 23:18 +0200: seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: a 16 s stage was flagged as 3.2 times its recorded 5 s.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 

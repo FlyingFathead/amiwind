@@ -18,11 +18,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-11-25 23:23 +0200: seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: about five minutes at the start of a reused build (choosing the reusable stages and copying their outputs) have no phase name on the build monitor.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 11 October 2026](#status-11-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

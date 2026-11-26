@@ -1,6 +1,6 @@
 # Bug tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev4._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev5._
 
 The one bug tracker of AmiWind: every bug, its current status, its dated events
 and how it was closed. How tracking works, the report template, the closure
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-2245 bugs: 1313 open, 808 fixed, 124 closed.
+2246 bugs: 1314 open, 808 fixed, 124 closed.
 
 ### Persisting, not resolved
 
@@ -37,12 +37,12 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](bugs/REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5 (reported 9 times, open)
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](bugs/BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (reported 8 times, open)
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](bugs/BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started (reported 8 times, open)
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 8 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 7 times, open)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 7 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
-- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 7 times, open)
 - [TRACKER-REGISTER-SIZE-33](bugs/TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit (reported 7 times, open)
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](bugs/BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages (reported 6 times, fixed)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 6 times, open)
 - [BUILD-UNIT-KEYS-REACH-64](bugs/BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them (reported 6 times, open)
 - [ENGINE-CRASH-EXIT-KEYBOARD-36](bugs/ENGINE-CRASH-EXIT-KEYBOARD-36.md): After AmiWind crashes, the AmigaDOS shell mangles typing: shift/caps latched, M and N never appear (reported 6 times, open)
 - [GATE-SMOKE-NO-REMOTE-CONTROL-60](bugs/GATE-SMOKE-NO-REMOTE-CONTROL-60.md): Gate boot smokes sometimes fail with no remote control after boot (reported 6 times, open)
@@ -169,6 +169,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-PLAYER-VIEW-UNDERUSED-48](bugs/BUILD-PLAYER-VIEW-UNDERUSED-48.md): The image step player view remade all 80 player bodies in every build on four fresh worker pools (2m05s at 16.2 of 24 cores) (reported 2 times, open)
 - [BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52](bugs/BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52.md): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off (reported 2 times, fixed)
 - [BUILD-RESOURCE-PLAN-UNIT-REUSE-66](bugs/BUILD-RESOURCE-PLAN-UNIT-REUSE-66.md): The build's resource plan estimates the wall time as if every unit cache held, while the reuse guard finds them all stale (reported 2 times, open)
+- [BUILD-REUSE-CHECK-ONE-CORE-59](bugs/BUILD-REUSE-CHECK-ONE-CORE-59.md): The reuse check phase runs on one core for several minutes on every full build (reported 2 times, open)
 - [BUILD-REUSE-SCRATCH-UNDECLARED-33](bugs/BUILD-REUSE-SCRATCH-UNDECLARED-33.md): A rerun with --reuse-from reused 1 of 33 stages: the builder's scratch folder made the first stages non-reusable (reported 2 times, fixed)
 - [BUILD-SETUP-ONE-CORE-66](bugs/BUILD-SETUP-ONE-CORE-66.md): A full build spends about five minutes on one core before its first stage starts (reported 2 times, open)
 - [BUILD-SILENT-PHASES-36](bugs/BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail (reported 2 times, open)
@@ -254,12 +255,13 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Three tables: the open bugs, the fixed ones and the closed ones. Each row links the bug's report page.
 
-#### Open (1313)
+#### Open (1314)
 
 Open bugs, most recently noticed first.
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [PERF-SAMPLER-EXITED-NO-OUTPUT-69](bugs/PERF-SAMPLER-EXITED-NO-OUTPUT-69.md) | The performance sampler stopped by itself with an error code and no message | low | v0.0.69-dev4 | open | - | - | - | Reported in v0.0.69-dev4; cause unknown. |
 | [TRACK-FIXED-CLOSES-UMBRELLA-HOME-69](bugs/TRACK-FIXED-CLOSES-UMBRELLA-HOME-69.md) | The tracker's fix command marks a work item done when any one of its bugs is fixed | medium | v0.0.69-dev3 | open | - | - | - | Reported in v0.0.69-dev3; cause unknown. |
 | [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md) | On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start | medium | v0.0.68 | open (fixed in source) | - | - | - | Reported in v0.0.68; cause unknown. |
 | [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](bugs/TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md) | Tests of the Solstheim test route stop the gate when the version is a release | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
@@ -273,7 +275,7 @@ Open bugs, most recently noticed first.
 | [WATER-WALKING-DEEP-CAST-NOT-REFUSED-68](bugs/WATER-WALKING-DEEP-CAST-NOT-REFUSED-68.md) | Water Walking cast deep under the water is applied and lifts the player to the surface, where the original refuses the effect | low | v0.0.68-dev12 | open | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
 | [WATER-RIPPLES-UNDER-ACTORS-MISSING-68](bugs/WATER-RIPPLES-UNDER-ACTORS-MISSING-68.md) | No ripples on the water: a swimmer at the surface or a player walking on water leaves no rings of ripples, which the original draws | medium | v0.0.68-dev12 | open | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
 | [ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68](bugs/ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68.md) | A room whose models do not fit is reported as a general load error, without the memory it needs and has | medium | v0.0.68-dev12 (found in source) | open (fixed in source) | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
-| [LF5-BOX-DESTINATION-MAP-NAME-68](bugs/LF5-BOX-DESTINATION-MAP-NAME-68.md) | When a load runs out of memory, the box writes the target as an internal file label instead of its in-game place | low | v0.0.68-dev12 | open | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
+| [LF5-BOX-DESTINATION-MAP-NAME-68](bugs/LF5-BOX-DESTINATION-MAP-NAME-68.md) | When a load runs out of memory, the box writes the target as an internal file label instead of its in-game place | low | v0.0.68-dev12 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
 | [JOURNAL-TOPIC-LETTER-INDEX-68](bugs/JOURNAL-TOPIC-LETTER-INDEX-68.md) | The journal's Topics view lists every topic in one scrolling list instead of the original's A to Z letter index | low | v0.0.68-dev12 | open | - | - | - | Open. The topic pages and their links work; the letter index is missing. |
 | [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](bugs/IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md) | The image step's per-map memory check reads only the main island's frame maps: Solstheim's and Mournhold's frame maps are not checked with their store index and the other memory users at 32 MB | medium | v0.0.68-dev12 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev12; cause unknown. |
 | [PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68](bugs/PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68.md) | The public progress snapshot accepts a build's raw tracker data without readiness counts and writes rooms 0 of 0 and no build history | medium | v0.0.68-dev11 | open | - | - | - | Reported in v0.0.68-dev11; cause unknown. |
@@ -2527,6 +2529,10 @@ Every dated event of every bug, newest first, from the entries' own data (report
 
 ##### 25 November 2026
 
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
+- [TOOLKIT-MONITOR-BLIND-PHASES-36](bugs/TOOLKIT-MONITOR-BLIND-PHASES-36.md): seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: about five minutes at the start of a reused build (choosing the reusable stages and copying their outputs) have no phase name on the build monitor.
+- [BUILD-REUSE-CHECK-ONE-CORE-59](bugs/BUILD-REUSE-CHECK-ONE-CORE-59.md): seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the first six minutes of a reused build ran on about one core before the image step.
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: a 16 s stage was flagged as 3.2 times its recorded 5 s.
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev3: Seen again on v0.0.69-dev3: an 18 s stage was flagged as 3.7 times its recorded 5 s.
 - [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: a 28 s stage was flagged as 5.8 times its recorded 5 s.
@@ -2539,6 +2545,7 @@ Every dated event of every bug, newest first, from the entries' own data (report
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): fixed in source: a gated commit, v0.0.69-dev1 (1021cef6); gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68: A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image).
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): shipped: a development snapshot, v0.0.69-dev1 (bbcef677a); the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b: the place marker rule is in the published snapshot
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): confirmed in play: an emulator session, v0.0.69-dev1 (1021cef6b); a map check session: a short walk into Raven Rock, then the world map zoomed in: Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk
+- [LF5-BOX-DESTINATION-MAP-NAME-68](bugs/LF5-BOX-DESTINATION-MAP-NAME-68.md): fixed in source: a gated commit, v0.0.69-dev4 (9e2ef18d); gate 13204 of the planning item MEMORY-EMERGENCY-PURGE-64: The failed-load box names the place, read from the map itself, instead of the map file's label.
 
 ##### 24 November 2026
 
@@ -7218,6 +7225,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [BENCH-SESSION-DRIFT-32](bugs/BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions (open, low)
 - [EMU-JIT-FAULT-ADDRESS-36](bugs/EMU-JIT-FAULT-ADDRESS-36.md): FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke (open, low)
 - [EMU-WARP-STARVES-GAME-CPU-67](bugs/EMU-WARP-STARVES-GAME-CPU-67.md): In the emulator's warp mode the game gets far less processor time per second of its own clock, so its frames take seconds of game time (open, low)
+- [PERF-SAMPLER-EXITED-NO-OUTPUT-69](bugs/PERF-SAMPLER-EXITED-NO-OUTPUT-69.md): The performance sampler stopped by itself with an error code and no message (open, low)
 - [TEST-GHOSTGATE-ARRIVAL-FACES-ROCK-67](bugs/TEST-GHOSTGATE-ARRIVAL-FACES-ROCK-67.md): The in-game check's still of Ghostgate shows a slope of rock: the test stood at the place label's point and looked away from the fortress (open, low)
 - [BENCH-AWBENCH-BUFFERS-32](bugs/BENCH-AWBENCH-BUFFERS-32.md): awbench reported the stale buffer count after AddBuffers (fixed, low)
 - [BENCH-FSUAE-FREQ-32](bugs/BENCH-FSUAE-FREQ-32.md): FS-UAE ignores uae_cpu_frequency in cycle-exact mode (closed, low)

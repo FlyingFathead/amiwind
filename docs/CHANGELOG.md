@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev5: fifth snapshot of v0.0.69, 26 November 2026](#v0069-dev5-fifth-snapshot-of-v0069-26-november-2026)
 - [v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026](#v0069-dev4-fourth-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev3: third snapshot of v0.0.69, 25 November 2026](#v0069-dev3-third-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev2: second snapshot of v0.0.69, 25 November 2026](#v0069-dev2-second-snapshot-of-v0069-25-november-2026)
@@ -224,6 +225,22 @@ _Last updated with AmiWind v0.0.69-dev4 (25 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.69-dev5: fifth snapshot of v0.0.69, 26 November 2026
+
+The fifth development snapshot of v0.0.69 ([release notes](releases/notes/RELEASE-v0.0.69-dev5.md)). Emulator presets:
+`AmiWind-v0.0.69-dev5-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev5-WinUAE.uae`, both with 32 MB of Fast RAM. The change is
+covered by tests and the gate of its commit.
+
+**Fixed**
+
+- The box shown when a load runs out of memory names the place first and its map file beside it ("Vivec, map
+  vivec_city"); once when there is no name or the two are the same (LF5-BOX-DESTINATION-MAP-NAME-68).
+
+**Known**
+
+- The open items of v0.0.69-dev4 stand ([its Known list](releases/notes/RELEASE-v0.0.69-dev4.md#known-in-this-build));
+  the build monitor's unnamed start-up phases are traced and planned (TOOLKIT-MONITOR-BLIND-PHASES-36).
 
 ## v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026
 

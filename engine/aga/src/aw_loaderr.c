@@ -104,7 +104,10 @@ int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
     else if(e->kind==AW_LOADERR_NO_POINT)putf_long(&t,"No map holds the point %ld %ld",(long)e->x,(long)e->y);
     else if(memory(e)){
         /* MEMORY-EMERGENCY-PURGE-64, the maintainer's text: the place that did not fit and the memory figures */
-        put(&t,"Not enough memory to load ");put_clean(&t,e->place[0]?e->place:e->map[0]?e->map:"?");   /* the place by name */
+        /* the place by name and its map file beside it (the maintainer, v0.0.69-dev5: "both, the internal map file id
+         * and the name"); one of them when there is no name or they are the same */
+        put(&t,"Not enough memory to load ");put_clean(&t,e->place[0]?e->place:e->map[0]?e->map:"?");
+        if(e->place[0] && e->map[0] && strcmp(e->place,e->map)){put(&t,", map ");put_clean(&t,e->map);}
         putf_long(&t," (needs %ld KiB, %ld KiB available)",kb(e->need),kb(e->have));
     }
     else{put(&t,"Map ");put_map(&t,e);put(&t,not_found(e->kind)?" was not found":" was found but could not be loaded");}

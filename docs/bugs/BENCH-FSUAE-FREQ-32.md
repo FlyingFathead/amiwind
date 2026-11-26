@@ -80,6 +80,7 @@ Family: Emulator measurement method (`benchmark-method`). Emulator numbers are r
 - [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
 - [EMU-JIT-FAULT-ADDRESS-36](EMU-JIT-FAULT-ADDRESS-36.md): FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke
 - [EMU-WARP-STARVES-GAME-CPU-67](EMU-WARP-STARVES-GAME-CPU-67.md): In the emulator's warp mode the game gets far less processor time per second of its own clock, so its frames take seconds of game time
+- [PERF-SAMPLER-EXITED-NO-OUTPUT-69](PERF-SAMPLER-EXITED-NO-OUTPUT-69.md): The performance sampler stopped by itself with an error code and no message
 - [TEST-GHOSTGATE-ARRIVAL-FACES-ROCK-67](TEST-GHOSTGATE-ARRIVAL-FACES-ROCK-67.md): The in-game check's still of Ghostgate shows a slope of rock: the test stood at the place label's point and looked away from the fortress
 
 <!-- END GENERATED CATEGORY -->

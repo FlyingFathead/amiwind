@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 7 times; something has to be done
 
 - Reported with v0.0.53 at 2026-10-27 07:45 +0200: Seen again: the v0.0.53 final run 2026_10_27_v0.0.53_final_45f4c426 ran its image stage under half its cores with units queued, 4 times (the build summary Needs attention item)
 - Reported with v0.0.64-dev1 at 2026-11-10 05:31 +0200: dev1 build of 4bd67418: the image step's hidden-surface cull walked its 1,136 maps at about one core (107 percent of 24)
@@ -10,6 +10,7 @@
 - Reported with v0.0.68-dev3 at 2026-11-21 05:51 +0200: Seen again in the v0.0.68-dev3 build: the image step's early phases ran on under half its cores for about five minutes.
 - Reported with v0.0.69-dev1 at 2026-11-25 13:34 +0200: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - Reported with v0.0.69-dev2 at 2026-11-25 17:32 +0200: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
+- Reported with v0.0.69-dev4 at 2026-11-25 23:26 +0200: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -48,6 +49,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 - 2026-11-25 13:34 +0200: seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - 2026-11-25 17:32 +0200: seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
+- 2026-11-25 23:26 +0200: seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -56,7 +58,7 @@ _Last updated with AmiWind v0.0.64-dev2 (10 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 10 November 2026](#status-10-november-2026)
 - [Symptom](#symptom)

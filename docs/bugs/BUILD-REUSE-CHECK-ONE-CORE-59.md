@@ -1,5 +1,14 @@
 # BUILD-REUSE-CHECK-ONE-CORE-59: The reuse check phase runs on one core for several minutes on every full build
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.62-dev2 at 2026-11-07 21:34 +0200: Seen again in the v0.0.62-dev2 builds (2026_11_07_v0.0.62-dev2_full-v0.0.62-dev2_ca39212 and its -try2): the check phase "Verifying game files, containers and reference hashes" ran on one core (100 % of 1 of 24) for over 2 min 40 s each time, the machine otherwise idle.
+- Reported with v0.0.69-dev4 at 2026-11-25 23:21 +0200: Seen again on v0.0.69-dev4: the first six minutes of a reused build ran on about one core before the image step.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -27,8 +36,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-03: reported in v0.0.59
 - 2026-11-07 21:34 +0200: seen again in v0.0.62-dev2: Seen again in the v0.0.62-dev2 builds (2026_11_07_v0.0.62-dev2_full-v0.0.62-dev2_ca39212 and its -try2): the check phase "Verifying game files, containers and reference hashes" ran on one core (100 % of 1 of 24) for over 2 min 40 s each ...
+- 2026-11-25 23:21 +0200: seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the first six minutes of a reused build ran on about one core before the image step.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
