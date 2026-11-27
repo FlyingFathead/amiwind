@@ -1035,14 +1035,44 @@ MOVING_GROUPS = ('walk', 'run', 'sneak', 'swimwalk', 'swimrun', 'jump')
 ROOT_BONE = 'bip01'
 
 
-def hold_in_place(pos, bones, groups, root=ROOT_BONE):
+def moving_group(name):
+    """Whether a table group is a moving one (MOVING_GROUPS), by its own name: a group appended under a view prefix
+    ('f:walkforward', the female walk; 'd:...', an NPC's own animation file) is its source's group of that name
+    (NPC-WALK-RUBBERBAND-69: asked by the table name alone, the prefixed female walk was never held in place, so a
+    woman's drawn body went a stride ahead of her position in every walk cycle and jumped back at its end)."""
+    return name.rsplit(':', 1)[-1].startswith(MOVING_GROUPS)
+
+
+# The accumulation root by name, in priority order (rule from OpenMW file apps/openmw/mwrender/animation.cpp, "Determine
+# the movement accumulation bone": bip01 is preferred, else root bone, the first of them the animation moves).
+ACCUM_ROOTS = (ROOT_BONE, 'root bone')
+
+
+def accumulation_root(pos, bones):
+    """The bone whose horizontal travel is the game's, not the animation's (ACCUM_ROOTS): the first of the names the
+    table has and whose position changes at all; the first it has when none changes; None when it has neither. A
+    creature whose root is named root bone (the netch, the slaughterfish) is held like a humanoid on bip01
+    (NPC-WALK-RUBBERBAND-69: only bip01 was asked, so such a creature's walk kept its whole travel)."""
+    have = [n for n in ACCUM_ROOTS if n in bones]
+    for name in have:
+        b = bones.index(name)
+        if len(pos) and np.any(pos[:, b] != pos[0, b]):
+            return name
+    return have[0] if have else None
+
+
+def hold_in_place(pos, bones, groups, root=None):
     """In place, the root bone's horizontal (x, y) travel within each moving group taken out, relative to the group's
-    first frame; its height (the body's bob) is kept. pos: [frame][bone] positions (sample_table)."""
-    if root not in bones:
+    first frame; its height (the body's bob) is kept. pos: [frame][bone] positions (sample_table). A group under a
+    view prefix is held like its source's group (moving_group). root: the bone to hold; None = the table's
+    accumulation root (accumulation_root)."""
+    if root is None:
+        root = accumulation_root(pos, bones)
+    if root is None or root not in bones:
         return
     b = bones.index(root)
     for name, (first, last) in groups.items():
-        if name.startswith(MOVING_GROUPS):
+        if moving_group(name):
             pos[first:last + 1, b, :2] = pos[first, b, :2]
 
 

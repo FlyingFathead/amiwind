@@ -20,6 +20,7 @@ LEGACY_PLAN = (
     ('setup', 'mwad.py'), ('terrain', 'mwad.py'), ('scenery', 'prepare_scenery.py'), ('scene', 'prepare_quake.py'),
     ('bsp', 'prepare_mesh_bsp.py'), ('npcs', 'prepare_npcs.py'), ('hands', 'prepare_hands.py'),
     ('interior', 'prepare_interior.py'), ('dialogue-lookup', 'prepare_dialogue_lookup.py'),
+    ('talk', 'talk_pack.py'),   # the skeletal characters' mouths (NPC-TALK-MOUTH-STILL-69): the game data only
     ('intro', 'prepare_intro.py'), ('census', 'prepare_census.py'), ('npc-gallery', 'build_gallery.py'),
     ('area', 'prepare_area.py'), ('balmora', 'prepare_balmora.py'),
     ('balmora-interiors', 'prepare_balmora_interiors.py'),
@@ -39,7 +40,8 @@ LEGACY_IMAGE_OPTIONS = (
     '--file-aliases', '--gallery', '--halloween', '--hand-catalog', '--hands', '--harvest', '--hidden-surface-cull',
     '--jobs', '--light',
     '--local-skybox', '--map-budget-policy', '--media', '--music', '--out', '--qbsp', '--qcc', '--rdbtool', '--scene',
-    '--sdk', '--shared-shapes', '--shared-skins', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis',
+    '--sdk', '--shared-shapes', '--shared-skins', '--talk', '--town-flora-scene-report', '--town-flora-source-index',
+    '--town-scenery', '--vis',
     '--world-bounds', '--world-flora', '--world-scenery', '--xdftool')
 # --world-bounds: a game setting for every builder (default on); --file-aliases / --shared-skins: the payload pass of
 # every image, on by default since v0.0.47 (--shared-shapes since v0.0.63; --skin-tiles is off by default); --halloween: the Halloween scene's cast in every full-world image (v0.0.54,

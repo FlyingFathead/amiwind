@@ -163,8 +163,14 @@ int AW_MoveSuperspeed(void);
  * game's maximum for a skill and an unfortified attribute) and the player's fatigue is filled every move
  * (aw_combat.c AW_CombatPlayerFatigueFill): endless stamina. The character sheet is never written. */
 #define AW_MOVE_SUPERSPEED_STAT 100.0f
-/* SNEAK-58: 1 while the player sneaks (the sneak key held, on foot, not swimming, not in noclip). */
+/* SNEAK-58: 1 while the player sneaks (the sneak key, on foot, not swimming, not in noclip). */
 int AW_MoveSneaking(void);
+/* PLAYER-SNEAK-NOT-HELD-69: the sneak key's press, in play with the player's controls allowed (cl_input.c IN_SneakDown):
+ * with aw_sneak_toggle 1 (the default) it turns the sneak on or off; with 0 the key is held. AW_MoveSneakOn / Set: the
+ * toggled state (New Game clears it, aw_loadfail.c). */
+void AW_MoveSneakPress(void);
+int AW_MoveSneakOn(void);
+void AW_MoveSneakSet(int on);
 /* MWSCRIPT-GAP-FUNCTIONS-62: 1 while a script's ForceSneak holds the player in the sneak stance (aw_mwhost.c). */
 extern int aw_move_force_sneak;
 /* MWSCRIPT-GAPS-63: 1 while a script's ForceRun makes the player run (aw_mwhost.c). */

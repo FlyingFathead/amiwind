@@ -236,7 +236,8 @@ class EngineWiring(unittest.TestCase):
         for axis in range(3):
             self.assertIn('pmdl->scale[%d] * R_AliasAxisScale(currententity, %d)' % (axis, axis), alias)
         self.assertIn('posed_table = NULL', alias)
-        self.assertRegex(alias, r'if \(table != posed_table \|\| key != posed_key')
+        # the bones' key (a speaking NPC's talk level keys its vertices only, NPC-TALK-MOUTH-STILL-69)
+        self.assertRegex(alias, r'if \(table != posed_table \|\| bones_key != posed_key')
         render = (SRC / 'render.h').read_text(encoding='utf-8')
         self.assertIn('float aw_alias_zscale;', render)
 

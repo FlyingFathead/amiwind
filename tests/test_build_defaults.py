@@ -35,6 +35,8 @@ SHIPPED_STAGES = {
     'hand-catalog': 'per-race hands (progs/hands, hand-models.awh, hand-torch.awt)',
     'harvest': 'harvestable mushrooms (harvest-*.txt, progs/harvest/*.mdl)',
     'interior': 'interiors', 'dialogue-lookup': 'voice lookup', 'intro': 'opening, chargen captions',
+    # the skeletal characters' mouths: the original heads' Talk morph (talk.awt; NPC-TALK-MOUTH-STILL-69)
+    'talk': 'talk pack (talk.awt)',
     # NPC Gallery v2.0 (NPC-GALLERY-V2, v0.0.54): no npc-gallery stage; the image step lists the actors the build made
     # (gallery/actors.txt). The baked gallery's stage (gallery/*.mdl, 7,102 files) runs with --npc-gallery-method baked.
     'census': 'census map',
@@ -98,6 +100,7 @@ SHIPPED_IMAGE_OPTIONS = {
     '--books': str(RUN / 'books'),
     '--chargen': str(RUN / 'chargen'),
     '--item-models': str(RUN / 'item-models'),
+    '--talk': str(RUN / 'talk'),
     '--harvest': str(RUN / 'harvest'),
     '--hidden-surface-cull': 'true',
     '--local-skybox': 'false',

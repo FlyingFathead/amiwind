@@ -1211,6 +1211,7 @@ static void noburden_command(void){
 /* MWSCRIPT-TRAY-SMOKE-58: what the last refused space check met (the map, or an entity's number and model), for
  * the test route's refusal line (aw_inventory drop) */
 static char space_blocker[80];
+static void drops_command(void);   /* aw_inventory drops [look N] (DROP-REFUSED-CENSUS-ROOM-67), below */
 void AW_InventoryGrantCommand(void){
     aw_inventory_item_t item;int n;
     /* ALCHEMY-61: aw_inventory use "ID" and aw_inventory alchemy ... (aw_alchemy.c), no resident command of their own */
@@ -1316,6 +1317,8 @@ void AW_InventoryGrantCommand(void){
         Con_Printf("DIAGNOSTIC inventory drop: %s -%d, now %ld.\n",item.id,n,(long)AW_StateGet(&aw_state,AW_ITEM,item.id));
         return;
     }
+    if(cmd_source==src_command && sv.active && svs.maxclients==1 && (Cmd_Argc()==2 || Cmd_Argc()==4) &&
+       !Q_strcasecmp(Cmd_Argv(1),"drops")){drops_command();return;}
     if(cmd_source!=src_command || !sv.active || svs.maxclients!=1 || Cmd_Argc()!=4 || Q_strcasecmp(Cmd_Argv(1),"grant"))return;
     n=Q_atoi(Cmd_Argv(3));
     if(n<1 || n>999 || !AW_InventoryRead(Cmd_Argv(2),&item)){Con_Printf("Diagnostic inventory grant refused: not a catalogue item, or a count outside 1 to 999.\n");return;}
@@ -1550,9 +1553,40 @@ static int inv_feet_drop(edict_t *p,const float mins[3],const float maxs[3],floa
     VectorCopy(tr.endpos,position);position[2]-=mins[2];position[2]+=.0625f;
     return inv_trace_support(position,mins,maxs,p);
 }
+/* aw_inventory drops [look N] (DROP-REFUSED-CENSUS-ROOM-67, test sessions, as aw_inventory drop): the world change
+ * list's drops this map shows, nearest the eye first (name, item, position, distance, the row's place: room, cell or
+ * scene); look N turns the view to the Nth (0 the nearest) as aw_aim does, so a session can take it again with E. */
+static void drops_command(void){
+    int order[AW_INVENTORY_DROPS],n=0,i,j,k,r;float d[AW_INVENTORY_DROPS],dist;edict_t *p,*e;vec3_t eye,delta;
+    if(!aw_ledger_on || !svs.clients || !(p=svs.clients[0].edict)){Con_Printf("aw_inventory drops: the world change list is off.\n");return;}
+    inv_level();VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
+    for(i=0;i<map_drop_count && n<AW_INVENTORY_DROPS;i++){
+        if(!(e=map_drops[i].e) || e->free)continue;
+        VectorSubtract(e->v.origin,eye,delta);dist=(float)sqrt(DotProduct(delta,delta));
+        for(j=n;j>0 && d[j-1]>dist;j--){d[j]=d[j-1];order[j]=order[j-1];}
+        d[j]=dist;order[j]=i;n++;
+    }
+    if(Cmd_Argc()==4){
+        k=atoi(Cmd_Argv(3));
+        if(Q_strcasecmp(Cmd_Argv(2),"look") || k<0 || k>=n){Con_Printf("aw_inventory drops look N: %d drops shown here.\n",n);return;}
+        e=map_drops[order[k]].e;VectorSubtract(e->v.origin,eye,delta);
+        cl.viewangles[1]=(float)(atan2(delta[1],delta[0])*180/M_PI);
+        cl.viewangles[0]=(float)(-atan2(delta[2],sqrt(delta[0]*delta[0]+delta[1]*delta[1]))*180/M_PI);   /* down is +pitch */
+        cl.viewangles[2]=0;VectorCopy(cl.viewangles,p->v.angles);p->v.fixangle=1;
+        Con_Printf("aw_inventory drops look: %s at %.0f units.\n",map_drops[order[k]].label,d[k]);return;
+    }
+    Con_Printf("Drops shown on this map: %d (the world change list holds %d rows).\n",n,aw_ledger.count);
+    for(i=0;i<n;i++){
+        e=map_drops[order[i]].e;r=AW_LedgerFind(&aw_ledger,map_drops[order[i]].key);
+        Con_Printf("  %d: %s (%s) at %.0f %.0f %.0f, %.0f units, %s %ld\n",i,map_drops[order[i]].label,
+                   r>=0 && aw_ledger.row[r].extra?aw_ledger.row[r].extra->item:"?",e->v.origin[0],e->v.origin[1],
+                   e->v.origin[2],d[i],r<0?"no row":aw_ledger.row[r].at==AW_AT_ROOM?"room":
+                   aw_ledger.row[r].at==AW_AT_CELL?"cell":"scene",r<0?0L:(long)aw_ledger.row[r].where);
+    }
+}
 int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     edict_t *p,*e;trace_t tr;vec3_t forward,right,up,eye,start,end,position,mins,maxs,low,high,swept_low,swept_high,point;
-    int model,index,j,corner,chim;float yaw;
+    int model,index,j,corner,chim,ahead;float yaw;
     drop_reason="Cannot drop this item here; kept.";
     if(!item || !(item->flags&AW_INV_DROP) || !sv.active || svs.maxclients!=1 ||
        !svs.clients || !(p=svs.clients[0].edict) || p->v.health<=0 ||
@@ -1560,9 +1594,17 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     /* Point traces include streamed/scenery/barrier collision, but the full
      * footprint query below currently certifies only BSP world/brush volumes.
      * Refuse that unsupported context before model/entity/ownership admission.
-     * CELL-CHANGES-59: with the world change list a CHIM map's drop is checked by point traces (inv_trace_support). */
+     * CELL-CHANGES-59: with the world change list a CHIM map's drop is checked by point traces (inv_trace_support).
+     * DROP-REFUSED-CENSUS-ROOM-67 (v0.0.69): that refusal is the old fixed tables' alone. With the world change list
+     * (the default) every area kind takes a drop: the point traces see the streamed, the room and the scenery
+     * collision (SV_Move, world.c: AW_SceneryClip), and the boxes that clip only the player (aw_barrier.c: the
+     * opening's and the world's invisible walls) are checked on the drop's path below. The story's hold
+     * (AW_StoryRestricted, CharGenState 0 or over: the prison ship up to the census office's exit door) refused every
+     * drop here, the census office's rooms included, where the original's inventory is open from the papers on
+     * (CharGenStatsSheet's EnableInventoryMenu; AW_StoryInventoryAllowed) and nothing holds a drop back: OpenMW 0.53
+     * mwgui/hud.cpp onWorldClicked and worlditemmodel.hpp dropItemImpl, World::placeObject / dropObjectOnGround. */
     chim=Chim_Active();
-    if((chim && !aw_ledger_on) || AW_SceneryCount()>0 || AW_StoryRestricted()){
+    if(!aw_ledger_on && (chim || AW_SceneryCount()>0 || AW_StoryRestricted())){
         drop_reason="Cannot place items in this area yet; kept.";return 0;
     }
     if(!aw_ledger_on){     /* the old fixed table: 32 drops (the world change list has no such ceiling) */
@@ -1577,11 +1619,22 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     start[2]=eye[2];
     /* The forward start must not teleport the drop beyond an intervening wall. */
     tr=SV_Move(eye,vec3_origin,vec3_origin,start,MOVE_NORMAL,p);
-    if(tr.startsolid || tr.allsolid || tr.fraction<1){drop_reason="Drop path obstructed; kept.";return 0;}
-    VectorCopy(start,end);end[2]-=256;
-    tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
-    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
-       SV_PointContents(tr.endpos)<=CONTENTS_WATER){drop_reason="No dry floor for item; kept.";return 0;}
+    ahead=!tr.startsolid && !tr.allsolid && tr.fraction>=1;
+    if(!ahead && !aw_ledger_on){drop_reason="Drop path obstructed; kept.";return 0;}
+    /* DROP-REFUSED-CENSUS-ROOM-67: nor beyond an invisible wall (a box that clips only the player, aw_barrier.c). With
+     * the world change list a spot ahead that cannot take the item is no refusal: the item goes on the floor under
+     * the player (below), as the original's drop does when the cursor's spot cannot (OpenMW 0.53 worlditemmodel.hpp
+     * dropItemImpl: canPlaceObject, else World::dropObjectOnGround at the actor's own position). */
+    if(ahead && aw_ledger_on && AW_BarrierPointBlocked(eye,start))ahead=0;
+    if(ahead){
+        VectorCopy(start,end);end[2]-=256;
+        tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+        if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
+           SV_PointContents(tr.endpos)<=CONTENTS_WATER){
+            if(!aw_ledger_on){drop_reason="No dry floor for item; kept.";return 0;}
+            ahead=0;
+        }else if(aw_ledger_on && AW_BarrierPointBlocked(start,tr.endpos))ahead=0;
+    }
     yaw=p->v.v_angle[1];point[0]=point[2]=0;point[1]=yaw;AngleVectors(point,forward,right,up);
     for(j=0;j<3;j++){mins[j]=32768;maxs[j]=-32768;}
     for(corner=0;corner<8;corner++){
@@ -1606,7 +1659,7 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
      * Census Office floor), so with the world change list a room is checked by the same point traces */
     if(chim || aw_ledger_on){
         drop_reason="Item footprint unsupported; kept.";
-        if(!inv_trace_support(position,mins,maxs,p) && !inv_feet_drop(p,mins,maxs,position))return 0;
+        if(!(ahead && inv_trace_support(position,mins,maxs,p)) && !inv_feet_drop(p,mins,maxs,position))return 0;
     }else{
     drop_reason="Item path or footprint obstructed; kept.";
     if(!inv_space_clear(swept_low,swept_high,p) || !inv_space_clear(low,high,p))return 0;
@@ -3464,12 +3517,35 @@ static void focus_refresh(const edict_t *p){
  * Cost: one point trace along the reach a call; a room ray only for the few rows that already pass the origin test. */
 /* CENSUS-CRAB-PLATE-FOCUS-66: the reference of the edict the view ray from EYE along F meets first within REACH (its
  * aw_ref; 0 for the world, nothing, or an edict without one) and in *HIT the distance to that point (map units) */
+static edict_t *view_met;   /* CENSUS-SHELF-PLATE-BAKED-67: the edict the last view trace met (NULL none, the world) */
 static unsigned view_reference(edict_t *p,vec3_t eye,vec3_t f,float reach,float *hit){
     vec3_t end;trace_t tr;eval_t *v;
-    *hit=-1;
+    *hit=-1;view_met=NULL;
     VectorMA(eye,reach,f,end);
     tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
     if(tr.startsolid || !(tr.fraction<1) || !tr.ent || tr.ent==sv.edicts || tr.ent==p)return 0;
+    view_met=tr.ent;
+    v=GetEdictFieldValue(tr.ent,"aw_ref");
+    if(!v || !(v->_float>0) || !(v->_float<16777216.0f))return 0;
+    *hit=tr.fraction*reach;
+    return (unsigned)v->_float;
+}
+/* CENSUS-SHELF-PLATE-BAKED-67: a compiled room's furniture collides as the convex hull of its shape, so the census
+ * office's bookshelf (reference 119541) is solid over its open front and the Limeware Platter standing in it (119554,
+ * an item brush of its own with its focus row) was never met by the view ray: the box showed nothing and E took
+ * nothing, the opening's classic first theft. The original's focus ray meets the drawn shapes, not the collision
+ * (OpenMW 0.53 worldimp.cpp getFocusObject: castCameraToViewportRay), so it meets the platter on the shelf. One more
+ * trace along the same ray past HOLDER (the edict the view trace met, passed over): the reference of the edict met next
+ * when that point lies in HOLDER's box (an item standing in the furniture), 0 else; *HIT its distance from the eye. An
+ * item behind the furniture (outside its box) stays hidden, and one met first always wins (placed_target: nearest). */
+static unsigned view_inner_reference(edict_t *holder,vec3_t eye,vec3_t f,float reach,float *hit){
+    vec3_t end;trace_t tr;eval_t *v;int k;
+    *hit=-1;
+    if(!holder)return 0;
+    VectorMA(eye,reach,f,end);
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,holder);
+    if(tr.startsolid || !(tr.fraction<1) || !tr.ent || tr.ent==sv.edicts || tr.ent==holder)return 0;
+    for(k=0;k<3;k++)if(tr.endpos[k]<holder->v.absmin[k]-1 || tr.endpos[k]>holder->v.absmax[k]+1)return 0;
     v=GetEdictFieldValue(tr.ent,"aw_ref");
     if(!v || !(v->_float>0) || !(v->_float<16777216.0f))return 0;
     *hit=tr.fraction*reach;
@@ -3488,8 +3564,8 @@ static int scripted_board(const focus_row_t *row){
     return row->kind=='N' && aw_inventory_takes_use && aw_inventory_takes_use(row->reference);
 }
 static int placed_target(void){
-    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit,rank,view_hit;edict_t *p;
-    vec3_t f,r,u,eye,delta,at;unsigned view_ref;
+    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit,rank,view_hit,inner_hit;
+    edict_t *p;vec3_t f,r,u,eye,delta,at;unsigned view_ref,inner_ref;
     trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     focus_refresh(p);
@@ -3498,6 +3574,7 @@ static int placed_target(void){
     if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
     nearest=reach;placed_aim=-1;
     view_ref=view_reference(p,eye,f,reach,&view_hit);
+    inner_ref=view_inner_reference(view_met,eye,f,reach,&inner_hit);   /* CENSUS-SHELF-PLATE-BAKED-67 */
     for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
         if(row->edict || AW_ObjectDisabled(row->reference))continue;
@@ -3511,6 +3588,13 @@ static int placed_target(void){
         if((row->kind=='I' || row->kind=='C') && row->live && view_ref && row->reference==view_ref){
             if(view_hit>nearest)continue;
             nearest=view_hit;best=i;continue;
+        }
+        /* CENSUS-SHELF-PLATE-BAKED-67: an item drawn as an edict of its own standing in the furniture the view ray met
+         * first (view_inner_reference: the Limeware Platter in the census office's bookshelf) is aimed at where the
+         * ray meets it past that furniture; anything met before it still wins (the nearest) */
+        if(row->kind=='I' && row->live && inner_ref && row->reference==inner_ref && inner_ref!=view_ref){
+            if(inner_hit>nearest)continue;
+            nearest=inner_hit;best=i;continue;
         }
         /* the ray asked only of drawn rows whose origin is within the reach and 64 units (the longest item) */
         if(row->kind=='I' && row->drawn>0 && aw_placed_ray && length<=(reach+64)*(reach+64) &&
@@ -3583,9 +3667,12 @@ void AW_PlacedAimReport(void){
     Con_Printf("aw_placed aim: reach %.0f, %d rows (%s), eye %.0f %.0f %.0f, aimed row %d\n",reach,focus_count,
                focus_outdoor?"outdoors":"room",eye[0],eye[1],eye[2],best);
     /* CENSUS-CRAB-PLATE-FOCUS-66: what the view ray meets first (an edict the map draws with its reference) */
-    {float view_hit;unsigned view_ref=view_reference(p,eye,f,reach,&view_hit);
+    {float view_hit,inner_hit;unsigned view_ref=view_reference(p,eye,f,reach,&view_hit),inner_ref;
      if(view_ref)Con_Printf("aw_placed aim: the view ray meets reference %u first, at %.1f\n",view_ref,view_hit);
-     else Con_Printf("aw_placed aim: the view ray meets no edict with a reference within the reach\n");}
+     else Con_Printf("aw_placed aim: the view ray meets no edict with a reference within the reach\n");
+     /* CENSUS-SHELF-PLATE-BAKED-67: and what stands in that furniture behind its hull */
+     if((inner_ref=view_inner_reference(view_met,eye,f,reach,&inner_hit))!=0)
+         Con_Printf("aw_placed aim: in it, the ray meets reference %u at %.1f\n",inner_ref,inner_hit);}
     /* PRISON-SHIP-ITEMS-TAKEABLE-65: the text overlay the aimed placed object gets now, as AW_SceneDraw takes it (the
      * name from AW_PlacedFocus, the action line from AW_ItemPrompt): "overlay none" before the papers */
     {const char *name=NULL;char w[48],v[48],line[48];int owned=0,steal=0,named,acting;

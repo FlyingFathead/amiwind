@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.69-dev5._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.69-dev6._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -276,4 +276,5 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |
 | `dbg showram` | - | on/off |
+| `dbg speech` | - | (the voice lines playing now: speaker, sound, where the mouth timing comes from (the .lip beside it or its samples), level and pose frame; then the talk pack's counts and memory. A/B, not saved: aw_speech_envelope 0 = baked .lip only; aw_talk_skeletal 0 = skeletal mouths shut) |
 | `dbg sweep` | - | [actors/plants/doors/lights/statics] each entity class of the loaded area: what the image ships (map entities, door bank, harvest catalogue) against what is live; names each failure (actor without model or animation, disabled but drawn, harvestable but not pickable, door without a link; hidden ones counted); last line SWEEP RESULT ok/FAIL (read only) |

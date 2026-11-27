@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -129,7 +129,8 @@ selected spell, [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)), and after `dbg recorder` 
 `aw_key_inv_info`, P: the item information box; [INVENTORY.md](INVENTORY.md)); P there opens the box, not the Stats
 window. In the dialogue window Up and Down move the highlighted topic or answer, Enter
 picks it and Tab switches to the conversation text, where Up and Down scroll it. Weapon sway has two styles, the
-AmiWind groove and a stiff one with still hands. Greyed rows are planned
+AmiWind groove and a stiff one with still hands. Sneak key: Toggle (the default: one press sneaks, the next stands
+up) or Hold (sneak while the key is held), the console's `aw_sneak_toggle` 1 or 0. Greyed rows are planned
 actions (quick keys) with their intended
 keys. They become selectable when the action exists. The action table
 and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
@@ -150,7 +151,7 @@ is tracked in [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
 | (unbound) | `+left` / `+right` | Keyboard turn; mouse turns by default. Earlier saved key files keep Left / Right as turn. |
 | Space | `+jump` | Jump |
 | Shift | `+speed` | Run; faster noclip flight |
-| Ctrl | `+aw_sneak` | Sneak while held (the original's default key, Left Ctrl): slower walking by the game's sneak speed setting, no running, a lower view, sneaking fatigue and the original's sneak indicator beside the HUD boxes; not while swimming. In debug noclip it is the fast-flight key (twice Shift flight speed). Older saved key files that bound `+aw_fastflight` get `+aw_sneak` on that key. |
+| Ctrl | `+aw_sneak` | Sneak (the original's default key, Left Ctrl): one press starts sneaking, the next press stands up (since v0.0.69; Options > Controls "Sneak key: Hold", or `aw_sneak_toggle 0`, sneaks only while the key is held, as the original). Sneaking: slower walking by the game's sneak speed setting, no running, a lower view, sneaking fatigue, the third-person body's sneak groups and the original's sneak indicator beside the HUD boxes; not while swimming (out of the water the sneak goes on). Menus do not end it; New Game does. In debug noclip it is the fast-flight key (twice Shift flight speed) and a press changes no sneak. Older saved key files that bound `+aw_fastflight` get `+aw_sneak` on that key. |
 | E | `+aw_use` | Use / interact; up in noclip. On a book, scroll or letter ("E: Read", red when it belongs to someone) E opens the reader: Left / Right, Up / Down or Page Up / Page Down turn the pages, E takes it ("E: Take", or "E: Steal" in red), Esc closes it; the mouse clicks both buttons. Reading is free. Magic scrolls are taken without reading. The texts come from the game data (build stage `books`, `tools/prepare_books.py`: id1/books.awb, read one book at a time). |
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |

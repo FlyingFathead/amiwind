@@ -33,6 +33,22 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 
 While fighting a guard in Seyda Neen, the maintainer still hears ordinary
@@ -140,6 +156,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
 - [NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58](NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58.md): NPCs never say their Intruder or Thief lines: the voice table holds them for 2,654 NPCs, but no engine event says them
+- [NPC-VOICE-ON-EFFECTS-VOLUME-69](NPC-VOICE-ON-EFFECTS-VOLUME-69.md): NPC voice lines from the voice table and script Say play at the effects volume, not the dialogue volume
 - PLAYER-FOOTSTEPS-NONE-58 (no report page): The player has no footstep sounds: only NPCs play them, and there is no setting for the player's own
 - [PUNCH-AUDIO-COVERAGE-29](PUNCH-AUDIO-COVERAGE-29.md): Original punch swing/hit sound coverage unverified
 - [SOUND-MARKERS-SILENT-48](SOUND-MARKERS-SILENT-48.md): The original's sound markers are placed but silent: 2,163 in Morrowind (187 outdoors in 78 cells, 1,976 in 434 rooms), water under the Khuul pier, creaking under bridges and boats

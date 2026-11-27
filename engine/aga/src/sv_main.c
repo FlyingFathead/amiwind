@@ -1307,9 +1307,12 @@ SV_SendClientMessages
 void SV_SendClientMessages (void)
 {
     int			i;
+    void		AW_ItemsPreSend (void);		/* aw_items.c (declared here: a build stage reads aw_items.h) */
 
 // every humanoid group by its state (aw_animkit.c): the picked frames go out, the drivers' come back below
     AW_AnimPickPreSend ();
+// held items and carried lights on the hand of the frame that goes out (NPC-WEAPON-GRIP-WRONG-69): after the pick
+    AW_ItemsPreSend ();
 // update frags, names, etc
     SV_UpdateToReliableMessages ();
 

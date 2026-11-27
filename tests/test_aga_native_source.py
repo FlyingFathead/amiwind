@@ -855,7 +855,43 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run("aga_actor_step_test.c", [Path(SOURCE)/"src/sv_move.c",Path(SOURCE)/"src/mathlib.c"])
 
     def test_speech_clock_end_interrupt_and_missing_envelope(self):
-        self.compile_run("aga_speech_test.c", [ROOT/"engine/aga/src/aw_speech.c"])
+        # NPC-TALK-MOUTH-STILL-69: also a pool voice line (a script's Say, the voice table's lines) on a speaker with the
+        # talk poses gets its envelope from its samples, and aw_speech_envelope 0 keeps the previous method
+        self.compile_run("aga_speech_test.c", [ROOT/"engine/aga/src/aw_speech.c"],
+                         cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_every_started_sound_hands_its_samples_to_the_speech_tracks(self):
+        # NPC-TALK-MOUTH-STILL-69 (broken by 49449ba84, v0.0.62): S_StartSound passes the loaded samples, so a voice line
+        # without a .lip beside it (sound/pool/a<hash>.wav) still drives the speaker's talk poses
+        source = (Path(SOURCE)/'src/snd_dma.c').read_text(encoding='utf-8')
+        self.assertIn('AW_SpeechStartPcm(entnum,entchannel,sfx->name,paintedtime,sc->length,shm->speed,'
+                      '(int)target_chan->pos,sc->data,sc->width);', source)
+        self.assertNotIn('AW_SpeechStart(entnum,', source)
+        speech = (ROOT/'engine/aga/src/aw_speech.c').read_text(encoding='utf-8')
+        self.assertIn('cvar_t aw_speech_envelope={"aw_speech_envelope","1",false,false,1};', speech)
+        debug = (ROOT/'engine/aga/src/aw_debug.c').read_text(encoding='utf-8')
+        self.assertIn('Cvar_RegisterVariable(&aw_speech_envelope);Cmd_AddCommand("aw_speech_status",speech_status);', debug)
+
+    def test_skeletal_npc_mouth_from_the_talk_pack(self):
+        # NPC-TALK-MOUTH-STILL-69, NPC-TALK-POSES-ONLY-OPENING-69: a skeletal NPC's head vertices follow the original
+        # head's Talk morph from the talk pack (tools/talk_pack.py) while it speaks
+        self.compile_run("aga_talkpack_test.c", [ROOT/"engine/aga/src/aw_talkpack.c"],
+                         cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_talk_pack_wired_into_speech_renderer_and_debug(self):
+        # the speech tracks ask the pack for a skeletal speaker's head; the alias renderer keys the pose by the talk
+        # level and poses the talking vertices again; aw_debug.c sets the hooks (NULL in the other fixtures)
+        speech = (ROOT/'engine/aga/src/aw_speech.c').read_text(encoding='utf-8')
+        self.assertIn('(talker(entity) || (aw_speech_talker && aw_speech_talker(entity,&head)))', speech)
+        alias = (ROOT/'engine/aga/src/r_alias.c').read_text(encoding='utf-8')
+        self.assertIn('talk = R_AliasTalkLevel ? R_AliasTalkLevel (currententity) : 0;', alias)
+        self.assertIn('R_AliasTalkApply (currententity, paliashdr, &block, (const float (*)[3][4])world, '
+                      '(unsigned char *)slot->verts);', alias)
+        self.assertIn('bones_key != posed_key', alias)
+        debug = (ROOT/'engine/aga/src/aw_debug.c').read_text(encoding='utf-8')
+        self.assertIn('aw_speech_talker=AW_TalkTalker;R_AliasTalkLevel=AW_TalkLevelOf;R_AliasTalkApply=AW_TalkApplyOf;',
+                      debug)
+        self.assertIn('aw_talkpack.c', (ROOT/'engine/aga/Makefile').read_text(encoding='utf-8'))
 
     def test_path_grid_collision_stop_and_escort_wait(self):
         self.compile_run("aga_nav_test.c", [ROOT/"engine/aga/src/aw_nav.c",Path(SOURCE)/"src/mathlib.c"])
@@ -1180,6 +1216,20 @@ class NativeSourceTests(unittest.TestCase):
         # ramps, lips and drops under aw_step_rules 0 (Quake, the default) and 1 (Morrowind's rules as OpenMW's).
         self.compile_run('aga_step_rules_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
                                                    Path(SOURCE)/'src/mathlib.c'])
+
+    def test_actor_step_slides_where_the_player_walks_and_settles_back_on_held_ground(self):
+        # CHIM-COLLISION-WALKS-67 / ACTOR-STEP-STEEP-CONTACT-REFUSED-69: the real walk (aw_walk.c, sv_phys.c) at the
+        # foot of a too-steep face and off a crate's steep edge: the player slides on, the actor step under
+        # aw_actor_steep 0 (the method before) is refused, under 1 (the default) it slides on, never up the face nor off
+        # a ledge higher than OpenMW's 64-unit ground test; AW_ActorGroundSettle puts a walker back on held ground.
+        self.compile_run('aga_actor_walk_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
+                                                   Path(SOURCE)/'src/mathlib.c'],
+                         cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+        ambient = (ROOT/'engine/aga/src/aw_ambient.c').read_text(encoding='utf-8')
+        self.assertIn('ground_back(s);', ambient)
+        self.assertIn('AW_AmbientGroundMove(ground_at(s->e->v.origin),ground_at(there)', ambient)
+        world = (ROOT/'engine/aga/src/chim/chim_world.c').read_text(encoding='utf-8')
+        self.assertIn('aw_chim_ground = Ground;', world)
 
     def test_water_walking_holds_the_player_on_the_surface(self):
         # WATER-WALKING-NOT-ON-SURFACE-68: the real walk (aw_walk.c, sv_phys.c) over a synthetic sea. With a Water

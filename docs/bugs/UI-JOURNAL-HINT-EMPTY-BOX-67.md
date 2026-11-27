@@ -1,5 +1,14 @@
 # UI-JOURNAL-HINT-EMPTY-BOX-67: An empty box flashes after the first journal hint has gone: the frame stays on screen for a moment without its text
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67 at 2026-11-20 15:22 +0200: The empty frame appeared again in the opening, at the clerk's desk of the Census and Excise Office, near the end of the first conversation. It had been reported before.
+- Reported with v0.0.69-dev5 at 2026-11-26 17:55 +0200: Seen again in v0.0.69-dev5: after the duties choice the journal hint still shows an empty rectangle in front of the key name.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,12 +33,29 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev5 (687262d4) | 2026-11-26 | gate 13360 of the planning item UI-JOURNAL-HINT-EMPTY-BOX-67 | a timed notice's blank rows are never a page of their own and the strip draws its box only while it has text, so the journal hint leaves no empty box |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-17: reported in v0.0.66
 - 2026-11-20 15:22 +0200: seen again in v0.0.67: The empty frame appeared again in the opening, at the clerk's desk of the Census and Excise Office, near the end of the first conversation.
+- 2026-11-26: fixed in source: a gated commit, v0.0.69-dev5 (687262d4); gate 13360 of the planning item UI-JOURNAL-HINT-EMPTY-BOX-67: a timed notice's blank rows are never a page of their own and the strip draws its box only while it has text, so the journal hint leaves no empty box
+- 2026-11-26 17:55 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: after the duties choice the journal hint still shows an empty rectangle in front of the key name.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

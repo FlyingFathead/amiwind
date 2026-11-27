@@ -599,7 +599,10 @@ static void inventory_action(int action){
         /* First stage drops one real item; repeated actions preserve stack count.
          * No deletion occurs when the world placement/model/entity is refused. */
         ok=AW_InventoryDropHere(item,1);
-        strcpy(inventory->message,ok?"Dropped one item.":AW_InventoryDropReason());
+        /* DROP-REFUSED-CENSUS-ROOM-67: the refusal's reason (which check, "kept.") only with the debug HUD on (dbg all);
+         * the player reads a plain line (the console's aw_inventory drop always prints the reason) */
+        strcpy(inventory->message,ok?"Dropped one item.":AW_DebugOverlaysEnabled()?AW_InventoryDropReason():
+               "This item cannot be dropped here.");
     }
     inventory->context=0;inventory_refresh();inventory_said();
 }

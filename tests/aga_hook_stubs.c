@@ -146,6 +146,10 @@ WEAK int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,
 WEAK float AW_ActivateDistance(void){return 48;}
 WEAK int AW_ConsoleWidth(void){return 38;}   /* aw_console.c: dbg give weapons lines its table up to it */
 WEAK int AW_MoveSneaking(void){return 0;}   /* aw_move.c (SNEAK-58): the HUD's sneak indicator asks it */
+/* aw_move.c (PLAYER-SNEAK-NOT-HELD-69): the sneak key's press (cl_input.c) and the toggled state (aw_loadfail.c's reset) */
+WEAK void AW_MoveSneakPress(void){}
+WEAK int AW_MoveSneakOn(void){return 0;}
+WEAK void AW_MoveSneakSet(int on){(void)on;}
 WEAK float (*aw_view_sneak)(void);   /* view.c's hook (SNEAK-58), for fixtures with aw_move.c and no view.c */
 /* WATER-WALKING-NOT-ON-SURFACE-68: aw_walk.c's Water Walking hook and aw_combat.c's effect hook, which aw_move.c sets
  * and asks, for fixtures with aw_move.c and neither of them (NULL: no hook) */
@@ -158,6 +162,10 @@ WEAK void AW_MwscriptRoomShift(float shift[3]){shift[0]=shift[1]=shift[2]=0;}
 WEAK int AW_SourceToWorld(const char *name,const float *world,float *local){(void)name;(void)world;(void)local;return 0;}
 /* aw_mwhost.c: the world change list's answer, which the solid boxes read (aw_barrier.c, OPENING-BARRIERS-PER-BOX-68) */
 WEAK int AW_ObjectDisabled(unsigned int reference){(void)reference;return 0;}
+/* DROP-REFUSED-CENSUS-ROOM-67: aw_barrier.c's answer for a drop's point path; a fixture without it has no boxes */
+WEAK int AW_BarrierPointBlocked(const float *start,const float *end){(void)start;(void)end;return 0;}
+/* aw_hud.c's debug HUD switch (dbg all), which the inventory window's drop reason reads: off without aw_hud.c */
+WEAK int AW_DebugOverlaysEnabled(void){return 0;}
 WEAK int AW_WorldToSource(const char *name,const float *local,float *world){(void)name;(void)local;(void)world;return 0;}
 WEAK void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned){(void)name;(void)line2;(void)line3;(void)owned;}
 WEAK void AW_InventorySpawn(void){}

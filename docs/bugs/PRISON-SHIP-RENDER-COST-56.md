@@ -259,5 +259,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 Related bugs in other categories:
 
 - [AW-20260928-01](AW-20260928-01.md): Prison ship to deck transition is intermittently very slow or freezes (FS-UAE)
+- [PRISON-SHIP-DRESSING-LEFT-OUT-69](PRISON-SHIP-DRESSING-LEFT-OUT-69.md): The Imperial Prison Ship leaves out 80 of the original's small decorations (ropes, hooks, hanging baskets, bones)
 
 <!-- END GENERATED CATEGORY -->

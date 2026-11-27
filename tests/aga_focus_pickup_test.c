@@ -87,11 +87,21 @@ int SV_PointContents(vec3_t p){(void)p;assert(0);return 0;}
 /* CENSUS-CRAB-PLATE-FOCUS-66: the view trace (the whole reach, 48 map units from the eye) meets edict view_entity at
  * view_fraction when it is set; a sight test to a row's origin (about 20 units) and everything else are clear */
 static int view_entity;static float view_fraction;
+/* CENSUS-SHELF-PLATE-BAKED-67: furniture (edict view_entity) whose collision hull holds an item: the trace past it
+ * (passing it over) meets edict inner_entity at inner_fraction, and while holder_blocks is set the sight test to a
+ * row's origin meets the furniture half way (its hull in front of the item) */
+static int inner_entity,holder_blocks;static float inner_fraction;
 trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t *pass){
-    trace_t tr;vec3_t d;(void)mins;(void)maxs;(void)type;(void)pass;
+    trace_t tr;vec3_t d;(void)mins;(void)maxs;(void)type;
     memset(&tr,0,sizeof(tr));tr.fraction=1;VectorCopy(end,tr.endpos);
     VectorSubtract(end,start,d);
+    if(view_entity && pass==&entities[view_entity]){
+        if(inner_entity && DotProduct(d,d)>40*40){
+            tr.fraction=inner_fraction;tr.ent=&entities[inner_entity];VectorMA(start,inner_fraction,d,tr.endpos);}
+        return tr;
+    }
     if(view_entity && DotProduct(d,d)>40*40){tr.fraction=view_fraction;tr.ent=&entities[view_entity];}
+    else if(view_entity && holder_blocks){tr.fraction=.5f;tr.ent=&entities[view_entity];}
     return tr;
 }
 static void put32(byte *p,unsigned long v){p[0]=(byte)v;p[1]=(byte)(v>>8);p[2]=(byte)(v>>16);p[3]=(byte)(v>>24);}
@@ -460,6 +470,26 @@ int main(void){
     /* an edict whose reference no row has (the crab meat's row then has no edict: not drawn): the plate */
     refs[3]._float=(float)(CRAB+1);level(0);sv.num_edicts=4;view_entity=3;view_fraction=19.5f/48;
     assert(AW_InventoryUse() && take_reference==(int)PLATE);
+    /* CENSUS-SHELF-PLATE-BAKED-67: the census office's Limeware Platter standing in its bookshelf. The shelf (edict 4,
+     * a compiled room's furniture brush with its own reference and no focus row) collides as its convex hull, over its
+     * open front: the view ray meets the shelf at 15 units, the sight line to the platter's origin meets it too. The
+     * old aim took nothing there; the original's focus ray meets the drawn platter on the shelf. Past the shelf, the
+     * ray meets the platter (here the plate's row, edict 2) at 20 units, inside the shelf's box: E takes it. */
+    refs[3]._float=(float)CRAB;ref_edicts=3;refs[4]._float=119541.0f;
+    level(0);sv.num_edicts=5;view_entity=4;view_fraction=15.0f/48;holder_blocks=1;inner_entity=2;inner_fraction=20.0f/48;
+    entities[4].v.absmin[0]=10;entities[4].v.absmin[1]=-5;entities[4].v.absmin[2]=0;
+    entities[4].v.absmax[0]=30;entities[4].v.absmax[1]=5;entities[4].v.absmax[2]=40;
+    assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    assert(AW_InventoryUse() && take_reference==(int)PLATE);
+    /* an item the ray meets past the furniture but outside its box (behind it, 40 units out): not aimed, nothing taken */
+    level(0);sv.num_edicts=5;view_entity=4;view_fraction=15.0f/48;holder_blocks=1;inner_entity=2;inner_fraction=40.0f/48;
+    entities[4].v.absmin[0]=10;entities[4].v.absmin[1]=-5;entities[4].v.absmin[2]=0;
+    entities[4].v.absmax[0]=30;entities[4].v.absmax[1]=5;entities[4].v.absmax[2]=40;
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_InventoryUse() && !taken);
+    /* nothing in the furniture: nothing aimed (the shelf has no row of its own) */
+    level(0);sv.num_edicts=5;view_entity=4;view_fraction=15.0f/48;holder_blocks=1;inner_entity=0;
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !taken);
+    holder_blocks=0;inner_entity=0;
     stacked=0;ref_edicts=0;view_entity=0;
     puts("Placed pickup through the use key's path: box, take, no second take, no box for an item the room leaves out; "
          "the placed list draws the left-out item by reference and it is taken the same way.");

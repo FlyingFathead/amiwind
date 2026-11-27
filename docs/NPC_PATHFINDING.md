@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -515,6 +515,41 @@ wanders near the spot it starts on. Memory: 16 bytes an entity (9,600 bytes); no
 prints each actor's route start (`home`), and `chim actors ambient` counts the placements told, the packages started
 away from their placement and the running ones given the destination where their actor stands. Kept by
 `tests/aga_ambient_test.c` (Fargoth's compiled package as the v0.0.67-dev2 build has it) and `tests/test_ambient_lut.py`.
+
+**Where the collision does not hold the ground (v0.0.69, `CHIM-COLLISION-WALKS-67`, `AMBIENT-WALK-STUCK-COLLISION-54`).**
+The original runs every actor within its processing range on its cell's own collision: OpenMW 0.51 keeps the 3 x 3
+cells around the player's in the physics (`components/misc/constants.hpp` `CellGridRadius` 1; `apps/openmw/mwworld/scene.cpp`
+loads each active cell's height field and objects) and processes actors within 7,168 units of the player
+(`apps/openmw/mwmechanics/actors.cpp`, the actors processing range; `aipackage.cpp` stops a mover only next to an
+inactive cell, which that range never reaches, a cell being 8,192 units across). A CHIM exterior holds the ground in its
+collision only around the player: the chunks grafted into the frame world (`chim_graft.c`), in the 32 MB towns 14
+chunks, the nearest chunk without ground about 400 map units (1,600 original units) away. A resident farther out found
+nothing under its step and stood at its placement until the player came near. Measured on the v0.0.69-dev5 image (its
+own engine, 32 MB Fast, 60 s in each town from one spot): in Seyda Neen 5 of the 10 residents with a moving package
+stood, every one for this reason, and in Balmora 8 of 16; of the steps refused in a minute, 1,051 of 1,287 (Seyda Neen)
+and 1,074 of 1,146 (Balmora) were of this kind, each checked on the frame's own collision: the ground was there, at the
+resident's feet. Now such a walker on its routes walks them without the collision: straight to each waypoint (the
+original's path grid, which the original walks on its own collision), its height going evenly to the waypoint's (the
+compiled points are offsets from the reference's authored height, which the build moved onto the ground: the offset is
+taken back), and when its ground is held again it is set on the floor once (up at most 16 under its headroom, down at
+most 32, as the spawn's bounded snap). A walk without a route (a spot near the start, a travel's or a follow's straight
+leg) waits there: nothing can be seen in its way. No trace is made for such a walker (in the Balmora minute the old way
+made 11,597 traces for 440 steps taken and 1,146 refused). `chim actors ambient offground on` is the default (written into `id1/default-game.cfg`);
+`chim actors ambient offground off` gives the old way back; `chim actors ambient` counts the route steps without the
+collision, the waits and the settles, and `chim actors ambient list` marks a walker off the collision `offground`.
+Memory: 5 bytes a resident slot, nothing resident besides.
+
+**A too-steep face under a walker (v0.0.69, `ACTOR-STEP-STEEP-CONTACT-REFUSED-69`).** The actor's step held only on a
+walkable floor, so a resident whose box touched the foot of a rock or a wall, or a crate's steep edge, stopped where
+the player walks on (32 to 61 refused steps a minute per town in the same sessions). Now the step follows OpenMW 0.51's
+rules for such a face (`apps/openmw/mwphysics/movementsolver.cpp`): a step into it slides along it level, as along a
+wall (279-287), never up it (363-370); a step that did not rise and has the face under it within OpenMW's ground test
+(`sStepSizeDown` 62 + 2 x `sGroundOffset`, 64 original units) holds when the point under the box's centre has walkable
+ground within that test too, and gravity takes the actor down the face in its next steps. A ledge higher than that is
+still not walked off. `chim actors ambient steep on` is the default (`id1/default-game.cfg`), `off` the old way. Kept by
+`tests/aga_actor_walk_test.c` (the engine's own walk on synthetic shapes: at the foot of a face the player and the new
+step pass, the old step is refused at once; off a crate's 11.2-unit steep edge the new step reaches the street, the old
+one stays on top; a 40-unit ledge holds both) and `tests/aga_ambient_test.c`.
 
 Not done yet (said so, not invented): occupied destinations (flyers and swimmers move since v0.0.57, below); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position

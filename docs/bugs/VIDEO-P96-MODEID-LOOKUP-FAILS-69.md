@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.69-dev2 (7dfbbe60) | 2026-11-25 | gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69 | With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged. |
+| shipped | the v0.0.69-dev2 development build | v0.0.69-dev2 (7dfbbe60f, build 2026_11_25_v0.0.69-dev2_full-v0.0.69-dev2_7dfbbe6) | 2026-11-25 | the delivered build holds the commit; pushed as GitHub main c41223898 | the screen-mode search with the native screen as fallback is in a numbered build; a tester's log of the screen-mode lines on a graphics card setup is still needed to confirm it |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-25: reported in v0.0.68
 - 2026-11-25: fixed in source: a gated commit, v0.0.69-dev2 (7dfbbe60); gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69: With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged.
+- 2026-11-25: shipped: the v0.0.69-dev2 development build, v0.0.69-dev2 (7dfbbe60f, build 2026_11_25_v0.0.69-dev2_full-v0.0.69-dev2_7dfbbe6); the delivered build holds the commit; pushed as GitHub main c41223898: the screen-mode search with the native screen as fallback is in a numbered build; a tester's log of the screen-mode lines on a graphics card setup is still needed to confirm it
 
 <!-- END GENERATED TIMELINE -->
 

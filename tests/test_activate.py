@@ -267,6 +267,22 @@ class ActivateSourceTests(unittest.TestCase):
         self.assertIn('the view ray meets reference %u first', report)
         self.assertIn('if(shown>=12 && i!=best)continue;', report)
 
+    def test_an_item_standing_in_furniture_is_aimed_past_its_hull(self):
+        # CENSUS-SHELF-PLATE-BAKED-67: the census office's Limeware Platter (119554) stands inside its bookshelf's
+        # collision hull (119541, the hull over the shelf's open front), so the view ray met the shelf and the sight line
+        # to the platter's origin met it too: no box, E took nothing. One more trace past the furniture met first: the
+        # item met inside the furniture's box is aimed (the host C test aga_focus_pickup_test.c takes it)
+        inner = body('aw_inventory.c', 'static unsigned view_inner_reference(')
+        self.assertIn('tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,holder);', inner)
+        self.assertIn('tr.endpos[k]<holder->v.absmin[k]-1 || tr.endpos[k]>holder->v.absmax[k]+1', inner)
+        self.assertIn('view_met=tr.ent;', body('aw_inventory.c', 'static unsigned view_reference('))
+        placed = body('aw_inventory.c', 'static int placed_target(void){')
+        self.assertIn('inner_ref=view_inner_reference(view_met,eye,f,reach,&inner_hit);', placed)
+        self.assertIn("if(row->kind=='I' && row->live && inner_ref && row->reference==inner_ref && inner_ref!=view_ref){",
+                      placed)
+        self.assertIn('nearest=inner_hit;best=i;continue;', placed)
+        self.assertIn('in it, the ray meets reference %u at %.1f', body('aw_inventory.c', 'void AW_PlacedAimReport(void){'))
+
     def test_the_rules_file_is_built(self):
         self.assertIn('aw_activate_rules.c', (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8'))
 

@@ -26,6 +26,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-10-10: reported in v0.0.33
 - 2026-10-10: HARVEST-BITTERCOAST-29 and HARVEST-PLANTS-IN-COLLISION-33: HARVEST-BITTERCOAST-29: seen again in v0.0.33 at the same Bitter Coast cluster.
+- 2026-11-26 18:00 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5 in Seyda Neen: the bungler's bane and hypha facia mushrooms on a tree are drawn inside its trunk, out of sight.
 
 <!-- END GENERATED TIMELINE -->
 

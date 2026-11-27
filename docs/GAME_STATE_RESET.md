@@ -1,6 +1,6 @@
 # Game state reset and failed loads
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 ## One reset for every game state
 
@@ -10,7 +10,8 @@ else resets a game.
 
 A state is anything a game changes that a fresh start does not have: the story stage, script globals and quest
 stages, the world change list (objects taken, placed, moved, locked, lights and fires switched), effects, the
-character, scene loads in progress, message boxes, the no-burden debug mode (`dbg noburden`).
+character, scene loads in progress, message boxes, the no-burden debug mode (`dbg noburden`), the sneak switched on by
+the sneak key (`aw_sneak_toggle`).
 
 ### Registering a new state
 

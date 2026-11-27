@@ -22,6 +22,7 @@ extern void (*aw_chim_clip)(vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, 
 extern void (*aw_chim_player)(vec3_t origin);			/* aw_walk.c */
 extern int (*aw_chim_frozen)(edict_t *ent);				/* aw_walk.c, called by sv_phys.c */
 extern int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);	/* aw_walk.c: the terrain floor (chim_far.c) */
+extern int (*aw_chim_ground)(const float *origin);		/* aw_walk.c: the collision holds the ground there (CHIM-COLLISION-WALKS-67) */
 extern void (*aw_chim_spawn)(vec3_t origin);			/* aw_scene.c */
 extern const char *(*aw_chim_town_map)(const char *town);	/* aw_region.c */
 extern int (*aw_chim_entity)(char **data);				/* pr_edict.c: a streamed static taken (chim_statics.c) */

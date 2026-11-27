@@ -1,6 +1,6 @@
 # Intro script mapping — v0.0.18-dev2
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 The owned base master and its ordered script/voice records are authoritative.
 Private conversion writes `intro-conversion.json` with extracted scripts, source
@@ -53,6 +53,34 @@ keys with root XY displacement removed. This is amplitude synchronization, not
 phoneme/viseme recognition. Legacy eight-frame actors remain supported. Final packed models were checked:
 talk alters 111–161 vertices and blink alters 8–20 vertices across the ten
 appearances, so byte quantization retains both effects.
+
+Since v0.0.62 the census office's people speak through their own scripts
+(`Say`) and every voiced character's greetings, idle and combat lines come
+from the voice table; both play the shared voice files of the media pool,
+which have no envelope beside them, so the clerk's mouth stayed shut while he
+spoke (NPC-TALK-MOUTH-STILL-69). Since v0.0.69 a voice line without a baked
+envelope gets one from its own loaded samples when its speaker's model carries
+the talk poses, by the builder's rule (four levels at 25 a second, the 95th
+percentile as the peak): measured on the 21 opening lines that have both, 96.8 %
+of the 2,128 bins equal the baked envelope and every bin is within one level.
+This follows the original's rule: while an actor says anything, in the world
+or in a conversation, its head's talk morph follows the loudness of the line
+playing. `aw_speech_envelope 0` keeps the baked envelopes only, for an A/B;
+`dbg speech` shows each playing line, where its timing comes from and the
+speaker's pose.
+
+Every other character is drawn from a skeletal actor model, which had no talk
+poses. Since v0.0.69 their mouths move too: the build's talk stage
+(`tools/talk_pack.py`) reads the original heads' Talk morph from the game data
+(the 162 heads of the three masters that carry it) and writes `talk.awt`: per
+head, the vertices the morph moves and the still ones around them, in the head
+bone's space, at the three open levels; per character, its head. While a
+character speaks, its model's head vertices near the mouth take those offsets
+(each from the original vertices around it, worked out once per model) and are
+posed again through the head bone. A character whose helmet takes the head's
+place has no entry, as the original draws no head under it. The game holds at
+most about 60 KB for this, whatever the town. `aw_talk_skeletal 0` switches it
+off for an A/B; `dbg speech` also shows the pack's counts.
 
 ## Light, time, ambience and music
 

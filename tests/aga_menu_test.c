@@ -21,6 +21,8 @@ static int own_cursor;   /* the menu's own (AmiWind) cursor strokes drawn: AW_UI
 static float combat_miss=1,combat_dice=1,combat_block=0;   /* the shipped defaults (COMBAT-BLOCK-DEFAULT-62: automatic block) */
 /* Controls > Weapon sway (aw_fp_sway, FP-WEAPON-SWAY-61: 1 AmiWind groove, the default; 2 Morrowind stiff). */
 static float fp_sway=1;
+/* Controls > Sneak key (aw_sneak_toggle, PLAYER-SNEAK-NOT-HELD-69: 1 Toggle, the default; 0 Hold). */
+static float sneak_toggle=1;
 /* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
 static float far_detail=4;static int far_sets;
 /* Video > Tree crowns (aw_tree_crowns, chim_world.c; default 0 = original). */
@@ -45,6 +47,7 @@ float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
     if(!strcmp(name,"aw_fp_sway"))return fp_sway;
+    if(!strcmp(name,"aw_sneak_toggle"))return sneak_toggle;
     if(!strcmp(name,"m_pitch"))return pitch_value;
     if(!strcmp(name,"aw_player_footsteps"))return player_steps;
     if(!strcmp(name,"aw_tree_crowns"))return tree_crowns;
@@ -63,6 +66,7 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}
     if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
     if(!strcmp(name,"aw_combat_block")){combat_block=value;return;}
+    if(!strcmp(name,"aw_sneak_toggle")){sneak_toggle=value;return;}
     if(!strcmp(name,"aw_combat_best_attack")){best_attack=value;return;}
     for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
@@ -247,8 +251,10 @@ static void check_controls(void){
  M_Keydown(K_ENTER);M_Keydown('W');assert(!strcmp(keybindings['w'],"+forward") && !strcmp(keybindings['k'],"+forward"));
  M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
  for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
- up(1);assert(highlight_y==150 && scroll_total==32 && scroll_top==25); /* Reset to defaults is the last row (Stats, Magic and Sneak rows included) */
+ up(1);assert(highlight_y==150 && scroll_total==33 && scroll_top==26); /* Reset to defaults is the last row (Stats, Magic and Sneak rows and the Sneak key option included) */
  M_Keydown(K_ENTER);assert(!strcmp(queued,"exec keymaps-default.cfg\n"));changes--;
+ /* Sneak key above it (PLAYER-SNEAK-NOT-HELD-69): Toggle by default; Enter and the arrows switch Toggle / Hold */
+ M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(sneak_toggle==0);M_Draw();M_Keydown(K_RIGHTARROW);assert(sneak_toggle==1);
  /* Weapon sway above it (FP-WEAPON-SWAY-61): Enter and the arrows switch AmiWind groove / Morrowind stiff */
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(fp_sway==2);M_Draw();M_Keydown(K_RIGHTARROW);assert(fp_sway==1);
  /* Blocking, Dice rolls, Combat style above it: Enter and the arrows switch the three options */

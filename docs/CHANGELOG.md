@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev6: sixth snapshot of v0.0.69, 26 November 2026](#v0069-dev6-sixth-snapshot-of-v0069-26-november-2026)
 - [v0.0.69-dev5: fifth snapshot of v0.0.69, 26 November 2026](#v0069-dev5-fifth-snapshot-of-v0069-26-november-2026)
 - [v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026](#v0069-dev4-fourth-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev3: third snapshot of v0.0.69, 25 November 2026](#v0069-dev3-third-snapshot-of-v0069-25-november-2026)
@@ -225,6 +226,42 @@ _Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.69-dev6: sixth snapshot of v0.0.69, 26 November 2026
+
+The sixth development snapshot of v0.0.69, "Fix The World After You Put It Together" ([release notes](releases/notes/RELEASE-v0.0.69-dev6.md)). Emulator presets:
+`AmiWind-v0.0.69-dev6-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev6-WinUAE.uae`, both with 32 MB of Fast RAM. Every change is
+covered by tests and the gate of its commit; none has been seen in play yet.
+
+**Fixed**
+
+- Walking residents no longer stride ahead and snap back: the female walk and the moving groups of root-bone creatures
+  are held in place in the animation table (NPC-WALK-RUBBERBAND-69).
+- Armed people hold their weapons in their hands through every attack: a held item follows the frame its actor is sent
+  with (NPC-WEAPON-GRIP-WRONG-69).
+- Items can be dropped in every room, the opening's rooms included; a drop that would pass an invisible wall lands at the
+  player's feet (DROP-REFUSED-CENSUS-ROOM-67, DROP-IN-ROOMS-REFUSED-62).
+- The census office's Limeware Platter can be aimed at and taken (CENSUS-SHELF-PLATE-BAKED-67).
+- The opening's two Seyda Neen guards hold their spears: an actor whose layout names a library model as its mover reads
+  that model's weapon data with the data's own frame count (NPC-WEAPON-MESH-33, GUARD-WEAPON-INVISIBLE-65).
+- Every voice line moves the speaker's mouth from its own loudness, also a line without a lip file, and every voiced
+  character whose face is drawn moves its mouth from the original heads' talk shapes, in conversation and in the world
+  (NPC-TALK-MOUTH-STILL-69, NPC-TALK-POSES-ONLY-OPENING-69).
+- The journal's first-time hint no longer leaves an empty box under the dialogue window (UI-JOURNAL-HINT-EMPTY-BOX-67).
+- The sneak key toggles again, with Hold as an option, and the crouched walk plays at the original's rate
+  (PLAYER-SNEAK-NOT-HELD-69).
+- The third-person body's gaits play at the player's own speed (PLAYER-GAIT-RATE-VELOCITY-STEPS-69).
+- Residents walk their routes where the collision does not hold the ground and settle when it loads; a step against a face
+  that is too steep slides along it (CHIM-COLLISION-WALKS-67, AMBIENT-WALK-STUCK-COLLISION-54,
+  NPC-WANDER-NOT-EXECUTED-35, ACTOR-STEP-STEEP-CONTACT-REFUSED-69).
+- The bug register locks its file and saves by compare-and-swap, so concurrent writers keep every entry, and entries can be
+  linked as probable variants or possibly related (REGISTER-CONCURRENT-WRITE-LOST-67, TRACK-POSSIBLY-RELATED-LINKS-69).
+
+**Known**
+
+- The open items of v0.0.69-dev5 stand ([its Known list](releases/notes/RELEASE-v0.0.69-dev5.md#known-in-this-build));
+  NPC weapon use beyond the grip (NPC-WEAPON-USE-PARITY-69), the bow's hand (NPC-BOW-RIGHT-HAND-69) and a creature's
+  carried weapon in combat (CREATURE-COMBAT-WEAPON-54) are open.
 
 ## v0.0.69-dev5: fifth snapshot of v0.0.69, 26 November 2026
 

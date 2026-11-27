@@ -26,7 +26,8 @@ PROJECT_MEDIA = {"resources/media/AmiWind_logo.png", "resources/media/AmiWind_wo
                  "resources/media/AmiWind_logo_name_only.png",
                  # the Workbench icon's pictures (tools/workbench_launcher.py, docs/WORKBENCH_ICON.md)
                  "resources/workbench/AmiWind-icon.png", "resources/workbench/AmiWind-icon-selected.png"}
-IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
+# .bug_register: the bug register tool's lock and the temporary files of its writes (tools/bug_register.py LOCK_FOLDER)
+IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache", ".bug_register"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.38-lava-{name}.png" for name in ("east-clean", "pool-clean"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.38-molag-{name}.png" for name in ("lantern-arch", "walkways"))

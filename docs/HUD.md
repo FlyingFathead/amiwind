@@ -1,6 +1,6 @@
 # HUD: weapon and magic boxes
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -185,7 +185,10 @@ is added to the pipeline once.
 - **Showing a box.** Call `AW_MsgBoxShow(text, buttons, count)` with plain text; `count` 0 makes a timed notice. The
   game's text defines (`%PCName`, `^ActionActivate` and the rest) are filled in by the same call.
 - **Line breaks and empty rows.** `\n` ends a line; `\n\n` leaves an empty row. Long lines wrap inside the box's
-  inner margins. The frame is sized from the lines, empty rows included (`AW_MsgBoxLayout`).
+  inner margins. The frame is sized from the lines, empty rows included (`AW_MsgBoxLayout`). A timed notice shows its
+  text a page at a time in the strip under the view (up to three rows a page); empty rows at the edge of a page are
+  the gap to the next page, never a page of their own, and the strip draws its box only while it has text, so a
+  notice such as the journal hint never leaves an empty box behind (since v0.0.69-dev6).
 - **The key column.** A tab in a line splits it: the part before the tab stands at the left inner margin, the part
   after it right-aligned at the right inner margin. Lines without a tab are centred.
 - **Keys come from the bindings.** A hint never names a fixed letter. Inside the engine use

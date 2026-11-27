@@ -277,6 +277,23 @@ int main(int argc,char **argv) {
         AW_AmbientCurrent(&pk,30000,-30000,0);assert(pk.cur<5);
         checks+=14;
     }
+    {   /* CHIM-COLLISION-WALKS-67: the v0.0.69-dev5 Seyda Neen session's five standing movers (the guard 128967, Fargoth,
+         * Vodunius Nuccius, Erene Llenim, Dreamer_Talker05) had their ground in chunks the frame world did not hold:
+         * every step was the collision step and found nothing. Now a route walker there walks its route; a walk without
+         * a route (the dreamer's, the creatures' spots near their start) waits; held ground, or the switch off, steps */
+        assert(AW_AmbientGroundMove(1,1,1,1)==AW_AMBIENT_MOVE_STEP && AW_AmbientGroundMove(1,1,0,1)==AW_AMBIENT_MOVE_STEP);
+        assert(AW_AmbientGroundMove(0,0,1,1)==AW_AMBIENT_MOVE_ROUTE);   /* the guard 128967 at his placement */
+        assert(AW_AmbientGroundMove(1,0,1,1)==AW_AMBIENT_MOVE_ROUTE);   /* the guard 128966 stepping into chunk 18,24 */
+        assert(AW_AmbientGroundMove(0,1,1,1)==AW_AMBIENT_MOVE_ROUTE);
+        assert(AW_AmbientGroundMove(0,0,0,1)==AW_AMBIENT_MOVE_WAIT && AW_AmbientGroundMove(1,0,0,1)==AW_AMBIENT_MOVE_WAIT);
+        assert(AW_AmbientGroundMove(0,0,1,0)==AW_AMBIENT_MOVE_STEP && AW_AmbientGroundMove(0,0,0,0)==AW_AMBIENT_MOVE_STEP);
+        /* the height on the way: evenly over the distance left, the waypoint's at the end (and past it) */
+        assert(fabs(AW_AmbientRouteHeight(10,30,25,100)-15)<1e-4f);
+        assert(fabs(AW_AmbientRouteHeight(15,30,25,75)-20)<1e-4f);
+        assert(AW_AmbientRouteHeight(10,30,25,25)==30 && AW_AmbientRouteHeight(10,30,40,25)==30);
+        assert(AW_AmbientRouteHeight(10,30,0,0)==30);
+        checks+=10;
+    }
     printf("aga_ambient_test: %d checks passed\n",checks);
     free(data);
     return 0;

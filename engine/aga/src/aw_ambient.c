@@ -17,6 +17,10 @@
  * Doors (v0.0.66, WANDER-DOOR-RULE-66; door_ahead below): every 1.5 s of an idle, a wanderer on its routes that faces a
  * door within 1.6 x the activation distance walks on; a walker stuck with a door ahead within the activation distance
  * drops its destination and those its route passes, and walks to another.
+ * Where the collision does not hold the ground (v0.0.69, CHIM-COLLISION-WALKS-67; aw_ambient.h AW_AmbientGroundMove):
+ * the CHIM frame world holds the ground only around the player, so a walker farther out walks its route without the
+ * collision (the original keeps every processed actor's cell in its physics) and is set on the floor when it is held
+ * again; a walk without a route waits there. "chim actors ambient offground on|off" (default on).
  * Not done (said in docs/NPC_PATHFINDING.md): occupied destinations, the package is not saved (an actor starts it again
  * where it stands), packages other than Wander.
  * Routes at the placement (v0.0.67, WANDER-DOOR-AFTER-LOAD-67; AW_AmbientHomeOf, AW_AmbientPlacedAt): the compiled
@@ -272,6 +276,15 @@ int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hu
     *max=hull+ESCORT_FAR;
     return AW_ESCORT_WAIT;
 }
+/* CHIM-COLLISION-WALKS-67 (aw_ambient.h): the walk where the collision does not hold the ground */
+int AW_AmbientGroundMove(int ground_here,int ground_there,int route,int on) {
+    if(!on || (ground_here && ground_there))return AW_AMBIENT_MOVE_STEP;
+    return route?AW_AMBIENT_MOVE_ROUTE:AW_AMBIENT_MOVE_WAIT;
+}
+float AW_AmbientRouteHeight(float z,float target_z,float step,float len) {
+    if(!(len>step) || !(len>0))return target_z;
+    return z+(target_z-z)*step/len;
+}
 
 #ifndef AW_AMBIENT_HOST_TEST
 /* ------------------------------------------------------------------ the engine part */
@@ -329,6 +342,10 @@ typedef struct {
     unsigned short unsticks;    /* AMBIENT-UNSTUCK-FLOOD-61: stuck searches its steps ran since the counters' reset */
     unsigned char standing;     /* ROOM-CREATURES-NO-AGGRO-62: no package, the slot runs the engage check alone */
     unsigned char follower;     /* ESCORT-FOLLOW-63: its follow state in follow_pool (index + 1), 0 none */
+    unsigned char off_ground;   /* CHIM-COLLISION-WALKS-67: it walked its route where the collision did not hold the
+                                   ground (its height from the route's points); set on the floor when it is held again */
+    float route_dz;             /* the compiled points' heights are from the reference's authored height, which the
+                                   build moved onto the ground (aw_authored_z - aw_ground_baked z; 0 when not told) */
 } slot_t;
 /* ESCORT-FOLLOW-63: the follow states of the following and escorting slots, the debug companion's follow think
  * (aw_follow.h, aw_companion.c) per follower; 8 at once (the game's scripts start at most 3 in one area). An entry
@@ -396,7 +413,14 @@ static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registere
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
                unsticks,unstick_tests,settles,settled,escorts,crossed,standing,
                door_checks,door_tests,door_found,door_idles,door_stuck,door_dropped,
-               placed,away,current,disabled;double seconds,worst,elapsed;} st;
+               placed,away,current,disabled,
+               route_steps,ground_waits,rejoined,rejoin_missed;double seconds,worst,elapsed;} st;
+/* "chim actors ambient offground on|off" (CHIM-COLLISION-WALKS-67; default on, id1/default-game.cfg; no cvar of its own:
+ * the resident registry budget; not saved): a walker where the collision does not hold the ground walks its route
+ * without it (aw_ambient.h AW_AmbientGroundMove); off = every step against the collision, the method before (a resident
+ * out there finds nothing under its step and stands). */
+static int offground_on=1;
+static unsigned long steep_base;   /* aw_walk.c's steep-contact steps at the counters' reset */
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -731,6 +755,13 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
         AW_AmbientCurrent(&s->pkg,(int)(e->v.origin[0]-s->home[0]),(int)(e->v.origin[1]-s->home[1]),
                           (int)(e->v.origin[2]-s->home[2]));
         if(s->home[0]!=e->v.origin[0] || s->home[1]!=e->v.origin[1])st.away++;
+        /* CHIM-COLLISION-WALKS-67: the routes' heights are offsets from the reference's authored height; the build put
+         * the actor on the ground under it (tools/chim/frame_map.py: aw_authored_z kept, aw_ground_baked the fit) */
+        {
+            eval_t *a=GetEdictFieldValue(e,"aw_authored_z"),*v=GetEdictFieldValue(e,"aw_ground_valid"),
+                   *b=GetEdictFieldValue(e,"aw_ground_baked");
+            s->route_dz=a && v && b && v->_float==1 && a->_float!=0?a->_float-b->vector[2]:0;
+        }
     }
     if(aggro_on)aggro_facts(s);
     s->state=S_CHOOSE;s->at=-1;s->can_walk=(unsigned char)can_walk(e);
@@ -1065,13 +1096,22 @@ static int fly(slot_t *s,const float target[3],float step) {
     VectorCopy(tr.endpos,e->v.origin);SV_LinkEdict(e,false);
     return tr.fraction>=1;
 }
+/* CHIM-COLLISION-WALKS-67: does the collision hold the ground at P (aw_walk.c aw_chim_ground; NULL: always) */
+static int ground_at(const float *p) {return !aw_chim_ground || aw_chim_ground(p);}
+/* ... and a walker that walked its route without it stands on the floor once it is held again (aw_walk.c
+ * AW_ActorGroundSettle: up at most 16 under its headroom, down at most 32 below, as the spawn's bounded snap) */
+static void ground_back(slot_t *s) {
+    if(!s->off_ground || !ground_at(s->e->v.origin))return;
+    s->off_ground=0;
+    if(AW_ActorGroundSettle(s->e,16.0f,32.0f))st.rejoined++;else st.rejoin_missed++;
+}
 static void walk(slot_t *s,float dt) {
-    float target[2],dx,dy,len,speed=walk_speed(s),step;vec3_t move,from;int xyz[3],heading,stepped;
+    float target[2],dx,dy,len,speed=walk_speed(s),step;vec3_t move,from;int xyz[3],heading,stepped,kind=AW_AMBIENT_GRID;
     unsigned long before,searches,tests;
     int flyer=(s->flags&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER))!=0;float tz=s->home[2];   /* swimmers move the same way, in water */
     if(AW_ActorStationary(s->e))return;   /* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: it cannot move: no step */
     if(s->manual_walk){target[0]=s->manual_goal[0];target[1]=s->manual_goal[1];}
-    else{AW_AmbientPoint(&s->pkg,s->at,xyz,NULL);target[0]=s->home[0]+xyz[0];target[1]=s->home[1]+xyz[1];tz=s->home[2]+xyz[2];}
+    else{AW_AmbientPoint(&s->pkg,s->at,xyz,&kind);target[0]=s->home[0]+xyz[0];target[1]=s->home[1]+xyz[1];tz=s->home[2]+xyz[2];}
     if(flyer){
         float t3[3],dz=tz-s->e->v.origin[2];
         dx=target[0]-s->e->v.origin[0];dy=target[1]-s->e->v.origin[1];
@@ -1102,6 +1142,31 @@ static void walk(slot_t *s,float dt) {
     move[0]=dx*step/len;move[1]=dy*step/len;move[2]=0;
     heading=AW_PathHeading((int)dx,(int)dy);
     s->e->v.angles[1]=heading*360.0f/AW_PATH_FAN-90;s->e->v.angles[0]=s->e->v.angles[2]=0;
+    {
+        /* CHIM-COLLISION-WALKS-67 (aw_ambient.h AW_AmbientGroundMove): where the collision does not hold the ground,
+         * under the walker or where it steps, a route walker walks its route without the collision (no trace: the
+         * original's path grid is walkable on the original's collision, which holds every actor's cell in range), its
+         * height going to the waypoint's (the authored height's offset for a grid point, the ground under the start
+         * for the start, between them for a part-way point); a walk without a route waits */
+        vec3_t there;int mode;
+        there[0]=s->e->v.origin[0]+move[0];there[1]=s->e->v.origin[1]+move[1];there[2]=s->e->v.origin[2];
+        mode=AW_AmbientGroundMove(ground_at(s->e->v.origin),ground_at(there),!s->manual_walk && s->at>=0,offground_on);
+        if(mode==AW_AMBIENT_MOVE_ROUTE){
+            float rz=tz+(kind==AW_AMBIENT_GRID?s->route_dz:kind==AW_AMBIENT_PARTWAY?s->route_dz*.5f:0);
+            VectorCopy(s->e->v.origin,s->e->v.oldorigin);
+            s->e->v.origin[2]=AW_AmbientRouteHeight(s->e->v.origin[2],rz,step,len);
+            s->e->v.origin[0]=there[0];s->e->v.origin[1]=there[1];
+            VectorCopy(vec3_origin,s->e->v.velocity);SV_LinkEdict(s->e,false);
+            s->off_ground=1;s->stuck=0;st.steps++;st.route_steps++;
+            walk_frames(s,dt>0?step/dt:speed,dt);
+            return;
+        }
+        if(mode==AW_AMBIENT_MOVE_WAIT){
+            st.ground_waits++;
+            if(s->travel){walk_frames(s,0,dt);return;}   /* a travel's or a follow's straight leg waits for its ground */
+            stop_walk(s);s->state=S_CHOOSE;return;        /* a walk to a random spot near the start: back to its roll */
+        }
+    }
     before=aw_sv_move_calls;VectorCopy(s->e->v.origin,from);
     if(steplog)log_start_solid(s);
     searches=aw_stuck_searches;tests=aw_stuck_tests;
@@ -1132,7 +1197,9 @@ static void walk(slot_t *s,float dt) {
     st.traces+=aw_sv_move_calls-before;
 }
 static void think(slot_t *s,float dt) {
-    edict_t *e=s->e;int fighting=AW_CombatSlotState(e,NULL)!=0;
+    edict_t *e=s->e;int fighting;
+    ground_back(s);                                          /* CHIM-COLLISION-WALKS-67: back on held ground */
+    fighting=AW_CombatSlotState(e,NULL)!=0;
     if(fighting){s->fighting=1;s->mover=0;return;}           /* combat owns it (it restores the model when done) */
     if(s->fighting){s->fighting=0;s->state=S_CHOOSE;s->at=-1;s->manual_walk=0;set_field(e,"aw_moving",0);
                     if(s->travel==1){   /* a travel goes on after the fight, straight to its target */
@@ -1641,6 +1708,11 @@ static void status(void) {
     Con_Printf("  script packages: travels %lu (%lu done), follows %lu, escorts %lu (%lu follows and escorts done); "
                "followers through a door with the player %lu\n",st.travels,st.travels_done,st.follows,st.escorts,
                st.follows_done,st.crossed);
+    {int k,off=0;for(k=0;k<SLOTS;k++)off+=slots[k].e && slots[k].off_ground;
+     Con_Printf("  where the collision does not hold the ground (offground %s, CHIM-COLLISION-WALKS-67): %lu route steps "
+                "without it, %lu waits (no route), %d actors off it now, %lu set on the floor when it came back (%lu "
+                "found none); steep-contact steps (steep %s) %lu\n",offground_on?"on":"off",st.route_steps,
+                st.ground_waits,off,st.rejoined,st.rejoin_missed,aw_actor_steep?"on":"off",aw_actor_steep_steps-steep_base);}
     Con_Printf("  cost: %.3f ms per think, worst frame %.3f ms\n",st.thinks?st.seconds*1000.0/st.thinks:0.0,st.worst*1000.0);
 }
 /* "chim actors ambient [on|off|think S|list|reset]" (aw_actors.c forwards it; arguments from the fourth word) */
@@ -1686,6 +1758,21 @@ void AW_AmbientCommand(void) {
                    "by a door takes another destination (OpenMW's door rule)":
                    "the old way: no door rule, a wanderer can stand in front of a door");
     }
+    else if(!strcmp(a,"offground") && Cmd_Argc()>4){
+        offground_on=!strcmp(Cmd_Argv(4),"on");
+        Con_Printf("Ambient: offground %s (default on, not saved): %s\n",offground_on?"ON":"OFF",offground_on?
+                   "a walker where the collision does not hold the ground (far from the player) walks its route without "
+                   "it, and stands on the floor again once it is held; a walk without a route waits there":
+                   "the old way: every step against the collision; a walker out there finds no floor and stands");
+    }
+    else if(!strcmp(a,"steep") && Cmd_Argc()>4){
+        aw_actor_steep=!strcmp(Cmd_Argv(4),"on");
+        Con_Printf("Ambient: steep %s (default on, not saved): %s\n",aw_actor_steep?"ON":"OFF",aw_actor_steep?
+                   "an actor's step into a too-steep face slides along it as along a wall, and one on such a face "
+                   "that does not rise holds where walkable ground lies under the box's centre within OpenMW's ground "
+                   "test (64 original units), as the player's walk goes on there":
+                   "the old way: such a step is refused");
+    }
     else if(!strcmp(a,"settle") && Cmd_Argc()>4){
         settle_on=!strcmp(Cmd_Argv(4),"on");
         Con_Printf("Ambient: settle %s (default on, not saved): %s\n",settle_on?"ON":"OFF",settle_on?
@@ -1713,6 +1800,7 @@ void AW_AmbientCommand(void) {
     }
     else if(!strcmp(a,"reset")){
         int i;memset(&st,0,sizeof(st));stuck_base=aw_stuck_searches;stuck_tests_base=aw_stuck_tests;stuck_failed_base=aw_stuck_failed;
+        steep_base=aw_actor_steep_steps;
         for(i=0;i<SLOTS;i++)slots[i].unsticks=0;
         Con_Printf("Ambient: counters reset\n");
     }
@@ -1721,14 +1809,15 @@ void AW_AmbientCommand(void) {
         for(i=0;i<SLOTS;i++)if(slots[i].e){
             slot_t *s=&slots[i];
             /* "home": where its routes start (its placement since v0.0.67, WANDER-DOOR-AFTER-LOAD-67) */
-            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f home %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s\n",
+            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f home %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s%s\n",
                        i,source_id(s->e),(long)s->ref,s->state,s->pkg.distance,s->pkg.count,s->pkg.destinations,s->pkg.cur,
                        s->goal,s->at,s->pkg.manual?" manual":"",s->can_walk?"":" no-walk",
                        s->travel==1?" TRAVEL":s->travel==2?" TRAVEL-DONE":s->travel==5?" ESCORT":s->travel>=3?" FOLLOW":"",
                        s->e->v.origin[0],s->e->v.origin[1],
                        s->e->v.origin[2],s->home[0],s->home[1],s->home[2],s->flags,field(s->e,"aw_ground_mode",-1),
                        field(s->e,"aw_scale",1),s->unsticks,
-                       s->e->v.model?pr_strings+s->e->v.model:"-",AW_CombatSlotState(s->e,NULL)?" fighting":"");
+                       s->e->v.model?pr_strings+s->e->v.model:"-",AW_CombatSlotState(s->e,NULL)?" fighting":"",
+                       s->off_ground?" offground":"");
         }
     }
     else status();

@@ -157,6 +157,8 @@ const char *AW_InventoryDropReason(void){
     return layout_mode?"Cannot place this item on the chosen floor; choose a clear spot. The carried item was kept.":
         "Cannot place item here; kept.";
 }
+/* DROP-REFUSED-CENSUS-ROOM-67: the refusal's reason only behind the debug HUD (dbg all; aga_worldui_test.c's
+ * debug_overlays, on): the long reason below checks the status line's wrapping, then off for the player's plain line */
 void AW_CombatEquipmentStore(void){store_calls++;}
 void AW_CombatEquipmentChanged(void){changed_calls++;}
 int AW_ViewInventoryBody(model_t **model,int *frame){static model_t body;*model=&body;*frame=7;return 1;}
@@ -345,6 +347,11 @@ int main(void){
         assert(!memcmp(&before,&aw_state,sizeof(before)));
         label=layout_find("Cannot place");assert(label && label->y==160);
         label=layout_find("choose a clear spot");assert(label && label->y==168 && strstr(label->value,"...")); /* 91-byte synthetic status exceeds two45-column lines; bounded ellipsis is explicit. */
+        /* DROP-REFUSED-CENSUS-ROOM-67: without the debug HUD the player reads the plain line, not the check's reason */
+        debug_overlays=0;before=aw_state;AW_WorldUIKey('d',1);layout_draw();
+        assert(!memcmp(&before,&aw_state,sizeof(before)));
+        assert(layout_find("This item cannot be dropped here.") && !layout_find("Cannot place") && !layout_find("kept"));
+        debug_overlays=1;
         AW_WorldUIKey('i',1);layout_noactions=0;placement=1;
         AW_InventoryOpen();layout_point(300,149);AW_WorldUIKey(K_MOUSE3,1);layout_draw();
         label=layout_find("Equip");assert(label);x=label->x;y=label->y;

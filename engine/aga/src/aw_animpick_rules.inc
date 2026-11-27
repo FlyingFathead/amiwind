@@ -243,6 +243,14 @@ int AW_PickPlayerBody(const aw_pick_player_t *in,aw_pick_state_t *out) {
     return 1;
 }
 
+/* PLAYER-SNEAK-NOT-HELD-69 (aw_animpick.h): the sneak gait at the speed over the sneak animation's own */
+float AW_PickSneakRate(float speed) {
+    float r=speed/AW_PICK_SNEAK_SPEED;
+    if(!(r>.25f))r=.25f;
+    if(r>10)r=10;
+    return r;
+}
+
 int AW_PickWanderIdle(const unsigned char chances[8],int multiplier100,int roll_gate,const unsigned char rolls[8]) {
     int i,best=0,pick=0;
     if(roll_gate>multiplier100)return 0;

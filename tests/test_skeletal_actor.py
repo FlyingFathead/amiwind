@@ -161,6 +161,79 @@ class TableTests(unittest.TestCase):
         np.testing.assert_array_equal(pos[3:6, 0], [[0, 0, 1], [3, 4, 2], [6, 8, 3]])
         self.assertTrue(np.all(pos[:, 1] == 7.0))
 
+    def test_a_moving_group_under_a_view_prefix_is_held_in_place_too(self):
+        # NPC-WALK-RUBBERBAND-69: the female walk lives in the common table as 'f:walkforward' (an NPC's own file as
+        # 'd:...'); asked by the table name alone it kept its root's travel, so a woman's drawn body went a stride
+        # ahead of her position in every walk cycle and jumped back at its end
+        pos = np.zeros((9, 2, 3))
+        walk = [[0, 0, 5], [10, 1, 6], [20, 2, 5]]
+        pos[:, 0] = walk + walk + [[0, 0, 1], [3, 4, 2], [6, 8, 3]]
+        S.hold_in_place(pos, ['bip01', 'pelvis'], {'f:walkforward': (0, 2), 'd:runforward': (3, 5), 'f:death1': (6, 8)})
+        np.testing.assert_array_equal(pos[0:3, 0], [[0, 0, 5], [0, 0, 6], [0, 0, 5]])
+        np.testing.assert_array_equal(pos[3:6, 0], [[0, 0, 5], [0, 0, 6], [0, 0, 5]])
+        np.testing.assert_array_equal(pos[6:9, 0], [[0, 0, 1], [3, 4, 2], [6, 8, 3]])
+        self.assertTrue(S.moving_group('f:walkforward') and S.moving_group('walkforward'))
+        self.assertFalse(S.moving_group('f:idle') or S.moving_group('f:death1'))
+
+    def test_the_accumulation_root_is_bip01_else_root_bone(self):
+        # NPC-WALK-RUBBERBAND-69: a creature whose accumulation root is named root bone (OpenMW's second name) is
+        # held too; with both, bip01 when the animation moves it, else the one that moves; no such bone: nothing held
+        walk = np.array([[0, 0, 5], [10, 1, 6], [20, 2, 5]], float)
+        pos = np.zeros((3, 2, 3))
+        pos[:, 1] = walk
+        S.hold_in_place(pos, ['scene root', 'root bone'], {'walkforward': (0, 2)})
+        np.testing.assert_array_equal(pos[:, 1], [[0, 0, 5], [0, 0, 6], [0, 0, 5]])
+        both = np.zeros((3, 2, 3))
+        both[:, 0] = [1, 2, 3]                      # a bip01 the animation leaves alone
+        both[:, 1] = walk
+        self.assertEqual(S.accumulation_root(both, ['bip01', 'root bone']), 'root bone')
+        both[:, 0] = walk
+        self.assertEqual(S.accumulation_root(both, ['bip01', 'root bone']), 'bip01')
+        self.assertEqual(S.accumulation_root(np.zeros((3, 2, 3)), ['bip01', 'root bone']), 'bip01')
+        self.assertIsNone(S.accumulation_root(both, ['spine', 'tail']))
+        other = np.zeros((3, 2, 3))
+        other[:, 0] = walk
+        S.hold_in_place(other, ['spine', 'tail'], {'walkforward': (0, 2)})
+        np.testing.assert_array_equal(other[:, 0], walk)
+
+    def test_a_walker_drawn_a_cycle_later_stands_where_its_position_is(self):
+        """NPC-WALK-RUBBERBAND-69, the whole table: a skeleton whose root (bip01) travels 40 units over its walk, as
+        the game's walk does, appended under 'f:' as the female skeleton is. The game moves the actor; the table
+        must hold both walks in place, so the root at the last frame of a cycle is where it was at the first (no
+        step forward in the drawn body, and so no jump back when the cycle starts again). On the code before the
+        fix 'f:walkforward' kept the whole travel."""
+        class Walker(ChainSkeleton):
+            parents = {'bip01': None, 'upper': 'bip01', 'fore': 'upper'}
+            nodes = {'bip01': None, 'upper': None, 'fore': None}
+
+            def local(self, name, time):
+                if name == 'bip01':
+                    along = 40.0 * max(0.0, time - 2.5) / 1.5      # 40 units over the walk (2.5 s to 4.0 s)
+                    return S.local_matrix(axis_quat((0, 0, 1), 0), (1.0, 2.0 + along, 3.0 + 0.5 * math.sin(time)))
+                return Chain.local(self, 'upper' if name == 'upper' else 'fore', time)
+
+            def pose(self, time):
+                out = {}
+
+                def world(name):
+                    if name not in out:
+                        p = self.parents[name]
+                        out[name] = self.local(name, time) @ (world(p) if p else np.eye(4))
+                    return out[name]
+                return world
+        data, report = S.build_table(Walker(), over=Walker(), append='f:')
+        table = S.read_table(data)
+        root = report['bone_names'].index('bip01')
+        p = np.asarray(table['p'], float) * table['scale']
+        for group in ('walkforward', 'f:walkforward'):
+            first, last = table['groups'][group]
+            self.assertGreater(last, first)
+            travel = np.abs(p[first:last + 1, root, :2] - p[first, root, :2]).max()
+            self.assertLess(travel, 2 * table['scale'], '%s: the root travels %.2f units inside the group' %
+                            (group, travel))
+            # the body's bob is kept
+            self.assertGreater(np.ptp(p[first:last + 1, root, 2]), 0)
+
     def test_every_group_is_in_the_table_combat_and_poses_included(self):
         # the maintainer, 25 October 2026: if a humanoid can do it, it is in the table; attack groups name their
         # phases instead of start/stop, inventory poses have one key; sound keys are events, not groups

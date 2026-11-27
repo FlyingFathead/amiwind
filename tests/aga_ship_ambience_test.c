@@ -8,6 +8,8 @@ int AW_Interior(void){return interior;}
 sfxcache_t *S_LoadSound(sfx_t *s){return &sample;}
 void Con_Printf(char *fmt,...){}
 void AW_SpeechStart(int a,int b,const char *c,int d,int e,int f,int g){}
+/* S_StartSound hands the samples on too (NPC-TALK-MOUTH-STILL-69) */
+void AW_SpeechStartPcm(int a,int b,const char *c,int d,int e,int f,int g,const void *h,int i){}
 void AW_SpeechStop(int a,int b){}
 extern int sound_started;
 extern volatile dma_t *shm;

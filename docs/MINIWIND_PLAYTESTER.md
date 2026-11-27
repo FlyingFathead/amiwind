@@ -1,6 +1,6 @@
 # AmiWind "MiniWind" Playtester Build
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -111,7 +111,7 @@ Left out on top of the table above (`tools/miniwind.py`, `SCOPE_OMITTED`):
 | `door-audio` | door sounds: every Balmora door leads to a left-out interior, so none opens |
 
 Stage plan, in order: `setup`, `terrain`, `scenery`, `scene`, `bsp`, `npcs`,
-`hands`, `interior`, `dialogue-lookup`, `intro`, `census`, `balmora`,
+`hands`, `interior`, `dialogue-lookup`, `talk`, `intro`, `census`, `balmora`,
 `character`, `reading`, `opening-references`, `media`, `music`, `engine`,
 `harvest`, `hand-catalog`, `chim`, `image`.
 
@@ -127,6 +127,8 @@ Why the rest stays:
 - `character`: the character catalogue the quick start's Hors preset needs.
 - `reading`, `opening-references`, `dialogue-lookup`: residents' dialogue and
   the placed-reference identities of the exterior objects.
+- `talk`: the residents' mouths while they speak (the original heads' Talk
+  morph, `talk.awt`, from the game data only; about 25 seconds).
 - `harvest`, `hands`, `hand-catalog`, `media`, `music`, `engine`, `chim`:
   plants, first-person hands, sounds, music, the engine and the CHIM world.
 

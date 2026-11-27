@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -176,9 +176,25 @@ ID, count, scene, placement, yaw and condition. The converted ground model must
 load, an entity must satisfy the engine allocator reuse rule, and the complete
 swept footprint must have clear space and dry solid support before ownership
 changes. Drops work in plain BSP scenes, in rooms and, since v0.0.59-dev4, on the streamed CHIM towns (a drop was
-refused on every streamed map before). Scenes that cannot take a drop refuse placement with
-"Cannot place items in this area yet; kept." Full-game CHIM/scenery drop support
-remains open under [UI-INVENTORY-INTEGRATION-40](bugs/UI-INVENTORY-INTEGRATION-40.md).
+refused on every streamed map before). Since v0.0.69 a drop works in every kind of area: the room maps of the opening
+(the Imperial Prison Ship and the Census and Excise Office, also during the registration, where the inventory opens
+with the release papers as in the original), tombs, caves, houses, the CHIM rooms, the towns and the open land. The
+item lands on the floor about an arm's length ahead; when that spot cannot take it (a wall, a ledge, water, an
+invisible wall of the game), it lands on the floor under the player, as the original's drop does when the cursor
+points at no floor. A drop in a room is a row of that room in the world change list: it is gone in other places,
+back where it lay when the player returns, kept by a save, and taken again with E. Only the older table of 32
+ground stacks (`aw_placed ledger off`) still refuses the areas its check cannot see ("Cannot place items in this
+area yet; kept."; [DROP-REFUSED-CENSUS-ROOM-67](bugs/DROP-REFUSED-CENSUS-ROOM-67.md)). A refused drop (deep water
+under the player, the area's 32 shown drops) keeps the item and says "This item cannot be dropped here."; the check
+that refused it is named in the window only with the debug display on (`dbg all on`). For test sessions,
+`aw_inventory drop "ID"` drops a carried item through the same rule and prints the reason, and `aw_inventory drops`
+lists the drops the current area shows (`aw_inventory drops look N` turns the view to one of them).
+An item standing in a piece of furniture (the Limeware Platter on the bookshelf of the census office's first room)
+is aimed at and taken like any other: the furniture's collision is one solid hull over its open front, so the aim
+looks past the furniture it meets first and takes the item standing inside it, as the original's aim meets the
+drawn item ([CENSUS-SHELF-PLATE-BAKED-67](bugs/CENSUS-SHELF-PLATE-BAKED-67.md)). The image step counts every placed
+reference of the opening's two rooms against what their maps hold (tools/room_item_census.py; the image's
+opening-item-sweep.md) and stops when an item there could not be taken or a container opened.
 Refused placement retains the item, quantity and condition. Aim at the dropped item
 and press E to pick it up. Full inventory or incompatible condition retains the
 world item. Save/load and scene re-entry restore the records: drops are rows of the world change list

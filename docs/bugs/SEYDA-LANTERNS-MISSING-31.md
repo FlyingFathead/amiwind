@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.61-dev1 at 2026-11-06 01:56 +0200: Seen again in the CHIM world of v0.0.61-dev1 and of a v0.0.61 Seyda Neen sandbox: none of the eight carriable lanterns of the Seyda Neen cells (-2, -9) and (-2, -10) (light_com_lantern_02) is a placement of the CHIM frame; their night lamp rows are there, so they light the night without a lantern drawn. Found by the island-wide survey of carriable lights (TAKEN-LIGHT-FLAME-61).
 - Reported with v0.0.66-dev1 at 2026-11-14 00:11 +0000: PERSISTING: the placed-item census of v0.0.66-dev1 finds 37,967 of the 37,975 placed base-game items in the built world; the 8 missing are all Seyda Neen travel lanterns, which are placed nowhere.
+- Reported with v0.0.69-dev5 at 2026-11-27 00:48 +0200: Seen again in v0.0.69-dev5 by the world item census: the eight travel lanterns of Seyda Neen and their hooks are still drawn by nothing; the town's frame leaves its lights out.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-07: LAMPS-FLICKER-31 and SEYDA-LANTERNS-MISSING-31: dev5 night walk: The maintainer, dev5: lamp light keeps switching on and off while turning or walking (our dev5 front priority; repaired in source with lamp stickiness and fade-out), and ...
 - 2026-11-06 01:56 +0200: seen again in v0.0.61-dev1: Seen again in the CHIM world of v0.0.61-dev1 and of a v0.0.61 Seyda Neen sandbox: none of the eight carriable lanterns of the Seyda Neen cells (-2, -9) and (-2, -10) (light_com_lantern_02) is a placement of the CHIM frame; their night lamp ...
 - 2026-11-14 00:11 +0000: seen again in v0.0.66-dev1: PERSISTING: the placed-item census of v0.0.66-dev1 finds 37,967 of the 37,975 placed base-game items in the built world; the 8 missing are all Seyda Neen travel lanterns, which are placed nowhere.
+- 2026-11-27 00:48 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5 by the world item census: the eight travel lanterns of Seyda Neen and their hooks are still drawn by nothing; the town's frame leaves its lights out.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -46,7 +48,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Symptom](#symptom)
@@ -173,6 +175,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYER-WEREWOLF-ROBE-NOT-BAKED-66](PLAYER-WEREWOLF-ROBE-NOT-BAKED-66.md): With Bloodmoon selected, the player parts stage stopped on the werewolf robe, a worn part with no player model
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
+- [PRISON-SHIP-DRESSING-LEFT-OUT-69](PRISON-SHIP-DRESSING-LEFT-OUT-69.md): The Imperial Prison Ship leaves out 80 of the original's small decorations (ropes, hooks, hanging baskets, bones)
 - [REF-IDENTITY-MERGED-MASTER-66](REF-IDENTITY-MERGED-MASTER-66.md): With both expansions selected the build stops in its focus stage: a merged reference number does not fit the stable id
 - [RELEASE-PRIVATE-NAMES-48](RELEASE-PRIVATE-NAMES-48.md): Two public files named the private working folder, and seven public lines used a banned abbreviation for actor behaviour
 - [ROBE-PART-NOT-BAKED-62](ROBE-PART-NOT-BAKED-62.md): An equipped robe taken from Tarhiel is drawn in first person but not on the third-person body or in the inventory picture

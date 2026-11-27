@@ -1185,9 +1185,9 @@ static int body_hand_layer(edict_t *p,int frame) {
  * on the hand bone. */
 static cvar_t stances_cvar={"aw_player_stances","1",true};
 static struct {
-    aw_pick_state_t last;int picked,from,to,lfrom,loop;float t;const aw_skel_table_t *table;
+    aw_pick_state_t last;int picked,from,to,lfrom,loop;float t,rate;const aw_skel_table_t *table;
     char group[AW_PICK_NAME];const char *rule;unsigned long changes;
-} stance;
+} stance;   /* rate: the moving group's last play rate (dbg camera; PLAYER-SNEAK-NOT-HELD-69) */
 static int stance_has(void *c,const char *name){return AW_SkelGroup((const aw_skel_table_t *)c,name)>=0;}
 static int stance_key(const aw_skel_table_t *t,int g,const char *key){
     aw_skel_group_t gg;
@@ -1215,8 +1215,9 @@ static int body_turn(int move,float dt){
     else if((turn.hold-=dt)<=0 || move!=AW_PM_NONE){turn.dir=0;turn.hold=0;}
     return turn.dir;
 }
-/* The body's frame for the drawn weapon's stance, or -1 (nothing drawn, bare hands, swimming, a torch, no such group). */
-static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
+/* The body's frame for the drawn weapon's stance, or -1 (nothing drawn, bare hands, swimming, a torch, no such group).
+ * SPEED: the body's ground speed (units/s), for the sneak gaits' own rate (PLAYER-SNEAK-NOT-HELD-69). */
+static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate,float speed){
     eval_t *v;aw_pick_state_t s;aw_pick_t o;aw_pick_player_t in;int hand,goal,move=AW_PM_NONE,run=0,gi,react,roll;float age;
     if(!stances_cvar.value || !body_parts || !parts_table || !p || p->v.health<=0)return -1;
     /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: a lit light no longer takes the weapon's stance away: the body holds the
@@ -1287,8 +1288,12 @@ again:
     case AW_PE_ATTACK:return stance.from+(int)(hand_fraction(p,AW_HAND_PUNCH)*(float)(stance.to-stance.from)+.5f);
     case AW_PE_JUMP:return stance.lfrom>=stance.from && stance.lfrom<=stance.to?stance.lfrom:stance.from;   /* held in the air */
     default:
+        /* PLAYER-SNEAK-NOT-HELD-69: a sneak gait at the speed over the sneak animation's own (AW_PickSneakRate, OpenMW
+         * 0.53 character.cpp refreshMovementAnims); before, at the walk's rate, 4.6 times too slowly: the body glided */
+        if(s.sneak && s.move!=AW_PM_NONE)rate=AW_PickSneakRate(speed)*aw_anim_kit_speed;
+        stance.rate=move!=AW_PM_NONE && rate>0?rate:1;
         return AW_AnimKitSpanFrame((unsigned)stance.from,(unsigned)stance.to,parts_table->rate,&stance.t,
-                                   dt*(move!=AW_PM_NONE && rate>0?rate:1),1,NULL);
+                                   dt*stance.rate,1,NULL);
     }
 }
 /* ---- the body's animation state across camera and control changes (PLAYER-VANITY-WALK-STUCK-67) ----
@@ -1350,8 +1355,12 @@ entity_t *AW_ViewBody(entity_t *ent) {
     if(dt>.25f)dt=.25f;
     if(death.stage!=AW_DEATH_NONE)group=AW_ANIM_DEATH;
     else{
-        speed=(float)sqrt(cl.velocity[0]*cl.velocity[0]+cl.velocity[1]*cl.velocity[1]+
-            (p && p->v.waterlevel>=2?cl.velocity[2]*cl.velocity[2]:0));
+        /* PLAYER-GAIT-RATE-VELOCITY-STEPS-69: the body's speed is the local player's own velocity (the server edict).
+         * cl.velocity is the copy the server sends in steps of 16 units, truncated (sv_main.c velocity/16 in a byte,
+         * cl_parse.c x16): a sneak at 40.7 read as 32, a walk at 54.3 as 48, so every gait played a tenth to a fifth too
+         * slowly for the ground covered. The copy only when there is no local edict. */
+        const float *v=p?p->v.velocity:cl.velocity;
+        speed=(float)sqrt(v[0]*v[0]+v[1]*v[1]+(p && p->v.waterlevel>=2?v[2]*v[2]:0));
         group=AW_AnimPlayerMoveGroup(&body_anim,speed,p && p->v.waterlevel>=2,fists,&rate);
     }
     body=*ent;body.model=body_model;
@@ -1362,7 +1371,7 @@ entity_t *AW_ViewBody(entity_t *ent) {
     if(air>=0)body.frame=air;
     body_motion_count(air,speed);
     if(death.stage==AW_DEATH_NONE && (layer=body_hand_layer(p,body.frame))>=0)body.frame=layer;
-    if(death.stage==AW_DEATH_NONE && (layer=body_stance_frame(p,group,air>=0,dt,rate))>=0)body.frame=layer;
+    if(death.stage==AW_DEATH_NONE && (layer=body_stance_frame(p,group,air>=0,dt,rate,speed))>=0)body.frame=layer;
     if(death.stage==AW_DEATH_NONE && (block=body_block_frame(dt))>=0)body.frame=block;
     /* the assembled body's frame is a frame of its table (every part draws it); the baked body's one of its own */
     if(body.frame<0 || body.frame>=(body_parts && parts_table?parts_table->frames:body_model->numframes))body.frame=0;
@@ -2481,6 +2490,10 @@ static void command(void) {
             Con_Printf("Weapon stance: %s (aw_player_stances %d), group %s (%s), frames %d..%d, %lu picks\n",
                 stance.picked && stance.group[0]?"playing":"not now",(int)stances_cvar.value,
                 stance.group[0]?stance.group:"-",stance.rule?stance.rule:"-",stance.from,stance.to,stance.changes);
+            /* PLAYER-SNEAK-NOT-HELD-69: the moving group's play rate (1 = its own time; a sneak gait: the speed over
+             * the sneak animation's own, AW_PICK_SNEAK_SPEED) and the sneak state */
+            Con_Printf("Stance rate: %.2f, sneaking %d (toggled %d, aw_sneak_toggle %d, forced %d)\n",stance.rate,AW_MoveSneaking(),
+                AW_MoveSneakOn(),(int)Cvar_VariableValue("aw_sneak_toggle"),aw_move_force_sneak);
             if(p)Con_Printf("Player state: waterlevel %.0f, movetype %.0f, velocity %.1f %.1f %.1f\n",
                 p->v.waterlevel,p->v.movetype,p->v.velocity[0],p->v.velocity[1],p->v.velocity[2]);
             /* PLAYER-VANITY-WALK-STUCK-67: walking, the move group changes a few times a second at most and the air

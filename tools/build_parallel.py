@@ -1319,6 +1319,12 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'actor-library')
         if name == 'image' and 'player-view' in names:
             deps = (*deps, 'player-view')
+        # the talk pack (tools/talk_pack.py, NPC-TALK-MOUTH-STILL-69): the game data only; the image copies its file.
+        # Here, not in DEPENDENCIES: this function is the planner's alone, so no stage's key reaches the edit.
+        if name == 'talk':
+            deps = ()
+        if name == 'image' and 'talk' in names:
+            deps = (*deps, 'talk')
         if name == 'image' and 'chim' in names:
             # the image installs every CHIM town's stage output and its rooms (BUILD-CHIM-ROOMS-IMAGE-RACE-36: the
             # image ran beside chim-rooms-vivec_city and read its record before it existed)

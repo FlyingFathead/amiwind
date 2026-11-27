@@ -1,5 +1,14 @@
 # SPRITE-BAD-TYPE-THREADED-56: R_DrawSprite "Bad sprite type" ends a load on Amiberry with the threaded CPU
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.57-dev2 at 2026-10-30 14:58 +0200: FS-UAE JIT, 32 MB Fast, dev2 image d725e23: crash R_DrawSprite: Bad sprite type 1073750932 just after the Gnisis region load (first-presented), in a settlement sweep; the same teleport passed in the dev2 sweep an hour earlier, so not every time
+- Reported with v0.0.68 at 2026-11-27 00:55 +0200: Seen again on the v0.0.68 release image: right after a teleport the Water Walking cast effect left out its two sprites once, their sprite data not loaded.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -27,6 +36,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-10-29: reported in v0.0.56-dev1
 - 2026-10-30 14:58 +0200: seen again in v0.0.57-dev2: FS-UAE JIT, 32 MB Fast, dev2 image d725e23: crash R_DrawSprite: Bad sprite type 1073750932 just after the Gnisis region load (first-presented), in a settlement sweep; the same teleport passed in the dev2 sweep an hour earlier, so not every ...
+- 2026-11-27 00:55 +0200: seen again in v0.0.68: Seen again on the v0.0.68 release image: right after a teleport the Water Walking cast effect left out its two sprites once, their sprite data not loaded.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -35,6 +45,7 @@ _Last updated with AmiWind v0.0.57-dev3 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 29 October 2026](#status-29-october-2026)
 - [Symptom](#symptom)

@@ -176,6 +176,41 @@ int main(void){
      clean();AW_UIDraw();assert(by0==type1_top);              /* the next frame: the same, no movement */
      realtime=511;clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);   /* gone at once */
      AW_UITextBoxTypeSet(7);assert(AW_UITextBoxType()==2);}
+    /* UI-JOURNAL-HINT-EMPTY-BOX-67: the journal hint (config/tutorial-texts.json, the once row of the journal notice, with
+     * the box pipeline's empty rows) as the timed notice shows it. Its blank rows are never a page of their own: before,
+     * the last newline was a page with no text after the hint (a three-row strip, the one over the dialogue window) and
+     * a one-row strip had one between the sentence and the key line, each drawn as an empty box. Over the notice's whole
+     * time no frame is drawn without its text, on three-, two- and one-row strips. */
+    {static const char hint[]="Your journal keeps your quests.\n\nOpen it\t(J)\n\n";
+     static const int view[3]={128,152,168};   /* the strip under the view 72, 48 and 32 rows: 3, 2 and 1 text rows */
+     int v,t,boxed,inked,shown;
+     rest=AW_UIPage(hint,296,3,pagebuf,sizeof(pagebuf));
+     assert(!strcmp(pagebuf,"Your journal keeps your quests.\n\nOpen it\t(J)") && !*rest);
+     rest=AW_UIPage(hint,296,1,pagebuf,sizeof(pagebuf));
+     assert(!strcmp(pagebuf,"Your journal keeps your quests.") && !strcmp(rest,"Open it\t(J)\n\n"));
+     rest=AW_UIPage(rest,296,1,pagebuf,sizeof(pagebuf));
+     assert(!strcmp(pagebuf,"Open it\t(J)") && !*rest);
+     rest=AW_UIPage("\n\n",296,3,pagebuf,sizeof(pagebuf));assert(!pagebuf[0] && !*rest);
+     Cvar_SetValue("aw_dialogue_box_layout",3);Cvar_SetValue("aw_dialogue_box_display_method",3);
+     AW_UITextBoxTypeSet(2);host_frametime=0;
+     for(v=0;v<3;v++){
+         r_refdef.vrect.height=view[v];realtime=600+v*10;shown=0;
+         AW_UIPickupNotice(hint,6);
+         for(t=0;t<=140;t++){
+             realtime=600+v*10+t*0.05;clean();AW_UIDraw();boxed=inked=0;
+             for(i=0;i<64000;i++){
+                 if(framed(i%320,i/320))boxed=1;
+                 if(vid.buffer[i]==AW_UIColor(223,199,144))inked=1;
+             }
+             assert(!boxed || inked);   /* a box only with its text */
+             if(boxed)shown++;
+             if(t*0.05>6.01)assert(!boxed);   /* gone with the notice */
+         }
+         assert(shown>100);   /* the hint itself shown for its time */
+     }
+     r_refdef.vrect.height=152;}
+    /* and a notice of blank rows only draws nothing */
+    AW_UIPickupNotice("\n\n",3);clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);
     return 0;
 }
 int AW_PhotoModeActive(void){return photo;}

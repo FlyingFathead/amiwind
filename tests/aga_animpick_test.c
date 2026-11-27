@@ -144,6 +144,13 @@ int main(void) {
         in.move=AW_PM_BACK;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakback"));
         in.move=AW_PM_LEFT;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakleft"));
         in.move=AW_PM_RIGHT;in.run=1;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakright"));   /* no run sneaking */
+        /* PLAYER-SNEAK-NOT-HELD-69: the sneak gait plays at the speed over the sneak animation's own (33.5452 original
+         * units/s, OpenMW 0.53 character.cpp:745-747, x 0.25): a sneak at 40.5 units/s (a Speed 75 Nord's walk 54 x
+         * fSneakSpeedMultiplier 0.75) plays 4.83 times its own time; the walk's own speed (38.52) gave 1.05, the body
+         * glided. Within .25 and the original's cap of 10. */
+        {float r=AW_PickSneakRate(40.5f);assert(r>4.82f && r<4.84f && r>3*(40.5f/38.52f));}
+        assert(AW_PickSneakRate(AW_PICK_SNEAK_SPEED)>.999f && AW_PickSneakRate(AW_PICK_SNEAK_SPEED)<1.001f);
+        assert(AW_PickSneakRate(0)==.25f && AW_PickSneakRate(1000)==10);
         in.move=AW_PM_NONE;in.run=0;in.turn=AW_PM_TURNLEFT;
         assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"idlesneak"));       /* no turning while sneaking */
         in.sneak=0;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"turnleft"));    /* turn on the spot */

@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -93,7 +93,7 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Running / swimming / jump fatigue | fatigue loss | now | character sheet fatigue (the HUD bar) |
 | Fatigue return | fatigue gain | now (before this change) | combat rules, Endurance |
 | Fatigue at or below 0 | knocked out | now, for a fight's damage | combat rules; movement never takes it below 0 |
-| Sneaking | x fSneakSpeedMultiplier, no running, fatigue | later | no sneak input yet |
+| Sneaking | x fSneakSpeedMultiplier on the walk (0.75 in Morrowind.esm), no running, fatigue | v0.0.58; the key toggles since v0.0.69 | the sneak key (Left Ctrl): one press on, the next off; Options > Controls "Sneak key: Hold" or `aw_sneak_toggle 0` sneaks while the key is held (OpenMW 0.53's toggle sneak setting); a script's ForceSneak |
 | Paralysis | speed 0 | later | magic effects (none yet) |
 | Feather / Burden | load | in (v0.0.61, `AW_EncumbranceSetEffects`): the spell effects Burden and Feather feed the carry weight | magic effects |
 | Fortify / Drain / Damage Speed, Athletics, Strength, Acrobatics | the stats | later (the sheet's damage field already counts) | magic effects |

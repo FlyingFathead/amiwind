@@ -343,6 +343,9 @@ static void reset_scripts(int new_game){AW_MwscriptNewGameReset();}
 /* DBG-NOBURDEN-62: the no-burden debug mode (aw_move.c) is off after New Game, as at boot */
 static void reset_noburden(int new_game){(void)new_game;AW_MoveNoBurdenSet(0);}
 static unsigned long digest_noburden(void){return (unsigned long)AW_MoveNoBurdenOn();}
+/* PLAYER-SNEAK-NOT-HELD-69: the toggled sneak (the sneak key's state, aw_move.c) is off after New Game, as at boot */
+static void reset_sneak(int new_game){(void)new_game;AW_MoveSneakSet(0);}
+static unsigned long digest_sneak(void){return (unsigned long)AW_MoveSneakOn();}
 static void register_resets(void){
     AW_ResetRegister("story and globals",reset_story,digest_story);
     AW_ResetRegister("character",reset_character,NULL);
@@ -354,6 +357,7 @@ static void register_resets(void){
      * sneak and fade, the session's object state (aw_mwhost.c AW_MwscriptNewGameReset) */
     AW_ResetRegister("scripts and actors",reset_scripts,AW_MwscriptDigest);
     AW_ResetRegister("no burden (dbg noburden)",reset_noburden,digest_noburden);
+    AW_ResetRegister("the toggled sneak",reset_sneak,digest_sneak);
 }
 /* New Game (aw_intro.c aw_game_reset): every registered reset, then the check that every state with a digest is what
  * a New Game from a fresh boot has (AW_ResetMarkBoot at the end of the start-up, host.c). */

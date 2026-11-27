@@ -187,6 +187,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
 - [MESH-EXPORT-FULL-67](MESH-EXPORT-FULL-67.md): tools/mesh_export.py writes no texture names in its material file and no texture coordinates
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
+- [MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69](MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69.md): The script tracker's effect table still describes a function as it was before its fix
 - [MWSCRIPT-TRACKER-MAIN-INERT-63](MWSCRIPT-TRACKER-MAIN-INERT-63.md): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - [PACKAGE-PORTABILITY-28](PACKAGE-PORTABILITY-28.md): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PERF-DB-CHIMPORT-NO-WALL-67](PERF-DB-CHIMPORT-NO-WALL-67.md): The performance database records the master builder's CHIM import runs without their times, so it cannot answer how long such a run takes
@@ -213,6 +214,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68](STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68.md): The stall watcher judged night only by the clock, so an alert the session had not yet acknowledged still reached the maintainer after night mode was switched on in the evening
 - [TEST-CHIMPORT-POOL-COPY-MODE-48](TEST-CHIMPORT-POOL-COPY-MODE-48.md): test_chimport_pool's copy-mode reuse test fails in the gate container: the units are computed again
 - TEST-TOOLKIT-LINE-TIED-VERSION-49 (no report page): The Toolkit fold test tied the Toolkit line (Last updated with AmiWind vX) to VERSION: the v0.0.50-dev1 bump failed gate 3840 although the Toolkit had not changed
+- [TODO-CHECK-SCRATCH-COPY-69](TODO-CHECK-SCRATCH-COPY-69.md): The work-list check kept the checked copy of a test list under the name of a real list, so a later check of a real list with that name would report items as lost
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker
 - TOOLKIT-COPY-ONE-CELL-57 (no report page): The world map's copy-cells button is disabled when only one cell is clicked
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
@@ -243,6 +245,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
 - [TRACK-NEW-REGISTER-BEFORE-TODO-68](TRACK-NEW-REGISTER-BEFORE-TODO-68.md): A fault filed through the tracker intake stays without its planning item while the register renders, and an item made by hand in that time makes the intake refuse its own item as a duplicate
+- [TRACK-STEP-PRIVATE-PATH-NOT-REFUSED-69](TRACK-STEP-PRIVATE-PATH-NOT-REFUSED-69.md): A private folder path in a closure step's text reaches the public bug pages; only the release check stops it
 - [TRACK-UPDATE-MOVED-ITEM-FIRST-68](TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item
 - [TRACK-UPDATE-SET-LAST-ONLY-68](TRACK-UPDATE-SET-LAST-ONLY-68.md): The tracker intake's update command applied only the last of several field options and dropped the others without a message
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island

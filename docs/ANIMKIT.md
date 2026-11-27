@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -83,6 +83,13 @@ entity's `aw_idle_base` and `aw_idle_count`). Yakov's is 5 against 40, so he sta
 `dbg animkit play idle9` (or `d:idle9` on any humanoid) plays the dance. The files the table appends are listed
 in `tools/skeletal_actor.py` (`OWN_ANIMATIONS`). An NPC naming a file that is not listed plays the common table. The carried weapon and shield hang on the table's weapon and shield bones (the item tag
 `AWTS1` beside the model: the item models, the two bone indices and the actor's scale).
+
+A baked actor whose layout names a skeletal mover (the opening's people wear an actor-library model to walk and
+fight) has the mover's item tag read when it spawns with the tag's own frame count: the mover is registered by name
+then and loads only when it is worn, and its frames are checked against the tag at that moment (in earlier versions
+the tag was read against the unloaded mover's count and refused, so those actors fought with nothing in their hands).
+`dbg animkit pick` also lists the level's item tag tables (how many are in use of the level's 64, how many were read
+with the tag's own count) and the table of the NPC under the crosshair.
 
 ## Console: dbg animkit
 
@@ -193,6 +200,13 @@ and `spellturn*`, held 0.05 s after the last turn), the hit recovery `hit1`..`hi
 damage and did not knock the player down (`swimhit` in water), `knockdown` held until the player gets up and
 `knockout` looping from its loop key while out, over any stance. Left: the inventory picture's poses, `pickprobe` (no
 lockpicking yet), turning in water. Cost: one group lookup by name when the state changes, as for the stance.
+Since v0.0.69 the sneak gaits play at the player's speed over the sneak animation's own speed, as OpenMW plays a
+movement group at the speed over that group's own velocity (the original's third-person sneak gait covers 33.5452
+original units a second, OpenMW 0.53 `character.cpp`, 8.39 AmiWind units); before, they played at the walk's rate,
+about 4.6 times too slowly at a sneak's pace, so the crouched body seemed to glide. `dbg camera` prints the rate
+("Stance rate") and the sneak state. The body's speed is the player's own velocity: before v0.0.69 it was the copy the
+server sends to the screen side in steps of 16 units, which made every gait a tenth to a fifth too slow (a sneak at
+40.7 units a second read as 32).
 
 ## Walk or run: the rules and their sources
 

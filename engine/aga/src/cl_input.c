@@ -177,9 +177,16 @@ void IN_MoverightUp(void) {KeyUp(&in_moveright);}
 
 void IN_SpeedDown(void) {KeyDown(&in_speed);}
 void IN_SpeedUp(void) {KeyUp(&in_speed);}
-/* SNEAK-58: +aw_sneak, held = sneak (the original's default Left Ctrl); in debug noclip it is the fast-flight key,
- * so both buttons follow it */
-void IN_SneakDown(void) {KeyDown(&in_sneak);KeyDown(&in_fastflight);}
+/* SNEAK-58: +aw_sneak, the sneak key (the original's default Left Ctrl); in debug noclip it is the fast-flight key,
+ * so both buttons follow it. PLAYER-SNEAK-NOT-HELD-69: a fresh press (the button was up), in play with the player's
+ * controls allowed (OpenMW 0.53 playercontrols.lua: the toggle only while movement is allowed), toggles the sneak
+ * (aw_move.c AW_MoveSneakPress; aw_sneak_toggle 0 = held, as before). */
+void AW_MoveSneakPress(void);
+void IN_SneakDown(void) {
+    int was=in_sneak.state&1;
+    KeyDown(&in_sneak);KeyDown(&in_fastflight);
+    if(!was && (in_sneak.state&1) && key_dest==key_game && AW_ControlAllowed(AW_CONTROL_PLAYER))AW_MoveSneakPress();
+}
 void IN_SneakUp(void) {KeyUp(&in_sneak);KeyUp(&in_fastflight);}
 void IN_StrafeDown(void) {KeyDown(&in_strafe);}
 void IN_StrafeUp(void) {KeyUp(&in_strafe);}

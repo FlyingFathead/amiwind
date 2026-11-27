@@ -103,5 +103,20 @@ int main(void)
       disabled_ref=0;strcpy(sv.name,"prison2");sv.time=8;t=check(a,b,&p);assert(t.fraction==1);   /* not on this map */
       file_text=NULL;AW_BarrierServerReset();strcpy(sv.name,"mh");sv.time=9;t=check(a,b,&p);assert(t.fraction==1);
     }
+    /* DROP-REFUSED-CENSUS-ROOM-67: a drop's point path (AW_BarrierPointBlocked, the inventory's drop ahead) meets the
+     * boxes the walking player meets, which AW_BarrierClip leaves alone for a point: the world's on their own map, the
+     * opening's while the story holds; it marks no box as met (GetCollidingPC is the player's own touch) */
+    { vec3_t c={90,0,0},d={110,0,0},e={90,20,0},f={110,20,0},g={-10,0,0},h={10,0,0};
+      sv.active=1;
+      file_text="AWWB1\nopening 0\nship 0\nbox 4218700 400.000 0.000 0.000 1 0 0 0 1 0 0 0 1 4.000 4.000 4.000\n";
+      AW_BarrierServerReset();AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);strcpy(sv.name,"mh");sv.time=10;
+      assert(AW_BarrierPointBlocked(c,d) && !AW_BarrierPointBlocked(e,f) && !AW_BarrierTouching(4218700));
+      strcpy(sv.name,"prison2");sv.time=11;assert(!AW_BarrierPointBlocked(c,d));
+      /* the opening's box on the dock (the decoded table above, at the map's origin): while the story holds only */
+      AW_StoryReset(1);strcpy(sv.name,"seyda");sv.time=12;assert(AW_BarrierPointBlocked(g,h));
+      AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);sv.time=13;assert(!AW_BarrierPointBlocked(g,h));
+      sv.active=0;assert(!AW_BarrierPointBlocked(g,h));
+      file_text=NULL;AW_BarrierServerReset();
+    }
     return 0;
 }

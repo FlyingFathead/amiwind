@@ -12,6 +12,8 @@ __pycache__/
 /engine/aga/obj/
 /engine/aga/obj-nofpu/
 /docs/PACKAGE_MANIFEST.json
+# The bug register tool's lock and the temporary files of its writes (tools/bug_register.py LOCK_FOLDER).
+/.bug_register/
 
 # Original/converted assets and accidental local copies are never source.
 *.[Ee][Ss][Mm]

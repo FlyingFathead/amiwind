@@ -263,3 +263,26 @@ void AW_BarrierClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,
     for(i=0;i<count;i++)if(box_on>>i&1)sweep(&boxes[i],start,mins,maxs,end,trace);
     pier_clip(start,mins,maxs,end,trace);
 }
+/* DROP-REFUSED-CENSUS-ROOM-67 (v0.0.69): the inventory's drop (aw_inventory.c AW_InventoryDropHere) traces points,
+ * which AW_BarrierClip above leaves alone (it clips the player's own box), so a drop ahead could lie past a box the
+ * player cannot pass. 1 when the segment START..END meets a box that clips the walking player on this map now: the
+ * world's boxes and, while the story holds, the opening's (the ship's blocker, the dock's boxes and the pier's sides),
+ * the same selection as AW_BarrierClip. It marks no box as met: GetCollidingPC is the player's own touch. */
+int AW_BarrierPointBlocked(const float *start,const float *end)
+{
+    vec3_t a,b,zero;trace_t trace;int i;
+    if(!sv.active)return 0;
+    refresh();
+    VectorCopy(start,a);VectorCopy(end,b);VectorCopy(vec3_origin,zero);
+    memset(&trace,0,sizeof(trace));trace.fraction=1;
+    for(i=0;i<world_n;i++)if(world_on>>i&1)sweep(&world_boxes[i],a,zero,zero,b,&trace);
+    if(AW_StoryRestricted()){
+        if(!strcmp(sv.name,"prison")){
+            for(i=0;i<ship_count;i++)if(ship_on>>i&1)sweep(&ship_boxes[i],a,zero,zero,b,&trace);
+        }else if(count && !strcmp(sv.name,"seyda")){
+            for(i=0;i<count;i++)if(box_on>>i&1)sweep(&boxes[i],a,zero,zero,b,&trace);
+            pier_clip(a,zero,zero,b,&trace);
+        }
+    }
+    return trace.fraction<1 || trace.startsolid;
+}

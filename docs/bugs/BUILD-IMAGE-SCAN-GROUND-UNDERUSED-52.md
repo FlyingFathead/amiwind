@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.53 at 2026-10-27 07:45 +0200: Seen again: the v0.0.53 final run 2026_10_27_v0.0.53_final_45f4c426 ran its image stage under half its cores with units queued, 4 times (the build summary Needs attention item)
 - Reported with v0.0.64-dev1 at 2026-11-10 05:31 +0200: dev1 build of 4bd67418: the image step's hidden-surface cull walked its 1,136 maps at about one core (107 percent of 24)
@@ -11,6 +11,7 @@
 - Reported with v0.0.69-dev1 at 2026-11-25 13:34 +0200: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - Reported with v0.0.69-dev2 at 2026-11-25 17:32 +0200: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
 - Reported with v0.0.69-dev4 at 2026-11-25 23:26 +0200: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
+- Reported with v0.0.69-dev5 at 2026-11-26 09:46 +0200: The v0.0.69-dev5 build's image stage again ran under half its cores with units queued, 7 times (6 in the build before it).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -50,6 +51,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-25 13:34 +0200: seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - 2026-11-25 17:32 +0200: seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
 - 2026-11-25 23:26 +0200: seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
+- 2026-11-26 09:46 +0200: seen again in v0.0.69-dev5: The v0.0.69-dev5 build's image stage again ran under half its cores with units queued, 7 times (6 in the build before it).
 
 <!-- END GENERATED TIMELINE -->
 
@@ -58,7 +60,7 @@ _Last updated with AmiWind v0.0.64-dev2 (10 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 10 November 2026](#status-10-november-2026)
 - [Symptom](#symptom)

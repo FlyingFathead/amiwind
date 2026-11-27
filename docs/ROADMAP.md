@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.69: in development, fifth snapshot 26 November 2026](#v0069-in-development-fifth-snapshot-26-november-2026)
+- [v0.0.69: Fix The World After You Put It Together, in development, sixth snapshot 26 November 2026](#v0069-fix-the-world-after-you-put-it-together-in-development-sixth-snapshot-26-november-2026)
 - [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
@@ -120,7 +120,17 @@ _Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.69: in development, fifth snapshot 26 November 2026
+## v0.0.69: Fix The World After You Put It Together, in development, sixth snapshot 26 November 2026
+
+The sixth snapshot, [v0.0.69-dev6](releases/notes/RELEASE-v0.0.69-dev6.md), answers the faults of the latest play
+report: the walking residents of Seyda Neen walk smoothly without snapping back, every armed person holds its weapon in
+its hand through every attack, items can be dropped inside tombs, caves and houses and stay where they were dropped, the
+census office's platter is a takeable item, voiced characters move their mouths with their voice lines, one press of the
+sneak key keeps the player sneaking and the third-person body walks crouched at the right pace, and residents walk their
+routes through the converted world's collision without getting stuck. The bug tracker also keeps every entry when
+several writers file at once and links entries that are probably the same fault. Next: every character and creature
+handling its weapons as in the original (draw, stance, attack types, speed, reach, blocking, bows and thrown weapons),
+the bow in the left hand, and the opening's people using the same paths as the rest of the world.
 
 The fifth snapshot, [v0.0.69-dev5](releases/notes/RELEASE-v0.0.69-dev5.md), names the place and its map file together
 in the failed-load box.

@@ -65,6 +65,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68](MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68.md): GetSoundPlaying and StopSound see only sounds the same script started, a loop on another object moves to the script's own object, and the pitch argument of the VP sound calls is not used
 - [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
+- [NPC-VOICE-ON-EFFECTS-VOLUME-69](NPC-VOICE-ON-EFFECTS-VOLUME-69.md): NPC voice lines from the voice table and script Say play at the effects volume, not the dialogue volume
 - PLAYER-FOOTSTEPS-NONE-58 (no report page): The player has no footstep sounds: only NPCs play them, and there is no setting for the player's own
 - [PUNCH-AUDIO-COVERAGE-29](PUNCH-AUDIO-COVERAGE-29.md): Original punch swing/hit sound coverage unverified
 - [SOUND-MARKERS-SILENT-48](SOUND-MARKERS-SILENT-48.md): The original's sound markers are placed but silent: 2,163 in Morrowind (187 outdoors in 78 cells, 1,976 in 434 rooms), water under the Khuul pier, creaking under bridges and boats

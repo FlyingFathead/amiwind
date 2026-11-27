@@ -14,6 +14,10 @@ int (*aw_chim_frozen)(edict_t *);
  * reach there and the ground to lift it onto. NULL or 0: no floor (legacy maps,
  * outside the layer, chim_terrain_floor 0). */
 int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);
+/* CHIM-COLLISION-WALKS-67: 1 when the collision holds the ground at a point (chim_world.c Ground: the chunk under it
+ * is grafted into the frame world, which CHIM keeps only around the player), 0 when it does not. NULL or a map that
+ * is no CHIM frame (rooms, legacy maps): the ground is always there. aw_ambient.c asks it before a walker's step. */
+int (*aw_chim_ground)(const float *origin);
 /* Step rules (docs/STEP_MOVEMENT.md, STEP-MOVEMENT-OPENMW-RULES-48): 1 = Morrowind's step and slope rules as
  * OpenMW states them (sv_phys.c SV_StepRulesStep, quakedef.h AW_WALKABLE); 0 (default) = the Quake rules. Not saved:
  * the default stays until the maintainer decides. */
@@ -253,6 +257,81 @@ static qboolean step_height_ok(const vec3_t delta,const trace_t *under)
     return fabs(delta[2])<=8.75f+run*sqrt(1-nz*nz)/nz;
 }
 int aw_actor_step_diag,aw_actor_step_fail;float aw_actor_step_reached[3],aw_actor_step_floor[5];   /* aw_ambient.h */
+/* CHIM-COLLISION-WALKS-67 (AMBIENT-WALK-STUCK-COLLISION-54): a step whose box meets a too-steep face at its support
+ * test. The player's walk goes on there: the face clips its move (sv_phys.c SV_WalkMove) and gravity takes it down
+ * the face; OpenMW's ground test marks such an actor as on a slope and lets it slide, never refusing the move
+ * (apps/openmw/mwphysics/movementsolver.cpp 379-428: the trace down sStepSizeDown, isOnSlope = !isWalkableSlope).
+ * The actor's trial step refused it whole (the support test wants a walkable floor), so a resident whose box touched
+ * the foot of a rock or a wall stopped where the player walks on: in the v0.0.69-dev5 Seyda Neen session 32 of 654
+ * refused steps, at faces of normal z 0.55 and 0.21 with walkable ground 1.8 to 4.8 under the box's centre; in Balmora
+ * a Hlaalu guard stood on a crate's steep top edge (normal z 0.49 and 0.69), the street 11.2 below, for 38 steps.
+ * aw_actor_steep 1 (the default; "chim actors ambient steep on|off", not saved, no cvar of its own), OpenMW's rules for
+ * such a face, our own code: a step INTO it slides along it level, as along a wall (movementsolver.cpp 279-287: a
+ * too-steep face met on the ground has its normal laid flat; 363-370: no sliding up a too-steep slope): the step is
+ * tried again with the move's part into the face taken out, and holds by the usual support test. A step that did not
+ * rise and has the face under it within OpenMW's ground test holds as the walk move left it (no snap onto the face)
+ * when the point under the box's centre has walkable ground within that test too (sStepSizeDown 62 + 2 x sGroundOffset
+ * 1 = 64 original units, 16 here: mwphysics/constants.hpp, movementsolver.cpp 384): the actor is on a slope and gravity
+ * takes it down the face in its next steps, as the player. So no too-steep face is climbed (Quake's own walk crawls up
+ * one: tests/aga_step_rules_test.c) and no ledge higher than the test is walked off. 0 = refused, the method before. */
+#define ACTOR_SLOPE_TEST 16.0f
+int aw_actor_steep=1;
+unsigned long aw_actor_steep_steps;   /* steps taken by that rule (the ambient status) */
+static qboolean steep_contact(edict_t *p,float depth,trace_t *t)
+{
+    vec3_t end;
+    VectorCopy(p->v.origin,end);end[2]-=depth;
+    *t=SV_Move(p->v.origin,p->v.mins,p->v.maxs,end,MOVE_NORMAL,p);
+    return !t->startsolid && !t->allsolid && t->fraction<1 && !AW_WALKABLE(t->plane.normal[2]) &&
+           t->ent && t->ent->v.solid==SOLID_BSP;
+}
+/* walkable ground of the world (no bodies) under the box's centre within DEPTH below its feet */
+static qboolean centre_ground(edict_t *p,float depth)
+{
+    vec3_t start,end;trace_t t;
+    VectorCopy(p->v.origin,start);start[2]+=p->v.mins[2]+0.25f;
+    VectorCopy(start,end);end[2]-=depth+0.25f;
+    t=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+    return !t.startsolid && !t.allsolid && t.fraction<1 && AW_WALKABLE(t.plane.normal[2]);
+}
+/* The steep rule's second trial: P from ORIGIN by MOVE over DT through the player's walk, as the first trial in
+ * AW_ActorStep; DELTA what it moved. */
+static void slide_move(edict_t *p,const vec3_t origin,const vec3_t move,double dt,float movetype,vec3_t delta)
+{
+    void (*ring)(vec3_t)=aw_chim_player;int i;
+    VectorCopy(origin,p->v.oldorigin);
+    for(i=0;i<2;i++)p->v.velocity[i]=move[i]/dt;
+    aw_chim_player=NULL;actor_step=1;
+    p->v.velocity[2]=0;p->v.movetype=MOVETYPE_WALK;AW_WalkPlayer(p);p->v.movetype=movetype;
+    aw_chim_player=ring;actor_step=0;
+    VectorSubtract(p->v.origin,origin,delta);
+}
+/* A refused step's too-steep face (aw_actor_steep above): 1 when the step holds now. A box that started its step
+ * inside solid is left to the stuck search's own rule (AW_ActorSettle, AMBIENT-UNSTUCK-FLOOD-61). */
+static qboolean steep_step(edict_t *p,const vec3_t move,double dt,const vec3_t origin,const vec3_t velocity,
+                           float flags,float groundentity,float movetype,vec3_t delta)
+{
+    trace_t face,floor;vec3_t along;float nx,ny,level,into=0;
+    if(!aw_actor_steep || !(delta[0]*delta[0]+delta[1]*delta[1]>.00001f) || !steep_contact(p,ACTOR_SLOPE_TEST,&face))
+        return false;
+    {trace_t at=SV_Move((float *)origin,p->v.mins,p->v.maxs,(float *)origin,MOVE_NOMONSTERS,p);if(at.startsolid)return false;}
+    nx=face.plane.normal[0];ny=face.plane.normal[1];level=(float)sqrt(nx*nx+ny*ny);
+    if(level>.0001f)into=(move[0]*nx+move[1]*ny)/level;
+    along[0]=move[0]-nx/level*into;along[1]=move[1]-ny/level*into;along[2]=0;
+    if(into<0 && along[0]*along[0]+along[1]*along[1]>.0001f){
+        /* into the face: slide along it level, as along a wall */
+        VectorCopy(origin,p->v.origin);VectorCopy(velocity,p->v.velocity);
+        p->v.flags=flags;p->v.groundentity=groundentity;
+        slide_move(p,origin,along,dt,movetype,delta);
+        if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && support(p,8.75f,&floor) && step_height_ok(delta,&floor) &&
+           !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin))){
+            ground(p,&floor);return true;
+        }
+    }
+    /* on the face without rising, walkable ground under its centre within the ground test: it is on a slope */
+    return delta[0]*delta[0]+delta[1]*delta[1]>.00001f && delta[2]<=0.5f && steep_contact(p,ACTOR_SLOPE_TEST,&face) &&
+           centre_ground(p,ACTOR_SLOPE_TEST) && !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin));
+}
 qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
 {
     vec3_t origin,oldorigin,velocity,delta;float flags,groundentity,movetype;trace_t floor;int i;
@@ -273,6 +352,10 @@ qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
     if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && support(p,8.75f,&floor) && step_height_ok(delta,&floor) &&
        !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin))) {
         ground(p,&floor);VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);return true;
+    }
+    /* a too-steep face under the box where the player's walk slides on (aw_actor_steep above) */
+    if(steep_step(p,move,dt,origin,velocity,flags,groundentity,movetype,delta)){
+        VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);aw_actor_steep_steps++;return true;
     }
     /* Why the step failed, only while a diagnostic asks ("chim actors ambient steplog", aw_ambient.c): the test
      * that refused it at the position the walk move reached, and that position's support trace. */
@@ -300,4 +383,25 @@ qboolean AW_ActorSettle(edict_t *p)
     VectorCopy(p->v.origin,at);VectorCopy(p->v.origin,p->v.oldorigin);
     SV_CheckStuck(p);
     return at[0]!=p->v.origin[0] || at[1]!=p->v.origin[1] || at[2]!=p->v.origin[2];
+}
+/* CHIM-COLLISION-WALKS-67: an actor that walked its route where the collision did not hold the ground (aw_ambient.c:
+ * its height then came from the route's points, not from a floor) stands on the ground again once it is there: the box
+ * goes up by at most UP (a ceiling stops it, so it never lands on anything above it), then down by at most UP + DOWN
+ * onto the first walkable floor, as the spawn's bounded snap does (aw_scene.c AW_NPCFloor: 32 down, never a storey).
+ * 1 when it stands on that floor now, 0 when none was in reach (it stays where it is; its steps decide then). */
+int AW_ActorGroundSettle(edict_t *p,float up,float down)
+{
+    vec3_t top,end;trace_t t;
+    VectorCopy(p->v.origin,top);top[2]+=up;
+    t=SV_Move(p->v.origin,p->v.mins,p->v.maxs,top,MOVE_NOMONSTERS,p);
+    if(t.allsolid)return false;
+    VectorCopy(t.endpos,top);
+    VectorCopy(top,end);end[2]=p->v.origin[2]-down;
+    t=SV_Move(top,p->v.mins,p->v.maxs,end,MOVE_NOMONSTERS,p);
+    if(t.startsolid || t.allsolid || t.fraction>=1 || !AW_WALKABLE(t.plane.normal[2]))return false;
+    VectorCopy(t.endpos,p->v.origin);VectorCopy(t.endpos,p->v.oldorigin);
+    p->v.flags=(int)p->v.flags|FL_ONGROUND;
+    if(t.ent)p->v.groundentity=EDICT_TO_PROG(t.ent);
+    SV_LinkEdict(p,false);
+    return true;
 }

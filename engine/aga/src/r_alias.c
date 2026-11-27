@@ -774,6 +774,13 @@ static int			posed_key, posed_roots[AW_SKEL_LAYERS];
 static float		posed_layers[AW_SKEL_LAYERS];
 int	aw_pose_hits, aw_pose_misses;	/* frames drawn from the cache and posed: for a measurement or a dbg line */
 
+/* NPC-TALK-MOUTH-STILL-69: a speaking NPC's open mouth (aw_talkpack.c; the hooks set in aw_debug.c, NULL in fixtures):
+ * its talk level (1..3) keys the pose as well, AW_TALK_KEY a level (above every frame and AW_STORM_KEY), and its
+ * head's talking vertices are posed again after AW_SkelPoseVerts; the bones' own pose is shared with the shut one */
+#define AW_TALK_KEY 0x400000
+int (*R_AliasTalkLevel)(const entity_t *e);
+int (*R_AliasTalkApply)(const entity_t *e, const void *hdr, const aw_skel_block_t *block, const float world[][3][4],
+                        unsigned char *out);
 static int R_AliasSkelFrame (void)
 {
     static float		world[AW_SKEL_MAX_BONES][3][4];
@@ -781,11 +788,14 @@ static int R_AliasSkelFrame (void)
     const aw_skel_table_t	*table = (const aw_skel_table_t *)paliashdr->aw_skel_table;
     trivertx_t			*rest;
     aw_posed_t			*slot;
-    int					i, frame = currententity->frame, key, roots[AW_SKEL_LAYERS] = {-1, -1};
+    int					i, frame = currententity->frame, key, bones_key, talk, roots[AW_SKEL_LAYERS] = {-1, -1};
     float				layers[AW_SKEL_LAYERS] = {0, 0};
     if (!table || pmdl->numverts > MAXALIASVERTS || paliashdr->frames[0].type != ALIAS_SINGLE)
         return 0;
-    key = AW_SkelEntityKey (currententity->model, paliashdr, frame, currententity->angles[YAW], layers, roots);
+    key = bones_key = AW_SkelEntityKey (currententity->model, paliashdr, frame, currententity->angles[YAW], layers, roots);
+    talk = R_AliasTalkLevel ? R_AliasTalkLevel (currententity) : 0;
+    if (talk)
+        key = key >= 0 ? key + talk * AW_TALK_KEY : key - talk * AW_TALK_KEY;
     if (!aw_pose_grown)
     {
         aw_posed_t *more = (aw_posed_t *)AW_TryMalloc (AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));
@@ -820,12 +830,12 @@ static int R_AliasSkelFrame (void)
         /* the bones of the last pose kept: the assembled player body's parts (aw_player_parts.h) are several models
          * on one table at one frame, so the bones are posed once for all of them, only the vertices per part */
         AW_RT_BEGIN(t0);
-        if (table != posed_table || key != posed_key || memcmp (roots, posed_roots, sizeof(posed_roots)) ||
+        if (table != posed_table || bones_key != posed_key || memcmp (roots, posed_roots, sizeof(posed_roots)) ||
             memcmp (layers, posed_layers, sizeof(posed_layers)))
         {
             AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);
             posed_table = table;
-            posed_key = key;
+            posed_key = bones_key;
             memcpy (posed_roots, roots, sizeof(posed_roots));
             memcpy (posed_layers, layers, sizeof(posed_layers));
         }
@@ -833,6 +843,8 @@ static int R_AliasSkelFrame (void)
         AW_RT_BEGIN(t0);
         AW_SkelPoseVerts (block.data, &rest[0].lightnormalindex, sizeof(trivertx_t), pmdl->numverts, block.rest_scale,
                           (const float (*)[3][4])world, block.pose_origin, block.pose_step, (unsigned char *)slot->verts);
+        if (talk && R_AliasTalkApply)
+            R_AliasTalkApply (currententity, paliashdr, &block, (const float (*)[3][4])world, (unsigned char *)slot->verts);
         AW_RT_END(RT_SKELVERTS, t0);
     }
     slot->model = currententity->model;

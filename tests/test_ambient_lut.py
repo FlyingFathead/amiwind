@@ -462,6 +462,13 @@ class AmbientSourceContractTests(unittest.TestCase):
         self.assertIn('!strcmp(a,"doors")', c)
         import build_aga
         self.assertIn(b'\nchim actors ambient doors on\n', build_aga.ACTOR_LOGIC_LINES)
+        # CHIM-COLLISION-WALKS-67: the walk where the collision does not hold the ground and the steep-contact step,
+        # both on in the shipped default (the engine's defaults too), each with its off switch for the A/B
+        self.assertIn(b'\nchim actors ambient offground on\nchim actors ambient steep on\n', build_aga.ACTOR_LOGIC_LINES)
+        self.assertIn('static int offground_on=1;', c)
+        self.assertIn('!strcmp(a,"offground")', c)
+        self.assertIn('!strcmp(a,"steep")', c)
+        self.assertIn('int aw_actor_steep=1;', self.code('aw_walk.c'))
         inv = self.code('aw_inventory.c')
         self.assertIn('focus_count=0;focus_outdoor=0;focus_boards=0;focus_door_count=0;', inv)
         self.assertIn("if(row->kind=='D'){if(focus_door_count<FOCUS_DOORS)focus_doors[focus_door_count++]=(short)j;", inv)

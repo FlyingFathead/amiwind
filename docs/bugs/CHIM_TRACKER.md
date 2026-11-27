@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev5._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev6._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -25,8 +25,8 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 18 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (reported 8 times, open)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 8 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 7 times, open)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 7 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core (reported 5 times, fixed)
@@ -87,6 +87,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-26 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev5: The v0.0.69-dev5 build's image stage again ran under half its cores with units queued, 7 times (6 in the build before it).
 - 2026-11-25 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev4: Seen again on v0.0.69-dev4: the image step ran on about 9 of 24 cores for five minutes.
 - 2026-11-25 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
 - 2026-11-25 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
@@ -96,7 +97,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-24 [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): seen again in v0.0.68-dev12: Measured in v0.0.68-dev12: inside the box of the original world map (cells x -29 to 23, y -19 to 28), 982 open-sea cells without any record are not built, 542 around Vvardenfell and 440 in the area Bloodmoon adds, so the edge of the world ...
 - 2026-11-24 [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): seen again in v0.0.68-dev12: Solstheim cannot be reached by swimming, walking on water or jumping from Vvardenfell: the open sea between the islands is not built, so the world ends at Vvardenfell's sea ring; only the boat from Khuul reaches the island.
 - 2026-11-24 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev12: The image step's room actor bake ran on one core again for about two minutes with every room resident cached.
-- 2026-11-24 [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item SOL-SEA-CROSSING-68: The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB ...
 
 ## Engine streaming and memory
 

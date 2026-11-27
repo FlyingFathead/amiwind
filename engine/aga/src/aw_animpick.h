@@ -90,6 +90,15 @@ int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,
  * too (the hand layer). */
 typedef struct {int weapon,hand,goal,move,run,attack,air,swim,sneak,turn,react,roll;} aw_pick_player_t;
 int AW_PickPlayerBody(const aw_pick_player_t *in,aw_pick_state_t *out);
+/* PLAYER-SNEAK-NOT-HELD-69: a sneak gait's play rate (1 = the group's own time): the actor's SPEED (AmiWind units/s)
+ * over the sneak animation's own speed, as OpenMW 0.53 character.cpp refreshMovementAnims plays a movement group at
+ * the speed over that group's velocity (getVelocity of the current movement group); the original's third-person sneak
+ * gait moves 33.5452 original units/s (character.cpp:745-747, beside walk 154.064 and run 222.857), 8.3863 AmiWind
+ * units at the world's 0.25 scale. At least .25, at most 10 (the original's cap, maxSpeedMult; as aw_anim.c's walk).
+ * The player body played its sneak gaits at the speed over the WALK's own speed (38.52), 4.6 times too slowly at a
+ * sneak's pace: the legs barely moved while the body went on (it glided). */
+#define AW_PICK_SNEAK_SPEED 8.3863f
+float AW_PickSneakRate(float speed);
 
 /* The coverage catalogue: every group of the humanoid animation files (base_anim, base_animkna, base_anim_female
  * and an NPC's own file), how the game logic reaches it. tools/anim_coverage.py reads this table from the source. */

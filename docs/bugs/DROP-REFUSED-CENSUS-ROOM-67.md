@@ -20,6 +20,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev5 (1035a158) | 2026-11-26 | gate 13260 of the planning item DROP-IN-ROOMS-REFUSED-62 | A drop from the inventory works in every room, the opening's rooms during the registration included; a spot ahead that cannot take the item puts it on the floor under the player |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.67
+- 2026-11-26: fixed in source: a gated commit, v0.0.69-dev5 (1035a158); gate 13260 of the planning item DROP-IN-ROOMS-REFUSED-62: A drop from the inventory works in every room, the opening's rooms during the registration included; a spot ahead that cannot take the item puts it on the floor under the player
+- 2026-11-26 17:48 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: dropping an item in the Census and Excise Office is still refused; raised to the top of the work list.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -147,6 +165,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [FACTION-EXPEL-MESSAGE-64](FACTION-EXPEL-MESSAGE-64.md): An expulsion from a faction shows no message to the player
 - [FACTION-STATS-PAGE-64](FACTION-STATS-PAGE-64.md): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
+- [FARGOTH-STASH-STUMP-69](FARGOTH-STASH-STUMP-69.md): Fargoth's hiding place, the hollow treestump in Seyda Neen, is drawn but cannot be opened, so the stash of the quest cannot be found
 - [FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67](FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67.md): While the run key is held, the key that readies the fight stance does nothing
 - [FOCUS-EYE-INSIDE-ACTOR-BOX-68](FOCUS-EYE-INSIDE-ACTOR-BOX-68.md): The use key goes to a creature instead of the door under the crosshair when the player stands inside the creature's use box: the Unmarked Shipwreck's trapdoor cannot be used while a dreugh is near
 - [GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67](GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67.md): A script reading the player's angle on the z axis gets a value 90 degrees off the view
@@ -164,6 +183,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [INVENTORY-EQUIP-KINDS-NOT-YET-67](INVENTORY-EQUIP-KINDS-NOT-YET-67.md): Arrows and bolts, lockpicks and probes cannot be equipped from the inventory, and repair tools cannot be used
 - INVENTORY-ITEM-MODEL-PATH-59 (no report page): The inventory catalogue refuses every item whose world model comes from the item model table (progs/items/)
 - [INVENTORY-OPEN-COST-MANY-KINDS-61](INVENTORY-OPEN-COST-MANY-KINDS-61.md): With hundreds of kinds of item the inventory takes seconds to open, and every Tab reads the item file again
+- [ITEM-AIM-UNDER-OTHERS-69](ITEM-AIM-UNDER-OTHERS-69.md): The Iron Dagger on the Census and Excise Office table is hard to aim at: the items around and over it take the aim
+- [ITEM-NAMELESS-NOT-TAKEN-69](ITEM-NAMELESS-NOT-TAKEN-69.md): Takeable items whose record has no name (the burned-out torches of the Temple Sewers West in Old Mournhold) cannot be aimed at or taken
 - JOURNAL-BOOK-32-QUESTS-59 (no report page): The journal book lists only the quests of the old 32-slot table, although every quest's stage is now kept
 - [JOURNAL-LOWER-INDEX-ENTRY-64](JOURNAL-LOWER-INDEX-ENTRY-64.md): A Journal command at or below the quest index adds no entry, no finished or restart mark and no notice
 - [LAVA-NO-DAMAGE-63](LAVA-NO-DAMAGE-63.md): Lava does no damage and is not drawn in the Red Mountain lava pool
@@ -235,6 +256,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [OPENING-VANITY-CAMERA-64](OPENING-VANITY-CAMERA-64.md): The idle camera orbit and the view switch run on the prison ship and the pier before the race is chosen
 - [OPENING-WEATHER-NOT-CLOUDY-63](OPENING-WEATHER-NOT-CLOUDY-63.md): A new game does not start with the Bitter Coast weather set to cloudy, as the original opening script does
 - [OUTDOOR-CONTAINER-AIM-66](OUTDOOR-CONTAINER-AIM-66.md): Containers outdoors (sacks, barrels, crates, chests by the huts and camps) cannot be aimed at, so they never open
+- [OUTDOOR-ITEM-CHIM-COPY-STAYS-69](OUTDOOR-ITEM-CHIM-COPY-STAYS-69.md): Outdoors, a takeable item that the world's scenery also places is drawn twice at the same spot, and its scenery copy stays after the item is taken
 - [OWNED-FACTION-RANK-GLOBAL-IGNORED-67](OWNED-FACTION-RANK-GLOBAL-IGNORED-67.md): A faction-owned container or item is free to take for any member of the faction, whatever rank its placement asks, and a placement freed by a global variable stays owned
 - [PERSUASION-BROKEN-62](PERSUASION-BROKEN-62.md): Persuasion in dialogue does nothing: Admire and Intimidate return to the topic list, Taunt shows nothing
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
@@ -251,6 +273,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue
 - [PLAYER-READY-MOVEMENT-39](PLAYER-READY-MOVEMENT-39.md): Third-person player cannot move with fists drawn
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water
+- [PLAYER-SNEAK-NOT-HELD-69](PLAYER-SNEAK-NOT-HELD-69.md): The sneak key no longer keeps the player crouched, and the third-person player body shows no crouch animation
 - [PLAYER-START-SPELLS-NOT-KNOWN-61](PLAYER-START-SPELLS-NOT-KNOWN-61.md): Character creation never puts the race, birthsign and class spells and abilities on the player record, so they cannot be cast or apply
 - [PLAYER-WALK-SPEED-SLOW-51](PLAYER-WALK-SPEED-SLOW-51.md): The starting walk speed feels very slow; check it against the original and OpenMW
 - [POWER-COOLDOWN-NOT-SAVED-66](POWER-COOLDOWN-NOT-SAVED-66.md): Power cooldowns are not saved and not reset by a new game: a save and reload makes a used power ready again
@@ -303,6 +326,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [SKILL-BOOKS-MISSING-62](SKILL-BOOKS-MISSING-62.md): Reading a skill book does not raise its skill: the original raises it by one on the first read
 - [SKILL-RAISE-NOT-SEEN-62](SKILL-RAISE-NOT-SEEN-62.md): In a playtest of v0.0.61 no skill was ever seen to rise: no skill-increased line and no sound in normal play
 - [SPELL-EFFECTS-TABLE-CUT-64](SPELL-EFFECTS-TABLE-CUT-64.md): Game spells cast nothing: the actor table read only the first 32 sections of the compiled scripts file
+- [STEAL-WITNESS-NO-ATTACK-69](STEAL-WITNESS-NO-ATTACK-69.md): NPCs who see the player steal shout but often do not turn hostile; the reaction differs from NPC to NPC and does not follow the original crime rule
 - [STEAL-WITNESSED-NO-CRIME-60](STEAL-WITNESSED-NO-CRIME-60.md): Taking an owned item in full view of its owner or other people has no consequence
 - [STORM-WALK-NOT-SLOWED-68](STORM-WALK-NOT-SLOWED-68.md): Walking into an ash storm, blight storm or blizzard is not slowed, the weathers have no sounds, and guards put their torches away in ash storms
 - [SWEEP-ARENA-PIT-TWO-FAIL-54](SWEEP-ARENA-PIT-TWO-FAIL-54.md): dbg sweep reports two failing entities in the Vivec Arena Pit (map vai000) in every session of the Arena Pit images

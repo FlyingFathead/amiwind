@@ -36,6 +36,19 @@ Build options (the build a bug was found in, docs/bugs/README.md "Found in build
                                 bugs.json) into the register: fills missing facts only
                                 unless --overwrite; related links are made symmetric;
                                 --pages also reads hand-written fact tables (they win)
+  bug_register.py link ID OTHER --kind variant|related --why TEXT
+                                link two entries both ways as a probable variant of the same fault
+                                or as possibly related (also inside one family); both pages show it
+                                under "Possibly related"; linking again changes the kind and reason
+  bug_register.py lock --hold [--max-seconds N] | lock --status
+                                hold the register lock of this checkout until standard input
+                                closes (prints "LOCKED <token>"; a command run with that token in
+                                BUG_REGISTER_LOCK_TOKEN runs under it), or say who holds it
+
+One writer at a time: every command but `persisting` and `lock --status` runs under the register lock of its
+checkout (.bug_register/register.lock, ignored by git and by the source package) and waits for it; bugs.json and its
+archives are written by compare-and-swap (the file read is checked again just before it is replaced) and every file
+through a temporary file that is moved into place.
 
 Schema (docs/bugs/bugs.schema.json): a list of objects, one per bug, unique "id"; "state" is
 open, fixed (a correction shipped in "fixed_in" with verification) or closed (not a bug,
@@ -45,9 +58,15 @@ report template: docs/bugs/README.md.
 """
 import argparse
 import datetime
+import errno
+import hashlib
 import json
+import os
 import re
+import secrets
 import sys
+import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -128,7 +147,16 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
 OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred', 'regressions',
-            'fix_commit', 'fixed_date', 'todo', 'closure', 'history')
+            'fix_commit', 'fixed_date', 'todo', 'closure', 'history', 'links')
+# POSSIBLY RELATED (TRACK-POSSIBLY-RELATED-LINKS-69, 26 November 2026): "links" {OTHER-ID: {"kind": "variant" |
+# "related", "why": one line}} names entries that are probably the same fault seen another way ("variant") or that may
+# share its cause ("related"), also inside one family, where "related" is refused because the family list already
+# shows every member, but not which of them are probably one fault. Both ways, never a merge: each entry keeps its own
+# symptom, timeline and verification. `link A B --kind K --why W` writes both; validate refuses a one-way link; both
+# pages show the links under "Possibly related" in the category block, with the linked entry's state: a fixed or closed
+# one listed there may have come back.
+LINK_KINDS = (('variant', 'Probable variant of the same fault'), ('related', 'Possibly related'))
+LINK_KIND_KEYS = tuple(k for k, _ in LINK_KINDS)
 # HOW A BUG IS CLOSED (the closure schema, decided for the project, 16 November 2026, docs/bugs/README.md "Closure"):
 # "closure" is the list of its closure steps, each {stage, who, where, when, how, why}, in time order:
 #   stage  fixed in source | shipped | confirmed in play | confirmed by the maintainer | confirmed by a tester |
@@ -215,6 +243,216 @@ MONTHS = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augus
           'November', 'December')
 ORDER = {'open': 0, 'fixed': 1, 'closed': 2}
 
+# ONE WRITER AT A TIME, NEVER FROM AN OLD COPY (REGISTER-CONCURRENT-WRITE-LOST-67, 26 November 2026). Two commands that
+# each loaded bugs.json, changed it and wrote it back lost the earlier command's change whenever several jobs filed into
+# one checkout at once (an entry, a sighting or a closure step, six times from 19 November on). So:
+# - every command but `persisting` runs under the register lock of its checkout: an OS lock (flock; a byte lock on
+#   Windows) on .bug_register/register.lock, a folder ignored by git and by the source package (tools/release.py
+#   IGNORED_PARTS). The OS frees the lock when its holder ends, so a dead holder never blocks. A command waits for it up
+#   to LOCK_WAIT_S seconds (BUG_REGISTER_LOCK_WAIT_S), says once who holds it, then refuses with nothing written. A
+#   checkout where the lock cannot be made (a read-only copy) runs without it: nothing can be written there anyway.
+# - compare-and-swap: load() records the SHA-256 of every file it read; just before a file is replaced it is compared
+#   with what was read. A change means a writer that did not take the lock: the command is applied again to a fresh
+#   read (CAS_TRIES times), then refused loudly; an old copy is never written.
+# - every file is written to a temporary file in .bug_register/ (beside the target outside the checkout) and moved into
+#   place, so a reader sees the old file or the new one, never half of one; a move or write refused for a moment (a
+#   reader holding the file, an invalid-argument or out-of-memory error of a shared folder, REGISTER-WRITE-EINVAL-67) is
+#   tried again.
+# - a caller that runs several commands in a row (add, then the page, render and check) holds the lock across all of
+#   them with `lock --hold`: it prints "LOCKED <token>", and a command run with that token in BUG_REGISTER_LOCK_TOKEN
+#   while that holder has the lock runs under it instead of waiting for it.
+LOCK_FOLDER = '.bug_register'
+LOCK_NAME = 'register.lock'
+LOCK_TOKEN_ENV = 'BUG_REGISTER_LOCK_TOKEN'
+LOCK_WAIT_ENV = 'BUG_REGISTER_LOCK_WAIT_S'
+LOCK_WAIT_S = 900
+LOCK_HOLD_MAX_S = 1800
+LOCK_BYTE = 1 << 30      # the byte a Windows byte lock takes: past the holder's note, which stays readable
+CAS_TRIES = 3
+WRITE_TRIES = 6
+WRITE_RETRY_ERRNOS = {errno.EINVAL, errno.EACCES, errno.EPERM, errno.EBUSY, errno.ENOMEM, errno.EAGAIN}
+_READ = {}               # what load() read: {resolved path: SHA-256 of its bytes, or None when it was not there}
+
+
+class RegisterBusy(Exception):
+    """The register lock stayed held past the wait: nothing was written."""
+
+
+class RegisterChanged(Exception):
+    """A register file changed on disk after it was read (a writer that does not take the lock)."""
+
+
+def _os_lock(f):
+    """Take the OS lock on the open lock file F without waiting; OSError while another holder has it."""
+    if os.name == 'nt':
+        import msvcrt
+        f.seek(LOCK_BYTE)
+        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _os_unlock(f):
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            f.seek(LOCK_BYTE)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+def lock_path(root=None):
+    return (ROOT if root is None else Path(root)) / LOCK_FOLDER / LOCK_NAME
+
+
+def lock_note(path):
+    """What the lock file says about its holder ({token, pid, command, since}), or {} (free, or no note)."""
+    try:
+        text = Path(path).read_text(encoding='utf-8').strip()
+        note = json.loads(text) if text else {}
+        return note if isinstance(note, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def describe_holder(note):
+    if not note:
+        return 'a holder that left no note'
+    return 'pid %s, "%s", since %s' % (note.get('pid', '?'), note.get('command') or '?', note.get('since') or '?')
+
+
+class RegisterLock:
+    """The register lock of a checkout (see LOCK_FOLDER above). `with RegisterLock(command='add X'):` waits for it and
+    holds it; .under is the holder's note when the command runs under a caller's `lock --hold` (its token in
+    BUG_REGISTER_LOCK_TOKEN), .unavailable the reason when the lock cannot be made (a read-only copy)."""
+
+    def __init__(self, root=None, command='', token=None, wait=None, say=None, caller_token=True):
+        self.path = lock_path(root)
+        self.command, self.token = command, token
+        self.wait = float(wait if wait is not None else (os.environ.get(LOCK_WAIT_ENV) or LOCK_WAIT_S))
+        self.say = say or (lambda text: print(text, file=sys.stderr, flush=True))
+        self.caller = (os.environ.get(LOCK_TOKEN_ENV) or None) if caller_token else None
+        self.f, self.held, self.under, self.unavailable = None, False, None, None
+
+    def __enter__(self):
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.f = os.fdopen(os.open(str(self.path), os.O_RDWR | os.O_CREAT, 0o666), 'r+b')
+        except OSError as exc:
+            self.f, self.unavailable = None, str(exc)
+            return self
+        start, said = time.monotonic(), False
+        while True:
+            try:
+                _os_lock(self.f)
+                break
+            except OSError:
+                note = lock_note(self.path)
+                if self.caller and note.get('token') == self.caller:
+                    self.under = note           # the caller's own `lock --hold` has it: this command runs under it
+                    return self
+                if time.monotonic() - start >= self.wait:
+                    self.f.close()
+                    self.f = None
+                    raise RegisterBusy('the register lock %s stayed held for over %d s (%s); nothing was written: '
+                                       'try again when that command has finished' % (
+                                           self.path.relative_to(self.path.parents[1]).as_posix(), self.wait,
+                                           describe_holder(note)))
+                if not said and self.wait > 0:
+                    self.say('bug_register: another register command holds the lock (%s); waiting for it, one writer '
+                             'at a time' % describe_holder(note))
+                    said = True
+                time.sleep(0.2)
+        self.held = True
+        self._note({'token': self.token, 'pid': os.getpid(), 'command': self.command,
+                    'since': datetime.datetime.now().astimezone().isoformat(timespec='seconds')})
+        return self
+
+    def _note(self, note):
+        self.f.seek(0)
+        self.f.truncate()
+        if note:
+            self.f.write((json.dumps(note, ensure_ascii=False) + '\n').encode('utf-8'))
+        self.f.flush()
+
+    def __exit__(self, *exc):
+        if self.f is not None:
+            if self.held:
+                try:
+                    self._note(None)
+                except OSError:
+                    pass
+                _os_unlock(self.f)
+            self.f.close()
+        self.f, self.held = None, False
+        return False
+
+
+def _sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def file_digest(path):
+    """SHA-256 of the file's bytes, or None when it is not there."""
+    try:
+        return _sha(Path(path).read_bytes())
+    except FileNotFoundError:
+        return None
+
+
+def _key(path):
+    return str(Path(path).resolve())
+
+
+def unchanged(expect, paths):
+    """Raise RegisterChanged when a file of PATHS that load() read (EXPECT) is not what was read any more."""
+    for p in paths:
+        k = _key(p)
+        if k in expect and file_digest(p) != expect[k]:
+            raise RegisterChanged('%s changed on disk after it was read' % Path(p).name)
+
+
+def write_file(path, text, root=None, check=None):
+    """Write TEXT (UTF-8, line endings as given) to PATH through a temporary file moved into place. The temporary file
+    lives in the checkout's .bug_register/ for a file of the checkout (no stray name ever shows in docs/bugs), else
+    beside PATH. CHECK, when given, runs just before the move (the compare-and-swap of bugs.json). A write or move
+    refused for a moment (WRITE_RETRY_ERRNOS) is tried again; the temporary file of a write that failed is removed by
+    this code, which made it."""
+    path = Path(path)
+    base = ROOT if root is None else Path(root)
+    try:
+        path.resolve().relative_to(base.resolve())
+        folder = base / LOCK_FOLDER
+    except ValueError:
+        folder = path.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    data = text.encode('utf-8')
+    tmp = folder / ('.%s.%d.%s.tmp' % (path.name, os.getpid(), secrets.token_hex(4)))
+    try:
+        for attempt in range(WRITE_TRIES):
+            try:
+                with open(str(tmp), 'wb') as f:
+                    f.write(data)
+                if check:
+                    check()
+                os.replace(str(tmp), str(path))
+                return
+            except OSError as exc:
+                if attempt == WRITE_TRIES - 1 or exc.errno not in WRITE_RETRY_ERRNOS:
+                    raise
+                time.sleep(0.2 * (attempt + 1))
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
 
 def found_series(b):
     """The version series a bug was first found in: found_in (v0.0.N...), else the ID suffix; None if unknown."""
@@ -248,12 +486,19 @@ def archive_paths(archives=ARCHIVES, retired=RETIRED_ARCHIVES):
 
 def load(path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None):
     """The register: bugs.json plus, for the default path (or rotate=True), every frozen archive in ARCHIVES
-    order, then any retired archive file still present (same schema)."""
-    bugs = json.loads(path.read_text(encoding='utf-8'))
+    order, then any retired archive file still present (same schema). The SHA-256 of every file read (None for an
+    archive that is not there) is kept in _READ for the compare-and-swap of save(expect=...)."""
+    raw = Path(path).read_bytes()
+    _READ[_key(path)] = _sha(raw)
+    bugs = json.loads(raw.decode('utf-8'))
     if path == DATA if rotate is None else rotate:
         for p in archive_paths(archives, retired):
             if p.is_file():
-                bugs = bugs + json.loads(p.read_text(encoding='utf-8'))
+                raw = p.read_bytes()
+                _READ[_key(p)] = _sha(raw)
+                bugs = bugs + json.loads(raw.decode('utf-8'))
+            else:
+                _READ[_key(p)] = None
     return bugs
 
 
@@ -305,18 +550,31 @@ def load_families(path=FAMILIES):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def save(bugs, path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None):
+def save(bugs, path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None, expect=None):
     """Write bugs.json and, for the default path (or rotate=True), every archive of rotated bugs; retired
-    archive files are removed once their bugs are written to the current ranges."""
+    archive files are removed once their bugs are written to the current ranges. Every file goes through write_file
+    (a temporary file moved into place).
+    COMPARE-AND-SWAP with EXPECT (the digests load() recorded): every file is compared with what was read before the
+    first write and bugs.json once more just before it is replaced; a change raises RegisterChanged (the caller applies
+    its command again to a fresh read). The archives are written before bugs.json, so a rotation stopped half-way leaves
+    an entry in both files (found by validate), never in neither. Returns the digests of what was written."""
     if not (path == DATA if rotate is None else rotate):
-        path.write_text(live_text(bugs), encoding='utf-8', newline='\n')
-        return
-    for p, text in rotation(bugs, archives, retired, path).items():
+        files = {path: live_text(bugs)}
+    else:
+        files = rotation(bugs, archives, retired, path)
+    if expect is not None:
+        unchanged(expect, list(files))
+    done = dict(expect or {})
+    for p, text in sorted(files.items(), key=lambda kv: kv[0] == path):
         if text is None:
             p.unlink()
-        else:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(text, encoding='utf-8', newline='\n')
+            done[_key(p)] = None
+            continue
+        p.parent.mkdir(parents=True, exist_ok=True)
+        last = (lambda p=p: unchanged(expect, [p])) if expect is not None and p == path else None
+        write_file(p, text, check=last)
+        done[_key(p)] = _sha(text.encode('utf-8'))
+    return done
 
 
 def series(bug_id):
@@ -612,7 +870,7 @@ def ensure_pages(bugs, pages=None):
     for b in live:
         page = pages / ('%s.md' % b['id'])
         if not page.is_file():
-            page.write_text(new_page_text(b), encoding='utf-8', newline='\n')
+            write_file(page, new_page_text(b))
             made.append(b['id'])
         b['report'] = 'bugs/%s.md' % b['id']
     return made
@@ -639,8 +897,19 @@ def list_pages(bugs, root=None):
         have.add(path)
         added.append(path)
     if added:
-        listing.write_text(json.dumps(files, indent=2) + '\n', encoding='utf-8', newline='\n')
+        write_file(listing, json.dumps(files, indent=2) + '\n', root=root)
     return added
+
+
+def orphan_pages(bugs, pages=None):
+    """One line per report page (docs/bugs/<ID>.md, the generated pages aside) with no register entry, live or
+    archived: a row that was lost or never written. Such a page once reached a full gate, whose tracker test then failed
+    (REGISTER-CONCURRENT-WRITE-LOST-67, 20 November 2026); `check` refuses it in seconds."""
+    pages = PAGES if pages is None else Path(pages)
+    ids = {b.get('id') for b in bugs if isinstance(b, dict)}
+    return ['docs/bugs/%s: a report page without a register entry (the entry was lost or never written: add it '
+            'again, or move the page out)' % p.name
+            for p in sorted(pages.glob('*.md')) if p.name not in GENERATED_PAGES and p.stem not in ids]
 
 
 def image_problems(bugs, pages=None, images=None, media=None):
@@ -769,7 +1038,15 @@ def validate(bugs, families=None):
         errors += validate_regressions(b, where)
         errors += validate_closure(b, where)
         errors += validate_history(b, where)
+        errors += validate_links(b, ids, where)
     for b in by_id.values():
+        for other_id, lk in (b.get('links') or {}).items() if isinstance(b.get('links'), dict) else ():
+            other = by_id.get(other_id)
+            back = (other.get('links') or {}).get(b['id']) if other and isinstance(other.get('links'), dict) else None
+            if other is not None and (not isinstance(back, dict) or not isinstance(lk, dict)
+                                      or back.get('kind') != lk.get('kind') or back.get('why') != lk.get('why')):
+                errors.append('%s: links names %s, but %s does not name %s with the same kind and reason (links '
+                              'are both ways: bug_register.py link)' % (b['id'], other_id, other_id, b['id']))
         for r in b.get('related') or []:
             other = by_id.get(r)
             if other is None or not isinstance(other.get('related'), list):
@@ -781,6 +1058,70 @@ def validate(bugs, families=None):
                 errors.append('%s: related %s is in the same family %s; the family already links them, '
                               'so list only bugs from other families' % (b['id'], r, b['family']))
     return errors
+
+
+def validate_links(b, ids, where):
+    """links: a non-empty object {OTHER-ID: {"kind": variant | related, "why": one line without |}}, sorted by ID,
+    naming other registered entries (the both-ways rule is checked in validate)."""
+    if 'links' not in b:
+        return []
+    links = b['links']
+    if not isinstance(links, dict) or not links:
+        return ['%s: links must be a non-empty object {ID: {"kind": ..., "why": ...}} (bug_register.py link)' % where]
+    errors = []
+    if list(links) != sorted(links):
+        errors.append('%s: links must be sorted by ID' % where)
+    for other, link in links.items():
+        if other == b['id'] or other not in ids:
+            errors.append('%s: links names %s, which is not another registered ID' % (where, other))
+        elif not isinstance(link, dict) or set(link) != {'kind', 'why'} or link['kind'] not in LINK_KIND_KEYS \
+                or not _line_ok(link['why'], LINE_MAX):
+            errors.append('%s: links.%s must be {"kind": %s, "why": one line without |}'
+                          % (where, other, ' or '.join(LINK_KIND_KEYS)))
+    return errors
+
+
+def link_entries(bugs_by_id, a, b, kind, why):
+    """Link the entries A and B both ways as KIND (variant | related) with the reason WHY; linking again changes the
+    kind and the reason on both. Raises ValueError for an unknown ID, a link to itself, an unknown kind or a reason
+    that is not one line."""
+    if a == b:
+        raise ValueError('a link needs two different IDs')
+    unknown = [x for x in (a, b) if x not in bugs_by_id]
+    if unknown:
+        raise ValueError('unknown ID: ' + ' '.join(unknown))
+    if kind not in LINK_KIND_KEYS:
+        raise ValueError('kind must be one of %s' % ', '.join(LINK_KIND_KEYS))
+    why = ' '.join(str(why or '').split())
+    if not _line_ok(why, LINE_MAX):
+        raise ValueError('why: one line without |, the reason the two are linked')
+    for me, other in ((a, b), (b, a)):
+        x = bugs_by_id[me]
+        links = dict(x.get('links') or {})
+        links[other] = {'kind': kind, 'why': why}
+        x['links'] = dict(sorted(links.items()))
+
+
+def links_section(b, by_id):
+    """The "Possibly related" lines of a page (in its category block), [] without links."""
+    links = b.get('links') if isinstance(b.get('links'), dict) else {}
+    if not links:
+        return []
+    out = ['## Possibly related', '',
+           'Entries that are probably the same fault seen another way, or that may share its cause; each keeps its own '
+           'timeline. One listed here as fixed or closed may have come back: read its history and check its guard '
+           'before calling this one new.', '']
+    for kind, label in LINK_KINDS:
+        for other_id in sorted(links):
+            link_ = links[other_id]
+            x = by_id.get(other_id)
+            if x is None or link_.get('kind') != kind:
+                continue
+            state = ('fixed in %s' % x['fixed_in'] if x['state'] == 'fixed' and x.get('fixed_in')
+                     else x['state'])
+            out.append('- %s: %s (%s): %s. Why: %s' % (label, page_link(x), state, x['title'].rstrip('.'),
+                                                       link_['why']))
+    return out + ['']
 
 
 def validate_waiting(b, where):
@@ -1344,7 +1685,7 @@ def page_link(b):
 def category_section(b, bugs, by_id, families):
     fam = families[b['family']]
     same = [x for x in sorted(bugs, key=lambda x: x['id']) if x.get('family') == b['family'] and x['id'] != b['id']]
-    out = [CAT_BEGIN, '', CAT_HEADING, '',
+    out = [CAT_BEGIN, ''] + links_section(b, by_id) + [CAT_HEADING, '',
            'Family: %s (`%s`). %s See [families](README.md#families).' % (fam['title'], fam['key'], fam['rule']), '']
     if same:
         out += ['- %s: %s' % (page_link(x), x['title']) for x in same]
@@ -1982,8 +2323,93 @@ def main(argv=None):
     s.add_argument('--tag', action='append', choices=TAGS, default=[])
     s.add_argument('--found-in'); s.add_argument('--duplicate-of'); s.add_argument('--persists-in', nargs='+')
     facts_args(s, False)
+    ln = sub.add_parser('link', help='link two entries both ways: a probable variant of the same fault, or possibly '
+                                     'related (also inside one family)')
+    ln.add_argument('id'); ln.add_argument('other')
+    ln.add_argument('--kind', required=True, choices=LINK_KIND_KEYS)
+    ln.add_argument('--why', required=True, help='one line: why the two are linked (shown on both pages)')
+    lk = sub.add_parser('lock', help='hold the register lock across several commands, or say who holds it')
+    mode = lk.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--hold', action='store_true', help='take the lock, print "LOCKED <token>", hold it until '
+                                                          'standard input closes (or a line "release")')
+    mode.add_argument('--status', action='store_true', help='say whether the lock is free or who holds it (no wait)')
+    lk.add_argument('--max-seconds', type=float, default=LOCK_HOLD_MAX_S,
+                    help='--hold lets go after this long at the latest (default %d)' % LOCK_HOLD_MAX_S)
     args = p.parse_args(argv)
+    if args.cmd == 'lock':
+        return lock_command(args)
+    if args.cmd == 'persisting':
+        return run_command(args)
+    command = ' '.join([args.cmd] + ([args.id] if getattr(args, 'id', None) else []))
+    try:
+        with RegisterLock(command=command) as lock:
+            if lock.unavailable and args.cmd != 'check':
+                print('bug_register: warning: no register lock here (%s): running without it' % lock.unavailable,
+                      file=sys.stderr)
+            for attempt in range(1, CAS_TRIES + 1):
+                try:
+                    return run_command(args)
+                except RegisterChanged as exc:
+                    print('bug_register: %s (a writer that does not take the register lock); %s' % (
+                        exc, 'reading the register again and applying %s again (try %d of %d)' % (
+                            args.cmd, attempt + 1, CAS_TRIES) if attempt < CAS_TRIES else 'giving up'),
+                          file=sys.stderr)
+            print('bug_register: REFUSED: the register kept changing under %s; it was not written from an old copy. '
+                  'Find the writer that does not take the lock, then run the command again.' % args.cmd,
+                  file=sys.stderr)
+            return 3
+    except RegisterBusy as exc:
+        print('bug_register: REFUSED: %s' % exc, file=sys.stderr)
+        return 3
+
+
+def lock_command(args):
+    """`lock --status`: free, or who holds it (no wait). `lock --hold`: take the lock (waiting for it like any command),
+    print "LOCKED <token>" and hold it until standard input closes, a line "release" arrives or --max-seconds pass;
+    clear the note and let go, print "RELEASED". A command run with the token in BUG_REGISTER_LOCK_TOKEN while this
+    holds the lock runs under it."""
+    path = lock_path()
+    if args.status:
+        try:
+            with RegisterLock(command='lock --status', wait=0, caller_token=False) as lock:
+                print('the register lock is free%s' % (' (it cannot be made here: %s)' % lock.unavailable
+                                                       if lock.unavailable else ''))
+        except RegisterBusy:
+            print('the register lock is held: %s' % describe_holder(lock_note(path)))
+        return 0
+    token = secrets.token_hex(8)
+    try:
+        with RegisterLock(command='lock --hold', token=token, caller_token=False) as lock:
+            if lock.unavailable:
+                print('REFUSED: the register lock cannot be made here (%s)' % lock.unavailable, flush=True)
+                return 3
+            print('LOCKED %s' % token, flush=True)
+            done = threading.Event()
+
+            def read():
+                try:
+                    for line in sys.stdin:
+                        if line.strip() == 'release':
+                            break
+                except (OSError, ValueError):
+                    pass
+                done.set()
+            threading.Thread(target=read, daemon=True).start()
+            if not done.wait(args.max_seconds):
+                print('bug_register: lock --hold: %d s passed; letting the lock go' % args.max_seconds,
+                      file=sys.stderr)
+        print('RELEASED', flush=True)
+        return 0
+    except RegisterBusy as exc:
+        print('REFUSED: %s' % exc, flush=True)
+        return 3
+
+
+def run_command(args):
+    """One command of main() on a fresh read of the register (main holds the lock and applies it again when the
+    register changed under it: RegisterChanged)."""
     bugs = load()
+    expect = dict(_READ)
     families = load_families()
     by_id = {b['id']: b for b in bugs}
     if args.cmd == 'persisting':
@@ -2166,6 +2592,12 @@ def main(argv=None):
         print('REGRESSION: %s came back in %s (%s before), now open, severity %s' % (
             b['id'], entry['version'], 'fixed in %s' % entry['fixed_in'] if entry['fixed_in'] else entry['was'],
             b.get('severity') or 'unknown'))
+    elif args.cmd == 'link':
+        try:
+            link_entries(by_id, args.id, args.other, args.kind, args.why)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print('linked %s and %s both ways: %s' % (args.id, args.other, dict(LINK_KINDS)[args.kind].lower()))
     elif args.cmd == 'backfill':
         records = json.loads(Path(args.file).read_text(encoding='utf-8'))
         print('backfill: %d values written' % backfill(bugs, records, args.overwrite, args.pages))
@@ -2175,20 +2607,26 @@ def main(argv=None):
             print('marked %s as a CHIM bug, part %s (correct with: set %s --chim PART)'
                   % (x, by_id[x]['chim'], x))
         if marked and args.cmd == 'render':
-            save([_order(b) for b in bugs])  # the marking is kept even when validation then fails
+            # the marking is kept even when validation then fails
+            expect = save([_order(b) for b in bugs], expect=expect)
     bugs[:] = [_order(b) for b in bugs]
     errors = validate_families(families) + validate(bugs, families) + image_problems(bugs)
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
     if args.cmd == 'check':
-        missing = page_problems(bugs) + ['%s: not in tools/release-files.json' % p for p in unshipped_pages(bugs)]
+        missing = page_problems(bugs) + orphan_pages(bugs) + [
+            '%s: not in tools/release-files.json' % p for p in unshipped_pages(bugs)]
         if missing:
-            print('every register entry has its report page, made by the tool, and every page is listed in '
-                  'tools/release-files.json; %d problems:' % len(missing), file=sys.stderr)
+            print('every register entry has its report page, made by the tool, every page has its entry, and every '
+                  'page is listed in tools/release-files.json; %d problems:' % len(missing), file=sys.stderr)
             print('\n'.join(missing), file=sys.stderr)
             return 1
     else:
+        # nothing is written from a register that changed after it was read (compare-and-swap)
+        unchanged(expect, [DATA] + archive_paths())
+        for line in orphan_pages(bugs):
+            print('warning: ' + line, file=sys.stderr)
         # the tool makes the page of every live entry (add, reopen, render, ...) and lists it for the release
         made = ensure_pages(bugs)
         if made:
@@ -2211,12 +2649,12 @@ def main(argv=None):
         print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
             len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))
         return 0
-    if args.cmd in ('add', 'set', 'backfill', 'report', 'reopen', 'render', 'step', 'note'):
-        save(bugs)
+    if args.cmd in ('add', 'set', 'backfill', 'report', 'reopen', 'render', 'step', 'note', 'link'):
+        save(bugs, expect=expect)
     changed = 0
     for path, text in new.items():
         if not path.is_file() or path.read_text(encoding='utf-8') != text:
-            path.write_text(text, encoding='utf-8', newline='\n')
+            write_file(path, text)
             changed += 1
     print('rendered %d bugs (%d files changed)' % (len(bugs), changed))
     for page in unshipped_pages(bugs):

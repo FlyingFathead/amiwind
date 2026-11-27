@@ -16,6 +16,7 @@
 #include "aw_talk.h"
 #include "aw_mappath.h"
 #include "aw_tryalloc.h"
+#include "aw_skel.h"         /* the talk pack's renderer hooks take a skeletal block (NPC-TALK-MOUTH-STILL-69) */
 #ifdef AMIGA
 #include <proto/dos.h>
 #endif
@@ -355,8 +356,52 @@ static void walkto_move(usercmd_t *cmd){
     cl.viewangles[1]=Q_atan2(d[1],d[0])*180/M_PI;cl.viewangles[0]=0;
     cmd->forwardmove=200;cmd->sidemove=0;
 }
+/* dbg speech (NPC-TALK-MOUTH-STILL-69): the voice tracks playing now (aw_speech.c), each with its speaker, its sound,
+ * where its mouth timing comes from, the level now and the speaker's pose frame; the session evidence beside a still */
+extern cvar_t aw_speech_envelope;
+static void speech_status(void) {
+    extern int AW_SpeechTrack(int,int *,int *,const char **,int *,int *,int *,int *);
+    extern void AW_SpeechCounts(unsigned long *,unsigned long *,unsigned long *,double *,double *);
+    static const char *const sources[]={"none (mouth shut)","baked .lip","from its samples"};
+    int k,live=0,entity,channel,source,count,index,level;const char *sound,*name;unsigned long baked,computed,bins;
+    double ms_last,ms_max;const entity_t *e;
+    AW_SpeechCounts(&baked,&computed,&bins,&ms_last,&ms_max);
+    Con_Printf("Speech: aw_speech_envelope %d; envelopes so far %lu baked, %lu from samples (%lu bins; the last took "
+               "%.1f ms, the longest %.1f ms)\n",(int)aw_speech_envelope.value,baked,computed,bins,ms_last,ms_max);
+    for(k=0;k<4;k++){
+        if(!AW_SpeechTrack(k,&entity,&channel,&sound,&source,&count,&index,&level))continue;
+        live++;name="";e=entity>0 && entity<MAX_EDICTS?&cl_entities[entity]:NULL;
+        if(sv.active && entity>0 && entity<sv.num_edicts){edict_t *d=EDICT_NUM(entity);if(!d->free && d->v.netname)name=pr_strings+d->v.netname;}
+        Con_Printf("Speech track %d: %s (entity %d) channel %d %s; envelope %s, %d bins, now bin %d level %d; pose frame %d of %s\n",
+                   k,name,entity,channel,sound,sources[source>=0 && source<=2?source:0],count,index,level,
+                   e?e->frame:-1,e && e->model?e->model->name:"-");
+    }
+    if(!live)Con_Printf("Speech: no voice line plays\n");
+    {extern void AW_TalkStatus(void);AW_TalkStatus();}
+}
+/* aw_talkpack.c's question (NPC-TALK-MOUTH-STILL-69): the record id of a client entity whose model is a skeletal
+ * actor's, NULL otherwise (in single player its number is its server edict's) */
+static const char *talk_record(int entity) {
+    const entity_t *e;aliashdr_t *h;edict_t *d;eval_t *id;
+    if(entity<=0 || entity>=MAX_EDICTS || !sv.active || entity>=sv.num_edicts)return NULL;
+    e=&cl_entities[entity];
+    if(!e->model || e->model->type!=mod_alias || !(h=(aliashdr_t *)Mod_Extradata(e->model)) || !h->aw_skel)return NULL;
+    d=EDICT_NUM(entity);
+    if(d->free || !(id=GetEdictFieldValue(d,"aw_source_id")) || !id->string)return NULL;
+    return pr_strings+id->string;
+}
 void AW_DebugInit(void) {
     AW_InspectInit();
+    Cvar_RegisterVariable(&aw_speech_envelope);Cmd_AddCommand("aw_speech_status",speech_status);   /* NPC-TALK-MOUTH-STILL-69 */
+    {extern double (*aw_speech_clock)(void);aw_speech_clock=Sys_FloatTime;}
+    /* the skeletal NPCs' mouths: the talk pack (aw_talkpack.c), asked by the speech tracks and the alias renderer */
+    {extern cvar_t aw_talk_skeletal;extern const char *(*aw_talk_record)(int);extern double (*aw_talk_clock)(void);
+     extern int (*aw_speech_talker)(int,int *);extern int AW_TalkTalker(int,int *);
+     extern int (*R_AliasTalkLevel)(const entity_t *);extern int AW_TalkLevelOf(const entity_t *);
+     extern int (*R_AliasTalkApply)(const entity_t *,const void *,const aw_skel_block_t *,const float [][3][4],unsigned char *);
+     extern int AW_TalkApplyOf(const entity_t *,const void *,const aw_skel_block_t *,const float [][3][4],unsigned char *);
+     Cvar_RegisterVariable(&aw_talk_skeletal);aw_talk_record=talk_record;aw_talk_clock=Sys_FloatTime;
+     aw_speech_talker=AW_TalkTalker;R_AliasTalkLevel=AW_TalkLevelOf;R_AliasTalkApply=AW_TalkApplyOf;}
     {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_ResetRegister("god mode across maps",godmode_reset,godmode_digest);

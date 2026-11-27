@@ -226,6 +226,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [STALL-PROBE-RUNNING-GAME-66](STALL-PROBE-RUNNING-GAME-66.md): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 - [TEST-ACTOR-GROUND-SLICED-POOL-LOAD-67](TEST-ACTOR-GROUND-SLICED-POOL-LOAD-67.md): The actor ground fit identity test stopped once with a broken process pool while other test runs and gates loaded the machine; it passed when run again alone
 - [TEST-ACTOR-LIBRARY-OFF-PLAN-48](TEST-ACTOR-LIBRARY-OFF-PLAN-48.md): test_actor_library StageTests.test_on_by_default_off_selectable fails on the interiors line: the actor-library stage stays in the plan with --chim-actor-table off
+- [TEST-BUG-TRACKER-STALLS-ON-MOUNT-69](TEST-BUG-TRACKER-STALLS-ON-MOUNT-69.md): The bug tracker test module stalls when run on a bind-mounted checkout outside the gate
 - [TEST-BUILD-STALL-STARTUP-TIMING-67](TEST-BUILD-STALL-STARTUP-TIMING-67.md): The build stall test of a startup watch (test_a_watch_started_before_the_run_name_writes_once_it_has_one) failed once in a gate on a busy machine: it allows the watch 0.2 s to write
 - [TEST-CENSUS-CONTRACTS-40](TEST-CENSUS-CONTRACTS-40.md): Three quick-character expected failures lack reconciled contracts
 - [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a loaded machine

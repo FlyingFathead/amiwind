@@ -107,6 +107,7 @@ REASONS = {
     'tools/stage_gallery.py:greetings': UNIFORM,
     'tools/stair_records.py:_chim_part': SORTED,
     'tools/survey_vvardenfell.py:run': UNIFORM,
+    'tools/talk_pack.py:build': UNIFORM,   # one original head NIF each (179 parts, a few hundred vertices; 25 s in all)
     'tools/world_estimate_data.py:scan_meshes': UNIFORM,
     'tools/world_estimate_sample.py:convert_frame': 'a study tool, not a build stage',
     'tools/world_volumes.py:write_partitions': FEW,

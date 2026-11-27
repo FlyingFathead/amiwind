@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -563,6 +563,15 @@ base game: idles, walking, running, sneaking, swimming and turning in every dire
 every attack set with its phases, spellcasting, blocking, hits, knockdowns, knockouts, deaths, the torch, lockpicking,
 the storm idle, the inventory poses). A build check refuses a table that misses a group of its sources. Walking,
 running, sneaking, swimming and jumping are held in place: the game moves the actor, the animation only moves its body.
+This holds for the groups a view plays first as well: the female walk (`f:walkforward`) and a group of an NPC's own
+animation file are held like the common group of the same name. Until v0.0.69 the female walk kept its root's travel,
+about 100 original units a cycle, so a walking woman was drawn striding ahead of her position and jumping back at the
+end of every cycle (`NPC-WALK-RUBBERBAND-69` in the [register](BUGS.md)); `tests/test_skeletal_actor.py` keeps it.
+The bone that is held is the accumulation root as OpenMW names it (`apps/openmw/mwrender/animation.cpp`: `bip01`, else
+`root bone`, the first of the two the animation moves), so a creature whose root is named `root bone` is held as well.
+Measured on the v0.0.69-dev5 build's 92 tables (596 moving groups): besides the female walk, the bull netch's walk
+kept 1,004 original units of travel a cycle, the slaughterfish's walk 384 and its run 768, and one mount's run 23;
+every other moving group was in place.
 
 **Chosen as the original chooses them.** The game logic picks the group and its speed the way OpenMW's character
 controller does (`mwmechanics/character.cpp`): the movement direction and speed pick walk, run, sneak or swim and the

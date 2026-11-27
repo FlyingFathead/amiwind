@@ -1,5 +1,14 @@
 # CENSUS-SHELF-PLATE-BAKED-67: Census and Excise Office: a plate on the bookshelf is drawn as part of the room and cannot be taken, although in the original it is a separate item
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67 at 2026-11-20 14:38 +0200: Seen again in the v0.0.67 release: the platter on the shelf of the first room is still drawn as part of the bookshelf and cannot be taken.
+- Reported with v0.0.69-dev5 at 2026-11-26 17:51 +0200: Seen again in v0.0.69-dev5: the silver plate in the census office still belongs to the room geometry, so the player cannot take it.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,10 +33,18 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev5 (f1bc715f) | 2026-11-26 | gate 13261 of the planning item CENSUS-SHELF-PLATE-BAKED-67 | The Limeware Platter standing in the census office's bookshelf is aimed at and taken: the aim looks past the furniture's collision hull to the item standing inside it; the opening rooms' item sweep runs in the image step |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-17: reported in v0.0.66
 - 2026-11-20 14:38 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release: the platter on the shelf of the first room is still drawn as part of the bookshelf and cannot be taken.
+- 2026-11-26: fixed in source: a gated commit, v0.0.69-dev5 (f1bc715f); gate 13261 of the planning item CENSUS-SHELF-PLATE-BAKED-67: The Limeware Platter standing in the census office's bookshelf is aimed at and taken: the aim looks past the furniture's collision hull to the item standing inside it; the opening rooms' item sweep runs in the image step
+- 2026-11-26 17:51 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: the silver plate in the census office still belongs to the room geometry, so the player cannot take it.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -39,6 +56,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 
 - [ACTOR-BAKE-NO-SEAM-STOP-68](ACTOR-BAKE-NO-SEAM-STOP-68.md): The creature library's default bake route and the residents' bake run no seam check, so models with open seams and thinned limbs reach the image unjudged
 - [ASH-TREE-HOLES-62](ASH-TREE-HOLES-62.md): The reduced-polygon ash tree in the Ashlands shows holes in its surface
+- [ASTIUS-STAIRS-VERTICAL-PLANE-69](ASTIUS-STAIRS-VERTICAL-PLANE-69.md): Astius Hanotepelus' House, Balmora: a dark vertical plane stands across the staircase where the steps should be
 - [ATRONACH-FLAME-MESH-62](ATRONACH-FLAME-MESH-62.md): The flame atronach's reduced mesh is broken and it has no flames
 - [AW-20260928-21](AW-20260928-21.md): Exterior Census door/wall overlap
 - AW25-02 (no report page): Dry valleys and rises rendered as flooded after coarse terrain conversion
@@ -84,6 +102,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
+- [NPC-WAIST-GEOMETRY-69](NPC-WAIST-GEOMETRY-69.md): Sugar-Lips Habasi's hip and waist are drawn as a stiff flat many-sided plate instead of the body and clothing shape
 - [PRISON-SHIP-TABLE-DARK-TRIANGLE-67](PRISON-SHIP-TABLE-DARK-TRIANGLE-67.md): A large dark triangle lies across the table in the prison ship hold
 - [ROOM-EFFECT-MODEL-NO-TRIANGLES-66](ROOM-EFFECT-MODEL-NO-TRIANGLES-66.md): A summoning effect model without drawn triangles refused the whole Dome of Sotha Sil room
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
@@ -101,5 +120,6 @@ Related bugs in other categories:
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
 - [DROP-REFUSED-CENSUS-ROOM-67](DROP-REFUSED-CENSUS-ROOM-67.md): Dropping an item in the first room of the Census and Excise Office is refused with "Cannot place items in this area yet; kept."
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
+- [PRISON-SHIP-DRESSING-LEFT-OUT-69](PRISON-SHIP-DRESSING-LEFT-OUT-69.md): The Imperial Prison Ship leaves out 80 of the original's small decorations (ropes, hooks, hanging baskets, bones)
 
 <!-- END GENERATED CATEGORY -->

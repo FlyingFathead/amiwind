@@ -70,6 +70,7 @@ int aw_efrags_used, aw_efrags_peak;
 char *pr_strings = "\0func_wall\0";
 void (*aw_chim_player)(vec3_t);
 int (*aw_chim_frozen)(edict_t *);
+int (*aw_chim_ground)(const float *origin);	/* aw_walk.c (the collision's ground at a point, chim_world.c sets it) */
 void (*aw_chim_spawn)(vec3_t);
 int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);	/* aw_walk.c (the terrain floor hook chim_far.c sets) */
 int (*aw_chim_memory)(int op, char *first, char *second, int size);	/* aw_movie.c (extra Fast RAM, chim_world.c sets it) */
@@ -812,6 +813,10 @@ static void evict(void){
         /* Rebuilds that found no room were retried and the world caught up. */
         assert(grafted==active_count());
         assert(ChimChunks_Frozen(&edicts[2])==!chim_frame.entries[entry_at(64,64)].grafted);
+        /* CHIM-COLLISION-WALKS-67: the collision's ground at a point is the grafted chunk under it (aw_ambient.c asks
+         * it before a resident's step) */
+        assert(!aw_chim_ground ||
+               aw_chim_ground(edicts[2].v.origin)==(!Chim_Active() || chim_frame.entries[entry_at(64,64)].grafted));
     }
     ChimZone_Stats(&s);
     printf("evict: evictions=%lu failures=%lu model_loads=%lu chunk_loads=%lu failed=%lu\n",

@@ -628,6 +628,22 @@ static void pick_command(void) {
     }
     if(argc==1){
         Con_Printf("Animation groups by state %s: %lu frames placed, %lu group changes.\n",pick_on?"on":"off",pick_driven,pick_changes);
+        {   /* NPC-WEAPON-GRIP-WRONG-69: the held items posed again at the frame sent (aw_items.c AW_ItemsPreSend) */
+            void AW_ItemsPreSendCount(unsigned long *sets,unsigned long *lights,float *far_units,int *shown_now);
+            unsigned long sets,lights;float far_units;int shown_now;
+            AW_ItemsPreSendCount(&sets,&lights,&far_units,&shown_now);
+            Con_Printf("Held items at the sent frame: %d sets shown; posed again %lu sets, %lu carried lights; largest "
+                       "move %ld.%ld units.\n",shown_now,sets,lights,(long)far_units,(long)(far_units*10)%10);
+        }
+        {   /* GUARD-WEAPON-INVISIBLE-65: the level's item tag tables, and the one of the NPC under the crosshair */
+            int AW_ItemsTables(edict_t *actor,int counts[4],const char **model,int info[3]);
+            int counts[4],info[3];const char *model="";
+            int has=AW_ItemsTables(e,counts,&model,info);
+            Con_Printf("Item tag tables: %d of %d this level, %d read with the tag's own frame count, %d tagged "
+                       "spawns found them full.\n",counts[0],counts[1],counts[2],counts[3]);
+            if(has)Con_Printf("%s: item tags of %s: %d frames, the model %d now (read against %d).\n",name_of(e),model,
+                              info[0],info[1],info[2]);
+        }
         if(e && (p=picker_of(e,0))!=NULL)
             Con_Printf("%s: %s (%s), stance %d, sneak %d, wander idle %d%s.\n",name_of(e),p->group[0]?p->group:"-",p->rule?p->rule:"-",
                        p->fighting?p->weapon:AW_PW_NONE,p->sneak,p->idle,p->has_chances?"":" (no chances given)");

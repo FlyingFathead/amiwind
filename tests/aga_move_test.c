@@ -146,10 +146,12 @@ int main(void){
     for(i=0;i<AW_MOVE_SETTING_COUNT;i++)n+=sprintf(settings_text+n,"move %s %g\n",AW_MoveSettingName(i),((float *)&originals)[i]);
     n+=sprintf(settings_text+n,"moverace 1 1 breton\nmoverace 1.25 1 nord\nmoverace 1 0.95 dark elf\nsound miss combat/miss.wav");
 
-    /* Registration: one variable (aw_superspeed, default off, not saved) and one command. */
+    /* Registration: two variables (aw_superspeed, default off, not saved; aw_sneak_toggle, default on, saved:
+     * PLAYER-SNEAK-NOT-HELD-69) and one command. */
     AW_MoveInit();
-    assert(variable_count==1 && !strcmp(variables[0]->name,"aw_superspeed") && !variables[0]->archive);
+    assert(variable_count==2 && !strcmp(variables[0]->name,"aw_superspeed") && !variables[0]->archive);
     assert(variables[0]->value==0 && !AW_MoveSuperspeed());
+    assert(!strcmp(variables[1]->name,"aw_sneak_toggle") && variables[1]->archive && variables[1]->value==1);
     assert(command_count==1 && !strcmp(commands[0],"superspeed"));
 
     /* A fresh character: Nord male Barbarian, Speed 50, Strength 60, Athletics 35, Acrobatics 15. */
@@ -224,17 +226,36 @@ int main(void){
     fatigue=200;player.v.flags=FL_ONGROUND|FL_GODMODE;ground(120,0,1);aw_move_after(1);assert(fatigue==200);
     player.v.flags=FL_ONGROUND;
 
-    /* SNEAK-58: the sneak key held: walk x fSneakSpeedMultiplier (0.75), Shift does not run, one second of sneaking
+    /* PLAYER-SNEAK-NOT-HELD-69: the sneak key toggles by default (aw_sneak_toggle 1): one press (the key down, then up
+     * again) sneaks until the next press (OpenMW 0.53 playercontrols.lua ToggleSneak); the key held alone, without a
+     * press, is no sneak. Until this fix the sneak ended as soon as the key was let go. */
+    assert(!AW_MoveSneaking() && !AW_MoveSneakOn());
+    in_sneak.state=1;assert(!AW_MoveSneaking());in_sneak.state=0;
+    in_sneak.state=1;AW_MoveSneakPress();in_sneak.state=0;
+    assert(AW_MoveSneaking() && AW_MoveSneakOn());
+    /* SNEAK-58: sneaking: walk x fSneakSpeedMultiplier (0.75), Shift does not run, one second of sneaking
      * costs fFatigueSneakBase (1.5; nothing carried); swimming stands up (no sneak, no sneak cost). */
-    in_sneak.state=1;assert(AW_MoveSneaking());
     {extern float (*aw_view_sneak)(void);assert(aw_view_sneak && aw_view_sneak()==1);}   /* the lowered eye */
     assert(near(ground(120,0,0),46.875f*originals.fSneakSpeedMultiplier));
     assert(near(ground(120,0,1),46.875f*originals.fSneakSpeedMultiplier));
     fatigue=200;ground(120,0,0);aw_move_after(1);assert(near(fatigue,200-originals.fFatigueSneakBase));
     fatigue=200;ground(0,0,0);aw_move_after(1);assert(fatigue==200);       /* standing still: no cost */
-    player.v.waterlevel=2;assert(!AW_MoveSneaking());player.v.waterlevel=0;
-    player.v.movetype=MOVETYPE_NOCLIP;assert(!AW_MoveSneaking());player.v.movetype=MOVETYPE_WALK;
+    /* in water he stands up; out of it the toggled sneak goes on */
+    player.v.waterlevel=2;assert(!AW_MoveSneaking());player.v.waterlevel=0;assert(AW_MoveSneaking());
+    /* in debug noclip the key is fast flight: no sneak, and a press there changes nothing */
+    player.v.movetype=MOVETYPE_NOCLIP;assert(!AW_MoveSneaking());AW_MoveSneakPress();assert(AW_MoveSneakOn());
+    player.v.movetype=MOVETYPE_WALK;assert(AW_MoveSneaking());
+    /* the second press: standing, the walk again */
+    in_sneak.state=1;AW_MoveSneakPress();in_sneak.state=0;
+    assert(!AW_MoveSneaking() && !AW_MoveSneakOn() && near(ground(120,0,0),46.875f));
+    /* New Game's reset (aw_loadfail.c) sets the toggled state */
+    AW_MoveSneakSet(1);assert(AW_MoveSneaking());AW_MoveSneakSet(0);assert(!AW_MoveSneaking());
+    /* aw_sneak_toggle 0: sneak while the key is held, as since SNEAK-58 (a press leaves no toggled state) */
+    Cvar_SetValue("aw_sneak_toggle",0);
+    in_sneak.state=1;AW_MoveSneakPress();assert(AW_MoveSneaking() && !AW_MoveSneakOn());
+    assert(near(ground(120,0,0),46.875f*originals.fSneakSpeedMultiplier));
     in_sneak.state=0;assert(!AW_MoveSneaking() && near(ground(120,0,0),46.875f));
+    Cvar_SetValue("aw_sneak_toggle",1);assert(!AW_MoveSneaking());
     fatigue=200;
 
     /* Falls (SCRIPTED-EVENT-FALLING-MAGE-61; OpenMW 0.51 character.cpp, mtphysics.cpp, physicssystem.cpp): Acrobatics

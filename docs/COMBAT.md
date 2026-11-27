@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.68 (23 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -650,6 +650,17 @@ the four fighters (about 0.3 MB each).
   bone's position from a tag table beside the resident's model (<model>.tag,
   tools/npc_items.py, engine/aga/src/aw_items.c). The item keeps its own size
   (the original also stretches it with the actor's race width and height).
+  A skeletal actor's items follow the animation frame it is drawn at: the
+  fight sets its frame inside the engine groups, and just before every send
+  the frame is moved into the group of its weapon class (the stance, the
+  attack, the walk and the run of one-handed, two-handed and wide weapons,
+  bows, crossbows and thrown weapons), so the items are placed again at that
+  frame before it goes out. Before v0.0.69-dev6 they stayed at the engine
+  group's frame, and the weapon hung away from the drawn hand for every
+  weapon class (NPC-WEAPON-GRIP-WRONG-69). `dbg animkit pick` prints how many
+  item sets and carried lights were placed again and the largest move. An
+  actor in a weapon stance does not shield its eyes in a storm, as in the
+  original.
 - First-person weapon views: since v0.0.59 an equipped melee weapon is drawn in the hands in the original's three
   stances (one-handed, two-handed close, two-handed wide; see [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)), and
   v0.0.61-dev2 adds the bow, crossbow and thrown stances (not yet seen in game as stills). The player's own shot of a

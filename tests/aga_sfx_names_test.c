@@ -11,6 +11,8 @@ int AW_Interior(void){return 0;}
 sfxcache_t *S_LoadSound(sfx_t *s){(void)s;return &sample;}
 void Con_Printf(char *fmt,...){(void)fmt;printed++;}
 void AW_SpeechStart(int a,int b,const char *c,int d,int e,int f,int g){}
+/* S_StartSound hands the samples on too (NPC-TALK-MOUTH-STILL-69) */
+void AW_SpeechStartPcm(int a,int b,const char *c,int d,int e,int f,int g,const void *h,int i){}
 static int stopped_all;   /* AW_SpeechStop(-1): every voice (only S_StopAllSounds may) */
 void AW_SpeechStop(int a,int b){(void)b;if(a<0)stopped_all++;}
 void *Cache_Check(cache_user_t *c){return c->data;}

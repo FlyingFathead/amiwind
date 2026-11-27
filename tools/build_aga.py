@@ -356,6 +356,26 @@ def install_books(stage, id1):
             'books_with_pictures': receipt.get('books_with_pictures'), 'how': how}
 
 
+def stage_talk_pack(args, id1):
+    """The talk pack (the talk stage, tools/talk_pack.py; NPC-TALK-MOUTH-STILL-69) into the image: the engine reads
+    id1/talk.awt when a skeletal NPC first speaks (aw_talkpack.c). Checked as the engine reads it (magic, version and
+    size) before it is staged; without --talk (a plan without the stage) the image has none and those mouths stay shut,
+    as before."""
+    folder = getattr(args, 'talk', None)
+    if not folder:
+        return None
+    from talk_pack import NAME, read
+    source = Path(folder) / NAME
+    raw = source.read_bytes()
+    records, heads, bone = read(raw)
+    if not records or not heads:
+        raise ValueError('The talk pack %s holds no record or no head' % source)
+    shutil.copyfile(source, id1 / NAME)
+    print('[talk pack] %s: %d records, %d heads, %d bytes (head bone %d)' % (NAME, len(records), len(heads), len(raw),
+                                                                             bone), flush=True)
+    return {'file': 'id1/' + NAME, 'records': len(records), 'heads': len(heads), 'bytes': len(raw)}
+
+
 def stage_debug_catalogues(id1, debug_luma=False):
     """Required on-disk metadata: fail the build instead of shipping broken dbg."""
     # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
@@ -1826,6 +1846,10 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'// Wanderers keep off doors as the original\'s do: one idle in front of a door it faces walks\n'
                      b'// on, one stuck by a door takes another destination (WANDER-DOOR-RULE-66); off = no door rule.\n'
                      b'chim actors ambient doors on\n'
+                     b'// A walker far from the player, where the collision does not hold the ground, walks its route\n'
+                     b'// without it and stands on the floor again once it is held; an actor\'s step whose box meets a\n'
+                     b'// too-steep face holds where the player slides on (CHIM-COLLISION-WALKS-67); off = the old way.\n'
+                     b'chim actors ambient offground on\nchim actors ambient steep on\n'
                      b'// Bodies that already overlap collide as the original\'s actors: only a move toward the other\'s\n'
                      b'// centre stops, so they walk apart; an arrival steps the player off an actor on the point\n'
                      b'// (DOOR-ARRIVAL-INSIDE-ACTOR-66). 0 = Quake\'s box clip / no step, the methods before v0.0.66.\n'
@@ -2109,6 +2133,7 @@ def image(args):
     if logs_record['diagnostic_logs']=='live':
         print('[diagnostics] --live-logs: this image writes its diagnostic logs as they happen (benchmark/diagnostic image)',flush=True)
     stage_debug_catalogues(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
+    stage_talk_pack(args, boot/'id1')
     from boot_cfg_fit import check as check_boot_cfgs   # the whole file must fit the engine (CFG-OVER-COMMAND-BUFFER-68)
     check_boot_cfgs(boot/'id1')
     if args.data_files:
@@ -2216,6 +2241,7 @@ def image(args):
         (out/'item-models-staging.json').write_text(json.dumps(item_models_staging,indent=2)+'\n',encoding='utf-8',newline='\n')
     inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs,model_table=item_model_table)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    write_opening_item_sweep(args,boot/'id1',out)
     # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables, installed here (made
     # in the worker started above). A --halloween image: every full-world build (tools/build.py adds it unless
     # --halloween-cast off) and the MiniWind preset --miniwind-halloween.
@@ -2631,6 +2657,35 @@ def write_ghostfence(args, id1, out):
     OUT/ghostfence-effects.json (tools/ghostfence_effects.py; engine aw_atmos.c, aw_curtain.c). Returns the receipt."""
     import ghostfence_effects
     return ghostfence_effects.write(args, id1, out)
+
+
+def write_opening_item_sweep(args, id1, out):
+    """CENSUS-SHELF-PLATE-BAKED-67: the item sweep of the opening's two compiled rooms (tools/room_item_census.py):
+    every placed reference of the original cell by category against the room map's entities and the placed item list,
+    into OUT/opening-item-sweep.json and .md. A takeable item that could be neither aimed at nor taken, or a container
+    that could not be opened, stops the image here, naming it. An image without those maps (a MiniWind) lists them
+    as absent. Returns the receipt (None without the game data)."""
+    if not getattr(args, 'data_files', None):
+        return None
+    from cell_numbers import load_table, room_numbers
+    from mwad.masters import master_path
+    from mwad.paths import resolve_data_files
+    from room_item_census import opening_sweep
+    # OPENING-SWEEP-BEFORE-STAMP-69: the maps get their room numbers later in this step (stamp_staged_cells); the
+    # sweep reads the placed list under the same table's numbers
+    sweep = opening_sweep(master_path(args.data_files), id1,
+                          numbers=room_numbers(load_table(resolve_data_files(Path(args.data_files)))[0]))
+    (out / 'opening-item-sweep.md').write_text(''.join(r.pop('md') for r in sweep['rooms'].values()) or
+                                               'No opening room in this image.\n', encoding='utf-8', newline='\n')
+    (out / 'opening-item-sweep.json').write_text(json.dumps(sweep, indent=1) + '\n', encoding='utf-8', newline='\n')
+    for cell, result in sweep['rooms'].items():
+        counts = {k: sum(c[k] for c in result['categories'].values()) for k in ('placed', 'entity', 'placed list')}
+        print('Opening item sweep: %s: %d placed, %d entities, %d on the placed list, %d problem(s)' % (
+            cell, counts['placed'], counts['entity'], counts['placed list'], len(result['problems'])), flush=True)
+    if sweep['problems']:
+        raise ValueError('Opening item sweep: %d takeable item(s) or container(s) cannot be used: %s' % (
+            len(sweep['problems']), '; '.join(sweep['problems'][:6])))
+    return sweep
 
 
 def write_world_doors(args, id1, out, chim_frames):
@@ -4145,6 +4200,8 @@ def main():
     i.add_argument('--accept-entity-loss',help='Recorded reason that makes an intended entity loss pass the --entity-baseline gate')
     for name in ['scene','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     i.add_argument('--music',type=Path,help='Converted soundtrack (prepare_music.py); required unless --exclude music')
+    i.add_argument('--talk',type=Path,help='The talk stage\'s folder (tools/talk_pack.py): its talk.awt, the original heads\' '
+                   'Talk morph for the skeletal NPCs\' mouths, goes into the image (NPC-TALK-MOUTH-STILL-69)')
     i.add_argument('--file-aliases',action='store_true',
                    help='build.py --file-aliases on (its default since v0.0.47): store byte-identical models, sounds, sprites and tags '
                         'once, the other names in id1/file-aliases.txt (tools/payload_share.py, IMAGE-DUPLICATE-FILES-46)')

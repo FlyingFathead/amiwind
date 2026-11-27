@@ -329,7 +329,12 @@ class LedgerWiringTests(unittest.TestCase):
         support = body(inventory, 'static int inv_trace_support(')
         self.assertNotIn('corner', support)
         self.assertIn('SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p)', body(inventory, 'static int inv_feet_drop('))
-        self.assertIn('(chim && !aw_ledger_on)', drop)
+        # DROP-REFUSED-CENSUS-ROOM-67 (v0.0.69): the area refusal (a CHIM map, a town's scenery, the opening's hold) is
+        # the old fixed tables' alone; with the list every area kind drops, and an invisible wall on the drop's point
+        # path (aw_barrier.c) puts the item under the player instead of past the wall
+        self.assertIn('if(!aw_ledger_on && (chim || AW_SceneryCount()>0 || AW_StoryRestricted())){', drop)
+        self.assertIn('AW_BarrierPointBlocked(eye,start)', drop)
+        self.assertIn('!(ahead && inv_trace_support(position,mins,maxs,p))', drop)
         self.assertIn('AW_LedgerPickup(&aw_state,&aw_ledger,map_drops[i].key)', body(inventory, 'int AW_InventoryUse(void)'))
         spawn = body(inventory, 'void AW_InventorySpawn(void)')
         self.assertIn('AW_LedgerAdoptDrops(&aw_state,&aw_ledger)', spawn)

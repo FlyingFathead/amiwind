@@ -1487,6 +1487,23 @@ static int Frozen (edict_t *ent)
 	return active && ChimChunks_Frozen (ent);
 }
 
+/* Server side (aw_ambient.c through aw_walk.c aw_chim_ground, CHIM-COLLISION-WALKS-67): does the collision hold the
+ * ground at ORIGIN? The frame world carries the terrain of the grafted chunks only, those around the player (as
+ * ChimChunks_Frozen reads them), so a resident's step farther out finds nothing under it. Always on a map that is no
+ * CHIM frame (a room, a legacy map: all of its collision is loaded); never outside the frame's grid. */
+static int Ground (const float *origin)
+{
+	int x, y, e;
+	float g;
+	if (!active || !chim_frame.count)
+		return 1;
+	g = (float)chim_frame.frame.grain;
+	x = origin[0] < chim_frame.frame.low[0] ? -1 : (int)((origin[0] - chim_frame.frame.low[0]) / g);
+	y = origin[1] < chim_frame.frame.low[1] ? -1 : (int)((origin[1] - chim_frame.frame.low[1]) / g);
+	e = ChimChunks_CellEntry (x, y);
+	return e >= 0 && chim_frame.entries[e].grafted;
+}
+
 /* Client side, once per frame (aw_scenery.c AW_SceneryLink). */
 static void Link (void)
 {
@@ -2313,6 +2330,7 @@ void Chim_Init (void)
 	aw_chim_player = Player;
 	aw_chim_spawn = Spawn;
 	aw_chim_frozen = Frozen;
+	aw_chim_ground = Ground;
 	aw_chim_rcount = RCount;
 	aw_chim_town_map = TownMap;
 	aw_chim_entity = ChimStatics_Capture;

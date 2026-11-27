@@ -16,12 +16,24 @@ static dclipnode_t nodes[6];
 static byte cache_token;
 char *pr_strings;
 static char strings[64];
-static int allocations,links,notices,trace_calls,path_blocked,wet,streamed,scenery,restricted;
+static int allocations,links,notices,trace_calls,path_blocked,wet,streamed,scenery,restricted,barrier,catalogue;
 int Chim_Active(void){return streamed;}
 int AW_SceneryCount(void){return scenery;}
 int AW_StoryRestricted(void){return restricted;}
+/* DROP-REFUSED-CENSUS-ROOM-67: an invisible wall (aw_barrier.c) on the drop's point path while BARRIER is set */
+int AW_BarrierPointBlocked(const float *start,const float *end){(void)start;(void)end;return barrier;}
 void Con_Printf(char *format,...){(void)format;}
-int COM_FOpenFile(char *name,FILE **file){(void)name;*file=NULL;return -1;}
+/* the item catalogue (inventory/items.awi, AWI2): one row, the fixture's own item, while CATALOGUE is set, so a map's
+ * spawn of the world change list's drops can show them (ledger_spawn reads the dropped item's record) */
+int COM_FOpenFile(char *name,FILE **file){
+    unsigned char head[8]={'A','W','I','2',1,0,0,0},row[512];FILE *f;
+    *file=NULL;
+    if(!catalogue || strcmp(name,"inventory/items.awi"))return -1;
+    memset(row,0,sizeof(row));strcpy((char *)row,"fixture0");strcpy((char *)row+64,"Fixture");
+    row[160]=AW_INV_MISC;row[180]=AW_INV_DROP;strcpy((char *)row+184,"progs/inv/fixture0.mdl");
+    f=tmpfile();assert(f);assert(fwrite(head,1,8,f)==8 && fwrite(row,1,512,f)==512);rewind(f);
+    *file=f;return 8+512;
+}
 void CDAudio_Update(void){}
 void S_ExtraUpdate(void){}
 static aw_inventory_item_t item;
@@ -42,6 +54,7 @@ void AW_CombatEquipmentChanged(void){}
 trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t *pass){
     trace_t tr;int k;memset(&tr,0,sizeof(tr));tr.fraction=1;VectorCopy(end,tr.endpos);tr.plane.normal[2]=1;
     for(k=0;k<3;k++)assert(mins[k]==0 && maxs[k]==0);
+    if(type==MOVE_NOMONSTERS && pass==&entities[1])return tr;   /* the use key's sight line to an aimed drop: clear */
     assert(type==MOVE_NORMAL && pass==&entities[1]);trace_calls++;
     if(start[2]==end[2]){if(path_blocked)tr.fraction=.5f;}
     else{tr.fraction=.1f;tr.endpos[2]=0;}
@@ -86,6 +99,71 @@ static void reset(int geometry){
 static void refused(void){
     static aw_state_t before;int allocated=allocations;
     before=aw_state;assert(!AW_InventoryDropHere(&item,1));assert(!memcmp(&before,&aw_state,sizeof(before)));assert(allocations==allocated);
+}
+/* the use key's take of a drop (aw_inventory.c AW_InventoryUse): counted here (aw_ui.c words it in the game); its
+ * placed-item branch (a take of the original's placements, not a drop) is never reached by this fixture */
+static int takes;
+void AW_UIPickupTaken(const char *name,int count,double duration){(void)name;(void)duration;assert(count==1);takes++;}
+void AW_UISubtitle(const char *name,const char *text,double seconds){(void)name;(void)text;(void)seconds;assert(0);}
+int AW_ObjectTake(unsigned int reference,int stolen){(void)reference;(void)stolen;assert(0);return 0;}
+int ChimRoom_Has(unsigned reference){(void)reference;return 0;}
+eval_t *GetEdictFieldValue(edict_t *ed,char *field){(void)ed;(void)field;return NULL;}
+/* the drop's edict this map shows (its classname is the drop's own string), NULL none */
+static edict_t *shown_drop(void){
+    int i;
+    for(i=2;i<sv.num_edicts;i++)if(!entities[i].free && entities[i].v.classname==1)return &entities[i];
+    return NULL;
+}
+/* a server spawn of map M: every edict but the player's goes, then the map's spawn of the change list's drops */
+static void new_map(model_t *m,const char *name){
+    memset(&entities[2],0,sizeof(entities)-2*sizeof(entities[0]));sv.num_edicts=2;
+    sv.worldmodel=m;strcpy(sv.name,name);AW_InventorySpawn();
+}
+/* DROP-REFUSED-CENSUS-ROOM-67 (v0.0.69), the world change list on (the default). In v0.0.69-dev5 every drop during
+ * the opening was refused ("Cannot place items in this area yet; kept.", the census office's first room: CharGenState
+ * 10), where the original's inventory is open from the papers on and nothing holds a drop back (OpenMW 0.53
+ * worlditemmodel.hpp dropItemImpl, worldimp.cpp dropObjectOnGround). A room map (its worldspawn's _aw_cell_int, the
+ * census office's 763) keeps the drop as a row of its room: gone on another map, shown again where it lay on the
+ * room's map, after a save and a load too, and taken again with the use key. A wall the point traces do not see (an
+ * invisible wall, aw_barrier.c) or one at eye height ahead puts the item under the player (dropObjectOnGround). */
+static void room_drops(void){
+    static char room[]="{\n\"classname\" \"worldspawn\"\n\"message\" \"Census and Excise Office\"\n\"_aw_cell_int\" \"763\"\n}\n";
+    static model_t court;static unsigned char bytes[65536];static aw_ledger_t loaded;
+    edict_t *e;vec3_t at;int k;long before;
+    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);barrier=0;catalogue=1;takes=0;
+    /* the opening's hold no longer refuses: the drop lies ahead (x 24) as a row of room 763, in the room's units */
+    reset(0);restricted=1;world.entities=room;strcpy(sv.name,"census");
+    assert(AW_InventoryDropHere(&item,1) && links==1 && notices==1 && aw_ledger.count==1);
+    assert(aw_ledger.row[0].at==AW_AT_ROOM && aw_ledger.row[0].where==763 && !strcmp(aw_ledger.row[0].extra->item,"fixture0"));
+    assert((e=shown_drop())!=NULL && e->v.origin[0]>23 && e->v.origin[0]<25);VectorCopy(e->v.origin,at);
+    for(k=0;k<3;k++)assert(fabs(aw_ledger.row[0].extra->position[k]-at[k]*4)<.01f);
+    /* out of the room: the courtyard's map shows none of it; back in: the room's map shows it where it lay */
+    court.type=mod_brush;new_map(&court,"sncourt");assert(!shown_drop() && links==1 && aw_ledger.count==1);
+    new_map(&world,"census");assert((e=shown_drop())!=NULL && links==2);
+    for(k=0;k<3;k++)assert(fabs(e->v.origin[k]-at[k])<.01f);
+    /* taken again with the use key, as any drop: aimed (53 degrees down to it), the row goes, the item is carried */
+    before=(long)AW_StateGet(&aw_state,AW_ITEM,item.id);entities[1].v.v_angle[0]=53.13f;
+    assert(AW_InventoryUse() && takes==1 && (long)AW_StateGet(&aw_state,AW_ITEM,item.id)==before+1);
+    assert(aw_ledger.count==0 && e->free && !shown_drop());entities[1].v.v_angle[0]=0;
+    /* dropped again, the list saved and loaded (a quicksave and its load), the room's map spawned again: still there */
+    assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==1);
+    k=AW_LedgerEncode(&aw_ledger,bytes,sizeof(bytes));AW_LedgerClear(&loaded);
+    assert(k>0 && AW_LedgerDecode(bytes,k,&loaded));AW_LedgerMove(&aw_ledger,&loaded);
+    new_map(&court,"sncourt");assert(!shown_drop());
+    new_map(&world,"census");assert((e=shown_drop())!=NULL && aw_ledger.count==1 && aw_ledger.row[0].at==AW_AT_ROOM);
+    for(k=0;k<3;k++)assert(fabs(e->v.origin[k]-at[k])<.01f);
+    /* an invisible wall on the path ahead: under the player (x 0), never past the wall */
+    AW_LedgerClear(&aw_ledger);reset(0);restricted=1;barrier=1;
+    assert(AW_InventoryDropHere(&item,1) && (e=shown_drop())!=NULL && fabs(e->v.origin[0])<.01f && fabs(e->v.origin[1])<.01f);
+    barrier=0;
+    /* a wall at eye height ahead (the old "Drop path obstructed; kept."): under the player too */
+    AW_LedgerClear(&aw_ledger);reset(0);path_blocked=1;
+    assert(AW_InventoryDropHere(&item,1) && (e=shown_drop())!=NULL && fabs(e->v.origin[0])<.01f);
+    /* a map with a town's scenery catalogue: the traces see the scenery (world.c AW_SceneryClip), no refusal */
+    AW_LedgerClear(&aw_ledger);reset(0);scenery=1;assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==1);
+    /* water under the player and ahead: still refused, nothing taken from the inventory */
+    AW_LedgerClear(&aw_ledger);reset(0);wet=1;refused();assert(aw_ledger.count==0);
+    AW_LedgerClear(&aw_ledger);catalogue=0;
 }
 int main(void){
     int i,before;
@@ -154,6 +232,7 @@ int main(void){
     assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==AW_INVENTORY_DROPS+1);
     assert(aw_ledger.row[AW_INVENTORY_DROPS].where==AW_MapId("census"));
     AW_LedgerClear(&aw_ledger);
+    room_drops();
     puts("Real drop: thin wall/hole/edge, forward path, rotated footprint, allocator quarantine,32drop/16model admission and no-loss passed.");
     return 0;
 }

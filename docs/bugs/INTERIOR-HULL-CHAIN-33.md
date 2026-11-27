@@ -138,6 +138,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 
 - [ACTOR-BAKE-NO-SEAM-STOP-68](ACTOR-BAKE-NO-SEAM-STOP-68.md): The creature library's default bake route and the residents' bake run no seam check, so models with open seams and thinned limbs reach the image unjudged
 - [ASH-TREE-HOLES-62](ASH-TREE-HOLES-62.md): The reduced-polygon ash tree in the Ashlands shows holes in its surface
+- [ASTIUS-STAIRS-VERTICAL-PLANE-69](ASTIUS-STAIRS-VERTICAL-PLANE-69.md): Astius Hanotepelus' House, Balmora: a dark vertical plane stands across the staircase where the steps should be
 - [ATRONACH-FLAME-MESH-62](ATRONACH-FLAME-MESH-62.md): The flame atronach's reduced mesh is broken and it has no flames
 - [AW-20260928-21](AW-20260928-21.md): Exterior Census door/wall overlap
 - AW25-02 (no report page): Dry valleys and rises rendered as flooded after coarse terrain conversion
@@ -183,6 +184,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
+- [NPC-WAIST-GEOMETRY-69](NPC-WAIST-GEOMETRY-69.md): Sugar-Lips Habasi's hip and waist are drawn as a stiff flat many-sided plate instead of the body and clothing shape
 - [PRISON-SHIP-TABLE-DARK-TRIANGLE-67](PRISON-SHIP-TABLE-DARK-TRIANGLE-67.md): A large dark triangle lies across the table in the prison ship hold
 - [ROOM-EFFECT-MODEL-NO-TRIANGLES-66](ROOM-EFFECT-MODEL-NO-TRIANGLES-66.md): A summoning effect model without drawn triangles refused the whole Dome of Sotha Sil room
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"

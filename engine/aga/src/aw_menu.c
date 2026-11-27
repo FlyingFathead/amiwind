@@ -243,18 +243,25 @@ static const control_t controls[]={
  * default: the held weapon bobs and lags behind the turn) / Morrowind stiff (2: the hands stay still, only the attack
  * moves them) */
 #define CONTROL_SWAY (CONTROL_STYLE+3)
-#define CONTROL_RESET (CONTROL_STYLE+4)
+/* Sneak key (PLAYER-SNEAK-NOT-HELD-69): Toggle (aw_sneak_toggle 1, the default: one press sneaks, the next stands up;
+ * OpenMW 0.53's "toggle sneak") / Hold (0: sneak while the key is held, as the original); the same saved value as the
+ * console's aw_sneak_toggle (aw_move.c) */
+#define CONTROL_SNEAK (CONTROL_STYLE+4)
+#define CONTROL_RESET (CONTROL_STYLE+5)
 #define CONTROL_ROWS (CONTROL_RESET+1)
 #define CONTROL_ACTION(row) ((row)>=CONTROL_FIRST && (row)<CONTROL_STYLE)
-#define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK || (row)==CONTROL_SWAY)
+#define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK || (row)==CONTROL_SWAY || \
+                             (row)==CONTROL_SNEAK)
 static void combat_toggle(int row){
     if(row==CONTROL_STYLE)Cvar_SetValue("aw_combat_miss",Cvar_VariableValue("aw_combat_miss")?0:1);
     else if(row==CONTROL_DICE)Cvar_SetValue("aw_combat_dice",Cvar_VariableValue("aw_combat_dice")?0:1);
     else if(row==CONTROL_BLOCK)Cvar_SetValue("aw_combat_block",Cvar_VariableValue("aw_combat_block")?0:1);
     else if(row==CONTROL_SWAY)Cvar_SetValue("aw_fp_sway",Cvar_VariableValue("aw_fp_sway")==2?1:2);
+    else if(row==CONTROL_SNEAK)Cvar_SetValue("aw_sneak_toggle",Cvar_VariableValue("aw_sneak_toggle")?0:1);
 }
 static void combat_line(int row,char *line){
-    if(row==CONTROL_STYLE){
+    if(row==CONTROL_SNEAK)strcpy(line,Cvar_VariableValue("aw_sneak_toggle")?"Sneak key: Toggle":"Sneak key: Hold");
+    else if(row==CONTROL_STYLE){
         strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat style: AmiWind":"Combat style: Original Morrowind");
         if(AW_UIWidth(line)>LIST_W-4)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
     }else if(row==CONTROL_SWAY){

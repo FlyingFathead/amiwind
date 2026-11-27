@@ -1122,9 +1122,15 @@ static int wrapped_count(const char *text,int width,int limit) {
     while(*text && n<=limit){text=AW_UILine(text,width,line,sizeof(line));n++;}
     return n;
 }
+/* UI-JOURNAL-HINT-EMPTY-BOX-67: blank rows ("\n\n", the box pipeline's empty row) at a page's edge are the gap between
+ * two pages, never a page of their own: before, the journal hint's "Open it\t(J)\n\n" left its last newline as a page
+ * with no text, and a one-row strip got one between its sentence and its key line, each drawn as an empty box */
+static int blank(int c){return c=='\n' || c==' ' || c=='\t' || c=='\r';}
 const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity) {
-    const char *p=text,*end,*accepted=text,*next;char candidate[2048],line[256];int len,n=0,used=0,k;
+    const char *p,*end,*accepted,*next;char candidate[2048],line[256];int len,n=0,used=0,k;
     initialize();if(capacity<2 || rows<1)return text;
+    while(blank((unsigned char)*text))text++;
+    p=accepted=text;
     /* Pack complete sentences while the whole page still fits. */
     while(*p){
         end=sentence_end(p);len=end-text;if(len>=(int)sizeof(candidate))break;
@@ -1142,7 +1148,9 @@ const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity
         if(n)out[used++]='\n';
         memcpy(out+used,line,k);used+=k;p=next;n++;
     }
-    out[used]=0;return p;
+    out[used]=0;
+    while(blank((unsigned char)*p))p++;
+    return p;
 }
 void AW_UIDraw(void) {
     const char *p;char line[256],visible[3][256];
@@ -1189,6 +1197,8 @@ void AW_UIDraw(void) {
         cached_rows=maxlines;cached_size=font_height;
         p=subtitle;cached_pages=0;total=0;
         while(*p && cached_pages<512){
+            while(blank((unsigned char)*p))p++;   /* blank rows alone are no page (UI-JOURNAL-HINT-EMPTY-BOX-67) */
+            if(!*p)break;
             next=AW_UIPage(p,vid.width-24,maxlines,page_text,sizeof(page_text));
             if(next==p)break;
             page_offsets[cached_pages]=p-subtitle;total+=(int)(next-p)+16;
@@ -1202,6 +1212,8 @@ void AW_UIDraw(void) {
     page=0;while(page<pages-1 && weight>=page_weights[page])page++;
     page_text[0]=0;
     if(pages)AW_UIPage(subtitle+page_offsets[page],vid.width-24,maxlines,page_text,sizeof(page_text));
+    /* UI-JOURNAL-HINT-EMPTY-BOX-67: the box is drawn only while it has text to show */
+    if(!page_text[0])return;
     p=page_text;
     if(centered){
         while(*p && n<maxlines){

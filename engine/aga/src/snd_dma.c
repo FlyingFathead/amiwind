@@ -590,7 +590,9 @@ void S_StartSound(int entnum, int entchannel, sfx_t *sfx, vec3_t origin, float f
 		}
 
 	}
-    AW_SpeechStart(entnum,entchannel,sfx->name,paintedtime,sc->length,shm->speed,(int)target_chan->pos);
+    /* the samples too: a voice line without an envelope beside it gets one from them (NPC-TALK-MOUTH-STILL-69) */
+    {extern void AW_SpeechStartPcm(int,int,const char *,int,int,int,int,const void *,int);
+     AW_SpeechStartPcm(entnum,entchannel,sfx->name,paintedtime,sc->length,shm->speed,(int)target_chan->pos,sc->data,sc->width);}
 }
 
 void S_StopSound(int entnum, int entchannel)

@@ -51,10 +51,30 @@ int aw_move_force_run;   /* MWSCRIPT-GAPS-63: ForceRun on the player; ClearForce
 int aw_move_force_jump,aw_move_force_move_jump;   /* v0.0.63: ForceJump / ForceMoveJump on the player (aw_mwhost.c) */
 int AW_MovePlayerRunning(void){return last_factor>0 && last_running && !last_sneaking && !last_swimming;}
 int aw_move_werewolf;    /* WEREWOLF-RUN-SPEED-63: the player's werewolf form (aw_mwhost.c) */
+/* PLAYER-SNEAK-NOT-HELD-69: the sneak key toggles. aw_sneak_toggle 1 (saved; AmiWind's default, after the maintainer's
+ * play report of 26 November 2026) = one press of the key starts sneaking, the next press ends it; 0 = sneak while the
+ * key is held, as the key has worked since it was added (SNEAK-58, v0.0.58) and as the original's PC default. Rule from
+ * OpenMW 0.53 files/data/scripts/omw/input/playercontrols.lua (the ToggleSneak trigger flips the sneak on each press
+ * while movement is allowed; without the setting the sneak follows the held key) and settings.lua (toggleSneak), read
+ * not copied. The toggled state lives here: a menu or a lost window focus clears the held key (cl_input.c
+ * IN_AWClearButtons), never the toggled sneak; New Game clears it (aw_loadfail.c). In debug noclip the key is the
+ * fast-flight key and a press there changes nothing. Options > Controls "Sneak key" and the console show the same value. */
+static cvar_t sneak_toggle={"aw_sneak_toggle","1",true};
+static int sneak_on;
+void AW_MoveSneakPress(void) {
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    if(!sneak_toggle.value){sneak_on=0;return;}
+    if(p && p->v.movetype==MOVETYPE_NOCLIP)return;
+    sneak_on=!sneak_on;
+}
+int AW_MoveSneakOn(void) {return sneak_on;}
+void AW_MoveSneakSet(int on) {sneak_on=on!=0;}
+/* the sneak key's state: the toggled sneak, or the key held (aw_sneak_toggle 0) */
+static int sneak_key(void) {return sneak_toggle.value?sneak_on:(in_sneak.state&1)!=0;}
 int AW_MoveSneaking(void) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
-    /* menus clear the held key (cl_input.c IN_AWClearButtons) */
-    return p && ((in_sneak.state&1) || aw_move_force_sneak) && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2 &&
+    /* menus clear the held key (cl_input.c IN_AWClearButtons); the toggled sneak stays */
+    return p && (sneak_key() || aw_move_force_sneak) && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2 &&
            p->v.health>0 && !AW_CombatPlayerKnocked();
 }
 
@@ -308,6 +328,7 @@ extern float (*aw_worldui_encumbrance)(float *capacity);   /* aw_worldui.c: the 
 void AW_MoveInit(void) {
     aw_worldui_encumbrance=AW_PlayerEncumbrance;
     Cvar_RegisterVariable(&superspeed);
+    Cvar_RegisterVariable(&sneak_toggle);   /* PLAYER-SNEAK-NOT-HELD-69 */
     Cmd_AddCommand("superspeed",superspeed_command);
     aw_move_ground=ground;aw_move_water=water;aw_move_after=after;aw_view_sneak=view_sneak;
     aw_walk_water_walking=water_walking;

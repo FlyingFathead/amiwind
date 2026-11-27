@@ -35,6 +35,12 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
+## Possibly related
+
+Entries that are probably the same fault seen another way, or that may share its cause; each keeps its own timeline. One listed here as fixed or closed may have come back: read its history and check its guard before calling this one new.
+
+- Possibly related: [NPC-WEAPON-GRIP-WRONG-69](NPC-WEAPON-GRIP-WRONG-69.md) (open): NPCs do not hold their weapons in their hands while attacking: the weapon floats beside the body (a battle axe, a knife). Why: A held item drawn apart from the hand that grips it, there for the torch.
+
 ## Bugs in the same category
 
 Family: First-person hands and torch (`torch-hands`). First-person hands, punches and the carried torch. See [families](README.md#families).

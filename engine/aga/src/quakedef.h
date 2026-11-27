@@ -1010,6 +1010,7 @@ int AW_OpeningHint(const char **name,const char **action);
 int AW_BarrierDecode(const byte *raw,int size);
 int AW_BarrierLoad(void);
 void AW_BarrierClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,edict_t *entity,trace_t *trace);
+int AW_BarrierPointBlocked(const float *start,const float *end);   /* DROP-REFUSED-CENSUS-ROOM-67: a drop's point path */
 void AW_IntroSpawn(void);
 void AW_IntroTick(void);
 void AW_IntroMove(usercmd_t *);

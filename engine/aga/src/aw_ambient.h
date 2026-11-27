@@ -164,6 +164,24 @@ int AW_AmbientFollowDone (long place, long room, float dist2, float fd);
  * kept between calls (0 at the start: 450 original units, then the half extent + 450 while near, + 250 once too far). */
 enum {AW_ESCORT_WAIT, AW_ESCORT_WALK, AW_ESCORT_DONE};
 int AW_AmbientEscortStep (long place, long room, float target2, float dest2, float hull, float *max);
+/* CHIM-COLLISION-WALKS-67 (AMBIENT-WALK-STUCK-COLLISION-54), a walker on the ground where the collision may not hold
+ * its ground. The original runs every actor within the processing range on its cell's collision: OpenMW 0.51 keeps the
+ * 3 x 3 cells around the player's in the physics (components/misc/constants.hpp CellGridRadius 1; mwworld/scene.cpp
+ * loads each active cell's height field and objects) and processes actors within 7168 units of the player
+ * (mwmechanics/actors.cpp, "actors processing range"; aipackage.cpp stops a mover only next to an inactive cell, which
+ * that range never reaches: a cell is 8192 units). AmiWind's CHIM frame world holds the ground only around the player
+ * (the grafted chunks, about 450 engine units = 1,800 original units in the 32 MB towns), so a resident farther out
+ * found nothing under its step and stood (the v0.0.69-dev5 Seyda Neen census: every one of the five standing movers).
+ *   AW_AmbientGroundMove  how it moves this think: AW_AMBIENT_MOVE_STEP (the collision step: the ground under it and
+ *                         under its step is held, or ON 0, the method before), AW_AMBIENT_MOVE_ROUTE (it walks its
+ *                         compiled route without collision: the route's points are the original's path grid, which the
+ *                         original walks on its own collision), AW_AMBIENT_MOVE_WAIT (no ground held and no route: a
+ *                         walk to a random spot, a travel's or follow's straight leg, waits, as no obstacle can be seen).
+ *   AW_AmbientRouteHeight the height a route walker goes to on the way to a waypoint at TARGET_Z, from Z, by STEP of the
+ *                         LEN units (in the plane) left: evenly over the distance left; TARGET_Z at the end. */
+enum {AW_AMBIENT_MOVE_STEP, AW_AMBIENT_MOVE_ROUTE, AW_AMBIENT_MOVE_WAIT};
+int AW_AmbientGroundMove (int ground_here, int ground_there, int route, int on);
+float AW_AmbientRouteHeight (float z, float target_z, float step, float len);
 
 #ifndef AW_AMBIENT_HOST_TEST
 struct edict_s;
@@ -237,6 +255,14 @@ int AW_AmbientInWater (const float p[3]);
 enum {AW_STEP_FAIL_MOVE=1,AW_STEP_FAIL_SUPPORT,AW_STEP_FAIL_HEIGHT,AW_STEP_FAIL_LAVA};
 extern int aw_actor_step_diag,aw_actor_step_fail;
 extern float aw_actor_step_reached[3],aw_actor_step_floor[5];
+/* CHIM-COLLISION-WALKS-67 (aw_walk.c): the collision's ground at a point (NULL or 1: there; 0: the CHIM frame world
+ * does not hold it, chim_world.c Ground); the steep-contact step rule's switch (1 default) and the steps
+ * it took; an actor back on collidable ground set on the floor (up at most UP under its headroom, then down at most
+ * UP + DOWN; 1 when it stands on a floor now). */
+extern int (*aw_chim_ground)(const float *origin);
+extern int aw_actor_steep;
+extern unsigned long aw_actor_steep_steps;
+int AW_ActorGroundSettle (struct edict_s *e, float up, float down);
 #endif
 
 #endif

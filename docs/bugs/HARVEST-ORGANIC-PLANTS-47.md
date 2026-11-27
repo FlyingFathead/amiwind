@@ -142,6 +142,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 
 Related bugs in other categories:
 
+- [FARGOTH-STASH-STUMP-69](FARGOTH-STASH-STUMP-69.md): Fargoth's hiding place, the hollow treestump in Seyda Neen, is drawn but cannot be opened, so the stash of the quest cannot be found
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
 <!-- END GENERATED CATEGORY -->

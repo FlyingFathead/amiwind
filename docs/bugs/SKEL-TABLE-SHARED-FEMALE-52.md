@@ -21,6 +21,12 @@
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
+## Possibly related
+
+Entries that are probably the same fault seen another way, or that may share its cause; each keeps its own timeline. One listed here as fixed or closed may have come back: read its history and check its guard before calling this one new.
+
+- Possibly related: [NPC-WALK-RUBBERBAND-69](NPC-WALK-RUBBERBAND-69.md) (open): Walking residents in Seyda Neen (Indrele Rathryon, Eldafire) move forward and then snap back, again and again. Why: The walk that travelled ahead is a group of the female animation table.
+
 ## Bugs in the same category
 
 Family: Map heap and memory budget (`heap-memory`). The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. See [families](README.md#families).

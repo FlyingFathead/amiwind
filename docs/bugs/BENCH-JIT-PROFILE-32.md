@@ -23,6 +23,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-10-08: reported in v0.0.32-dev
 - 2026-10-08: Independent review of the open-world plan: All performance figures were taken with the emulator at host speed; flat directories are slow on real FFS; brush models may fragment down the terrain BSP; the loader stages lumps before decoding.
+- 2026-11-26 23:39 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: two emulator sessions run at the same time share the processor, and the frame rate of one followed the processor share it received (frame times up to 1.7 times longer at the same spot), while the same comparison ...
 
 <!-- END GENERATED TIMELINE -->
 
