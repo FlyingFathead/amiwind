@@ -501,6 +501,14 @@ def main(argv=None):
         more, more_failed = L.bake(a.data_files, palette, rooms_only, id1, a.jobs, 'skeletal', bipedal)
         models.update(more)
         failed.update(more_failed)
+    # CREATURE-COMBAT-WEAPON-54: the armed creatures' item tags (the bones their weapon and shield hang on; which
+    # items is each actor's own record's), beside the bake as the people's tags are: no creature unit is baked again
+    import creature_held_tags
+    t3 = time.time()
+    held_tags, held_left = creature_held_tags.write(a.data_files, planned, meshes, models, id1)
+    print('Actor library: item tags for %d armed creature models (%d records) - took %.1fs; %d without: %s' % (
+        len(held_tags), sum(len(v['records']) for v in held_tags.values()), time.time() - t3, len(held_left),
+        '; '.join('%s (%s)' % kv for kv in sorted(held_left.items())) or 'none'), flush=True)
     creature_manifest = dict(L.manifest(planned, models), left_out=failed)
     (a.out / 'creature-library.json').write_text(json.dumps(creature_manifest, indent=1, sort_keys=True) + '\n',
                                                  encoding='utf-8', newline='\n')
@@ -516,6 +524,8 @@ def main(argv=None):
     summary = {'creature_meshes': len(meshes), 'corpse_meshes': len(corpses),
                'corpse_models': sum(1 for k in models if k.endswith(L.CORPSE_KEY)),
                'creature_models': len(models), 'creature_left_out': failed,
+               'creature_item_tags': {m: v['tag'] for m, v in sorted(held_tags.items())},
+               'creature_item_tags_left': held_left,
                'creature_bytes': sum(m.get('standing_bytes', 0) + m.get('mover_bytes', 0) for m in models.values()),
                'npc_records': len(npcs), 'npc_appearances': len(npc_manifest['models']),
                'npc_left_out': npc_manifest['left_out'],

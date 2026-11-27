@@ -121,8 +121,9 @@ void AW_SkelPose (const aw_skel_table_t *t, float frame, float world[][3][4]);
 void AW_SkelPoseLayer (const aw_skel_table_t *t, float frame, float layer_frame, int root, float world[][3][4]);
 /* Up to AW_SKEL_LAYERS such layers at once (roots[j] -1: none): a guard in an ash storm shields his eyes with his
  * right arm ("idlestorm", ACTOR-STORM-POSE-51) while his left arm holds the torch. A bone takes the layer of the
- * nearest root at or above it. */
-#define AW_SKEL_LAYERS 2
+ * nearest root at or above it. The third: a fighter drawing or putting away its weapon while it moves has its torso
+ * on the draw and its legs on the walk (ACTOR-DRAW-STOPS-LEGS-69; the arms' own layers still win below it). */
+#define AW_SKEL_LAYERS 3
 void AW_SkelPoseLayers (const aw_skel_table_t *t, float frame, int n, const float *layer_frames, const int *roots,
 	float world[][3][4]);
 /* The right arm's root (Bip01 R Clavicle): the weapon bone's fourth ancestor, as AW_SkelLeftArmRoot; -1 when the

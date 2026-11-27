@@ -216,6 +216,21 @@ class RoomRowTests(unittest.TestCase):
         doors = build[build.index('def write_world_doors('):]
         self.assertLess(doors.index('rooms.update('), doors.index('tp_places_rooms(id1, rooms, master_raw, out)'))
 
+    def test_being_ids_count_the_being_rows_and_leave_the_common_kinds_out(self):
+        # DBG-TP-LORDVIVEC-69: what a named place that is a being may point at (exactly one row of its id)
+        found = [{'id': 'vivec_god', 'name': 'Vivec', 'place': 'Vivec, Palace of Vivec', 'map': 'vpi015',
+                  'x': 0, 'y': 4, 'z': -98},
+                 {'id': 'Fargoth', 'name': 'Fargoth', 'place': 'Seyda Neen', 'map': '', 'x': 1, 'y': 2, 'z': 3},
+                 {'id': 'Fargoth', 'name': 'Fargoth', 'place': "Arrille's Tradehouse", 'map': 'ri0123abcd',
+                  'x': 4, 'y': 5, 'z': 6}]
+        found += [{'id': 'mudcrab', 'name': 'Mudcrab', 'place': 'Bitter Coast %d' % i, 'map': '', 'x': i, 'y': 0,
+                   'z': 0} for i in range(T.COMMON_AT)]
+        rows, kinds = T.being_rows(found)
+        data = T.encode_table(rows)
+        self.assertEqual(T.being_ids(data), {'vivec_god': 1, 'fargoth': 2})      # mudcrab: a common kind, no id
+        self.assertEqual(len(kinds), 1)
+        self.assertEqual(T.being_ids(T.encode_table([])), {})
+
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'a host C compiler is required')

@@ -274,9 +274,11 @@ class SkelSourceTests(unittest.TestCase):
         self.assertIn('aw_posed_t *more = (aw_posed_t *)AW_TryMalloc (AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));', alias)
         self.assertIn('for (i=0 ; i<aw_pose_slots ; i++)', alias)
         # culled by the box of the pose it stands in once posed, not by the every-pose rest box (an extra model drawn)
-        # (its key: the frame, or the torch pose's, SKEL-ITEM-TAGS-52; the storm pose's, ACTOR-STORM-POSE-51)
-        self.assertIn('if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, '
+        # (its key: the frame, or the torch pose's, SKEL-ITEM-TAGS-52; the storm pose's, ACTOR-STORM-POSE-51; and the
+        # torso layer's frame beside it, ACTOR-DRAW-STOPS-LEGS-69)
+        self.assertIn('int torso = 0, key = pahdr->aw_skel ? AW_SkelEntityKey (currententity, pmodel, pahdr, '
                       'currententity->frame,', alias)
+        self.assertIn('if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, key, torso, box))', alias)
         self.assertIn('memcpy (box, aw_posed[i].box, 6);', alias)
 
     def test_a_room_short_of_memory_gets_the_tables_and_posed_frames_back_first(self):
@@ -443,18 +445,68 @@ class SkelTorchLayerNativeTests(unittest.TestCase):
         root, got = self.run_layer(table, 2, 4, 1, 2, 2, 6, 11)
         np.testing.assert_allclose(got, layered(2, {1: 4, 2: 2}), atol=2e-3)
 
+    def test_a_torso_layer_over_the_walk_with_an_arm_nested_under_it(self):
+        # ACTOR-DRAW-STOPS-LEGS-69: three layers at once: the torso (Spine2 down) on a draw's frame, the legs on the
+        # walk's (the base frame), the left arm on its own torch layer below the torso's root (the nearer root wins)
+        # root, pelvis, spine2, neck, head, L clavicle, L upper arm, L hand, R clavicle, R upper arm, R hand, thighs
+        parents = [-1, 0, 1, 2, 3, 3, 5, 6, 3, 8, 9, 1, 1]
+        rng = np.random.default_rng(69)
+        frames, bones = 12, len(parents)
+        rot = rng.normal(size=(frames, bones, 4))
+        rot /= np.linalg.norm(rot, axis=2, keepdims=True)
+        rot[rot[:, :, 0] < 0] *= -1
+        pos = rng.uniform(-20, 20, size=(frames, bones, 3))
+        q, p, scale = S.quantise_table(rot, pos)
+        table = S.write_table(parents, {'walk': (0, 5), 'draw': (6, 11)}, q, p, scale)
+        rq, pq = S.dequantise_table(q, p, scale)
+
+        def layered(frame, roots):
+            under = {}
+            for b, parent in enumerate(parents):
+                if b in roots:
+                    under[b] = roots[b]
+                elif parent in under:
+                    under[b] = under[parent]
+            locals_ = [S.local_matrix(rq[under.get(b, frame), b], pq[under.get(b, frame), b]) for b in range(bones)]
+            return np.array([m[3, :3] for m in S.pose_matrices(parents, locals_)])
+
+        with tempfile.TemporaryDirectory() as scratch:
+            scratch = Path(scratch)
+            (scratch / 'table.bin').write_bytes(table)
+            exe = scratch / 'skel-layers3'
+            compiled = subprocess.run(['cc', '-std=gnu89', '-O1', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                                       '-I' + str(SOURCE), str(ROOT / 'tests/aga_skel_test.c'),
+                                       str(SOURCE / 'aw_skel.c'), '-lm', '-o', str(exe)],
+                                      capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            # walk frame 2; the torch on the left arm (frame 4, root 5), no storm, the draw on the torso (frame 9, root 2)
+            result = subprocess.run([str(exe), 'layers3', str(scratch / 'table.bin'), '2', '4', '5', '0', '-1', '9', '2'],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        got = np.array([[float(v) for v in l.split()] for l in result.stdout.splitlines()])
+        want = layered(2, {5: 4, 2: 9})
+        np.testing.assert_allclose(got, want, atol=2e-3)
+        walk = layered(2, {})
+        np.testing.assert_allclose(got[[0, 1, 11, 12]], walk[[0, 1, 11, 12]], atol=2e-3)   # the legs walk on
+        self.assertGreater(np.abs(got[10] - walk[10]).max(), 0.5)                        # the drawing hand moved
+        self.assertGreater(np.abs(got[7] - layered(2, {2: 9})[7]).max(), 0.5)            # the torch arm its own
+
     def test_the_renderer_the_cull_box_and_the_items_pose_alike(self):
         alias = (SOURCE / 'r_alias.c').read_text()
         self.assertIn('AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);', alias)
-        self.assertIn('p->frame == key)', alias)
-        self.assertIn('AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame,', alias)
+        # ACTOR-DRAW-STOPS-LEGS-69 (v0.0.69): the torso layer is a second part of the pose cache's key
+        self.assertIn('p->frame == key && p->torso == torso)', alias)
+        self.assertIn('AW_SkelEntityKey (currententity, pmodel, pahdr, currententity->frame,', alias)
         # ACTOR-STORM-POSE-51: the storm layer is part of the pose key and of the cull box's pose
         self.assertIn('key += AW_STORM_KEY;', alias)
-        self.assertIn('currententity->angles[YAW], NULL, NULL), box))', alias)
+        self.assertIn('currententity->angles[YAW], NULL, NULL, &torso) : 0;', alias)
+        self.assertIn('AW_PoseBox (pmodel, pahdr, key, torso, box)', alias)
         self.assertIn('R_AliasStormLayer=AW_ItemsStormLayer;', (SOURCE / 'aw_items.c').read_text())
         self.assertIn('AW_SkelGroup(tab,"idlestorm")', (SOURCE / 'aw_items.c').read_text())
         items = (SOURCE / 'aw_items.c').read_text()
-        self.assertIn('AW_SkelPoseLayer(tab,(float)f,layer,layered?root:-1,world);', items)
+        # the torch layer and, while a draw plays over the walk, the torso layer (ACTOR-DRAW-STOPS-LEGS-69)
+        self.assertIn('AW_SkelPoseLayers(tab,(float)f,2,layers,roots,world);', items)
+        self.assertIn('layers[0]=layer;roots[0]=layered?root:-1;', items)
         self.assertIn('R_AliasTorchLayer=AW_ItemsTorchLayer;', items)
         self.assertIn('AW_SkelGroup(tab,"torch")', items)
         # the flame point at the item's own scale (0.25), not the bone's units

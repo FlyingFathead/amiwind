@@ -58,9 +58,10 @@ class SentFrameWiringTests(unittest.TestCase):
         items = code('aw_items.c')
         presend = body(items, 'void AW_ItemsPreSend(void) {')
         # every set between its show and its hide, by the rule the fixture runs; a set that cannot be posed is hidden
-        self.assertIn('AW_ItemsStale(shown[i].frame,shown[i].at,(int)a->v.frame,a->v.origin,a->v.angles[1])', presend)
+        # the frame with a torso layer's frame in it (pose_key; ACTOR-DRAW-STOPS-LEGS-69, v0.0.69)
+        self.assertIn('AW_ItemsStale(shown[i].frame,shown[i].at,pose_key(a),a->v.origin,a->v.angles[1])', presend)
         self.assertIn('AW_ItemsUpdate(a,items);', presend)
-        self.assertIn('AW_ItemsStale(carrier_posed[i].frame,carrier_posed[i].at,(int)a->v.frame,a->v.origin,'
+        self.assertIn('AW_ItemsStale(carrier_posed[i].frame,carrier_posed[i].at,pose_key(a),a->v.origin,'
                       'a->v.angles[1])', presend)
         self.assertIn('carried_pose(i);', presend)
         show = body(items, 'int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {')

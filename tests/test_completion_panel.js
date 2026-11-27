@@ -50,6 +50,28 @@ assert(/audits \(open terrain\): Fully approved cells:/.test(rows[0].html), 'the
 // without readiness the old rows are drawn (older pages)
 assert.strictEqual(H.headRows(doc.headline, null, null).length, 4);
 
+// TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69: the game's scripts in each land's block and the functions' effect in play, from the
+// data's own counts (completion.script_summary); the rows above, drawn without them, hold no script line at all
+const sum = doc.completion && doc.completion.script_summary;
+assert(sum && sum.lands && sum.all && sum.functions, 'the ingest wrote the script summary');
+assert(!rows.some(r => /scripts ready/.test(r.html)), 'no script line without the summary');
+const srows = H.headRows(doc.headline, null, doc.readiness, sum);
+assert.strictEqual(srows.length, 5, 'the same rows, with the scripts in them');
+const num = v => v.toLocaleString();
+for (const l of doc.readiness.lands) {
+  const r = srows[doc.readiness.lands.indexOf(l)].html, s = sum.lands[l.id];
+  assert(r.includes('scripts ready <b>' + num(s.done) + ' of ' + num(s.used)), l.id + ' scripts ready: ' + r);
+  assert(r.includes('used in the original ' + num(s.used) + ' · run ' + num(s.run) + ' · AmiWind adaptation ' + num(s.adaptation) + ' · not yet ' + num(s.not_yet)), l.id + ': ' + r);
+  assert(r.includes('not used in the original game (never runs there either): ' + num(s.unused) + ' · not counted'), l.id + ' unused on its own line: ' + r);
+  assert.strictEqual(s.done, s.run + s.adaptation, 'the unused and the open ones are never counted as done');
+  assert(/open terrain ready <b>.*rooms ready <b>.*total ready <b>.*scripts ready <b>/.test(r), 'after the land\'s three columns');
+}
+const allRow = srows[3].html, f = sum.functions;
+assert(allRow.includes('scripts ready <b>' + num(sum.all.done) + ' of ' + num(sum.all.used)), 'all lands: ' + allRow);
+assert(allRow.includes('script functions, effect in play: full <b>' + num(f.full) + ' of ' + num(f.called) + '</b> · in part ' + num(f.part) + ' · none ' + num(f.none) + ' · seen in play ' + num(f.seen_in_play)), 'the effect in play: ' + allRow);
+assert(srows[0].title.includes(sum.definition), 'the scripts\' definition is in the row\'s help text');
+assert(/In the game:/.test(srows[4].html), 'the build row stays last');
+
 // the completion panel: Tribunal first, every count a link to its list, the gaps named
 const games = CP.masters(doc.completion, doc.readiness);
 assert.deepStrictEqual(games.map(g => g.id), ['mournhold', 'solstheim', 'vvardenfell']);

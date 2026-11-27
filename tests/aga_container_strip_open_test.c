@@ -27,6 +27,11 @@ static int notices,focus_opens;
  * quill, in the file's order), served instead of item_file while many_items is set */
 #define MANY 40
 static byte many_file[8+(MANY+2)*512];static int many_items,item_search_opens,item_pass_opens;
+/* PLANT-PICK-DIRECT-DEFAULT-69: the strip's init also registers the plant pick's setting and sets its hooks (the pick
+ * sound, the room's hide); the chest here is no plant, so neither runs */
+void Cvar_RegisterVariable(cvar_t *v){v->value=(float)atof(v->string);}
+void S_LocalSound(char *name){(void)name;assert(0);}
+int ChimRoom_Hide(unsigned reference,int hide){(void)reference;(void)hide;assert(0);return 0;}
 /* the engine pieces the strip and the take reach */
 keydest_t key_dest;viddef_t vid;refdef_t r_refdef;int scr_copyeverything;
 int (*aw_cstrip_mouse)(int dx,int dy);int (*aw_cstrip_key)(int key);void (*aw_cstrip_draw)(void);int (*aw_cstrip_open_now)(void);

@@ -38,8 +38,11 @@ static int serve(const void *data,int size,FILE **file){
 }
 /* CENSUS-CRAB-PLATE-FOCUS-66: a focus table of two item rows (the silver plate and the crab meat on it) */
 static byte stacked_file[8+12+2*96];static int stacked;
+/* PLANT-PICK-DIRECT-DEFAULT-69: an AWF3 table of one room container row (a plant) with its contents list */
+static byte plant_file[8+12+96+12+8+12+4+36];static int plant;
 int COM_FOpenFile(char *name,FILE **file){
     *file=NULL;
+    if(!strcmp(name,"focus.awf") && plant)return serve(plant_file,sizeof(plant_file),file);
     if(!strcmp(name,"focus.awf") && stacked)return serve(stacked_file,sizeof(stacked_file),file);
     if(!strcmp(name,"focus.awf"))return serve(focus_file,focus_size,file);
     if(!strcmp(name,"inventory/items.awi"))return serve(item_file,sizeof(item_file),file);
@@ -72,7 +75,13 @@ void AW_MwscriptRoomShift(float shift[3]){shift[0]=shift[1]=shift[2]=0;}
 int AW_ObjectDisabled(unsigned reference){return disabled && reference==QUILL;}
 int AW_ObjectTake(unsigned reference,int stolen){(void)stolen;take_reference=(int)reference;taken++;disabled=1;return 1;}
 int ChimRoom_Has(unsigned reference){return room_draws && reference==QUILL;}
-void AW_UIPickupNotice(const char *name,double duration){(void)duration;assert(!strcmp(name,"Quill Pen") || !strcmp(name,"Candle"));notices++;}
+/* PLANT-PICK-DIRECT-DEFAULT-69: a plant's pick says what it took, as the mushrooms' ("Picked up 2 Quill Pen.") */
+static char picked_line[128];static int picked_lines;
+void AW_UIPickupNotice(const char *name,double duration){
+    (void)duration;
+    if(!strncmp(name,"Picked up ",10)){strcpy(picked_line,name);picked_lines++;return;}
+    assert(!strcmp(name,"Quill Pen") || !strcmp(name,"Candle"));notices++;
+}
 static int subtitles;   /* only the locked container's line (DOOR-TRAPS-NOT-SPRUNG-55 check) */
 void AW_UISubtitle(const char *speaker,const char *text,double duration){(void)speaker;(void)duration;assert(!strcmp(text,"Locked"));subtitles++;}
 void AW_CombatEquipmentChanged(void){}
@@ -143,6 +152,27 @@ static void stacked_tables(void){
         put32(row+20,bits);put32(row+24,1);memcpy(row+28,"Quill Pen",9);memcpy(row+64,"misc_quill",10);
     }
 }
+/* PLANT-PICK-DIRECT-DEFAULT-69: the plant at the quill's place (reference QUILL, room 763), unowned, its row's action
+ * ACTION (tools/prepare_focus.py: 1 opens, +16 the AmiWind pick, +32 stays drawn), its record holding two of
+ * misc_quill (the item table's "Quill Pen"): AWF3, the rows, an empty owners list, the AWC1 contents list */
+static void plant_table(int action){
+    byte *p=plant_file,*row=plant_file+8+12;
+    memset(plant_file,0,sizeof(plant_file));memcpy(p,"AWF3",4);put32(p+4,1);put32(p+8,763);put32(p+12,0);put32(p+16,1);
+    row[0]='C';row[1]=0;row[2]=(byte)action;put32(row+4,QUILL);put32(row+8,80);put32(row+12,0);put32(row+16,116);
+    memcpy(row+28,"Comberry Bush",13);memcpy(row+64,"flora_comberry_01",17);
+    p=row+96;memcpy(p,"AWO1",4);put32(p+4,0);put32(p+8,0);
+    p+=12;memcpy(p,"AWC1",4);put32(p+4,1);put32(p+8,QUILL);put32(p+12,0);p[16]=1;p[17]=0;p[18]=4;p[19]=0;
+    put32(p+20,1);memcpy(p+24,"misc_quill",10);put32(p+24+32,2);
+    plant=1;
+}
+extern int (*aw_plant_pick_amiwind)(void);
+const char *AW_PlacedPlantHint(int *owned);
+extern void (*aw_plant_pick_sound)(void);
+extern int (*aw_plant_hide)(unsigned reference,int hide);
+static int pick_sounds,plant_hides,plant_original;static unsigned hidden_ref;
+static int plant_mode(void){return !plant_original;}
+static void plant_sound(void){pick_sounds++;}
+static int plant_hide_stand_in(unsigned reference,int hide){assert(hide==1);hidden_ref=reference;plant_hides++;return 1;}
 static void level(int draws){
     static model_t *next;
     memset(&sv,0,sizeof(sv));memset(&svs,0,sizeof(svs));memset(entities,0,sizeof(entities));AW_StateReset();
@@ -380,6 +410,45 @@ int main(void){
      assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && AW_InventoryUse() && taken==1 &&
             AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==1);
      tables();aw_container_open=NULL;aw_inventory_allowed=NULL;aw_object_labels=NULL;level(1);}
+    /* PLANT-PICK-DIRECT-DEFAULT-69: a plant (an organic container the builder marks for the pick, action 1+16) reads
+     * "E: Pick"; under the AmiWind value (the default: the hook unset, then set) one press takes its two Quill Pens
+     * into the inventory with the pick sound and one "Picked up" line, opens no window, and the room's placement goes
+     * out of the view; the emptied plant is not aimed at again, also on the next map (the change list holds it). A
+     * stash (action 1: Fargoth's treestump, a supply barrel) opens its window under both values; under the Original
+     * value the plant opens its window too, nothing taken. An ore rock (+32) is picked and stays drawn. */
+    {char prompt[48];int steal=-1;
+     aw_container_open=open_stand_in;aw_plant_pick_sound=plant_sound;aw_plant_hide=plant_hide_stand_in;
+     (void)AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned);   /* read on this map: the next map reads again */
+     AW_LedgerClear(&aw_ledger);plant_table(1|16);opens=pick_sounds=plant_hides=picked_lines=0;level(1);
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Comberry Bush"));
+     {int plant_owned=-1;const char *plant_name;   /* no "Open": the scene draws the mushrooms' line for it */
+      assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));
+      assert((plant_name=AW_PlacedPlantHint(&plant_owned))!=NULL && !strcmp(plant_name,"Comberry Bush") && plant_owned==0);}
+     assert(AW_InventoryUse() && opens==0 && pick_sounds==1 && picked_lines==1);
+     assert(!strcmp(picked_line,"Picked up 2 Quill Pen."));
+     assert(AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==2 && AW_ContainerCount(QUILL,"misc_quill")==0);
+     assert(plant_hides==1 && hidden_ref==QUILL);
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_InventoryUse() && pick_sounds==1);
+     level(1);   /* the next map: the change list holds it empty: shown picked again, not aimed at */
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && plant_hides==2 && !AW_InventoryUse());
+     /* the hook set and saying AmiWind: the same pick */
+     aw_plant_pick_amiwind=plant_mode;plant_original=0;AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && opens==0 && pick_sounds==2 && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==2);
+     /* the Original value: its window, nothing taken, no sound, nothing hidden */
+     plant_original=1;AW_LedgerClear(&aw_ledger);plant_hides=0;level(1);
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && !strcmp(prompt,"E: Open") && !AW_PlacedPlantHint(NULL));
+     assert(AW_InventoryUse() && opens==1 && pick_sounds==2 && !plant_hides && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==0);
+     /* a stash: its window under both values */
+     plant_table(1);level(1);assert(AW_InventoryUse() && opens==2);
+     plant_original=0;level(1);
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && !strcmp(prompt,"E: Open"));
+     assert(AW_InventoryUse() && opens==3 && pick_sounds==2);
+     /* an ore rock: picked, stays drawn (nothing hidden), not aimed at once empty */
+     plant_table(1|16|32);AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && opens==3 && pick_sounds==3 && !plant_hides && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==2);
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     AW_LedgerClear(&aw_ledger);aw_plant_pick_amiwind=NULL;aw_plant_pick_sound=NULL;aw_plant_hide=NULL;aw_container_open=NULL;
+     plant=0;tables();level(1);}
     assert(AW_InventoryUse());
     assert(taken==1 && take_reference==(int)QUILL && notices==1);
     assert(AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==1);

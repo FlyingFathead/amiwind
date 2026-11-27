@@ -18,7 +18,7 @@
 | Where | Census and Excise Office, talking to the clerk Sellus Gravius when the journal is updated for the first time: the hint Your journal keeps your quests (config/tutorial-texts.json, the once row for the journal notice; aw_dialwin.c, the journal-updated notice) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66 (last seen) |
+| Persists in | fixed in v0.0.69-dev6 |
 | Severity | low: cosmetic: a frame without text shows for a moment |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
 | Playtest version | 2026_11_17_v0.0.66_full-v0.0.66-release-try2_ad5e9a0 |
@@ -38,6 +38,8 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.69-dev5 (687262d4) | 2026-11-26 | gate 13360 of the planning item UI-JOURNAL-HINT-EMPTY-BOX-67 | a timed notice's blank rows are never a page of their own and the strip draws its box only while it has text, so the journal hint leaves no empty box |
+| shipped | the v0.0.69-dev6 snapshot build | v0.0.69-dev6 (317c49c0c) | 2026-11-27 | the dev6 build and its delivery | the fix 687262d49 (gate 13360) is in the delivered dev6 image |
+| confirmed in play | a scripted play session | v0.0.69-dev6 (317c49c0c) | 2026-11-27 | FS-UAE at 32 MB Fast: the census office, the duties topic, stills at 1 to 8 s after the journal hint and a 10 s clip | the hint shows over the dialogue and goes; no empty box is drawn after it |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -45,6 +47,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20 15:22 +0200: seen again in v0.0.67: The empty frame appeared again in the opening, at the clerk's desk of the Census and Excise Office, near the end of the first conversation.
 - 2026-11-26: fixed in source: a gated commit, v0.0.69-dev5 (687262d4); gate 13360 of the planning item UI-JOURNAL-HINT-EMPTY-BOX-67: a timed notice's blank rows are never a page of their own and the strip draws its box only while it has text, so the journal hint leaves no empty box
 - 2026-11-26 17:55 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: after the duties choice the journal hint still shows an empty rectangle in front of the key name.
+- 2026-11-27: shipped: the v0.0.69-dev6 snapshot build, v0.0.69-dev6 (317c49c0c); the dev6 build and its delivery: the fix 687262d49 (gate 13360) is in the delivered dev6 image
+- 2026-11-27: confirmed in play: a scripted play session, v0.0.69-dev6 (317c49c0c); FS-UAE at 32 MB Fast: the census office, the duties topic, stills at 1 to 8 s after the journal hint and a 10 s clip: the hint shows over the dialogue and goes; no empty box is drawn after it
 
 <!-- END GENERATED TIMELINE -->
 

@@ -53,6 +53,164 @@ def items_share_models(numbers):
     finally:prepare_mesh_bsp._instance_key=original
 
 
+# ITEM-AIM-UNDER-OTHERS-69: the office's item models that keep every drawn triangle, by their entry in
+# config/room-item-faces.json (read by this converter alone, so only this stage keys it). The converter's surface pass
+# (mesh_geometry.surface_polygons) leaves out a triangle whose doubled area at the quarter scale is under
+# SURFACE_FLOOR: right for the world, but on a small item it takes the fine parts. The Iron Dagger (chargen dagger,
+# w_iron_dagger.nif, upright in the note on the table) lost its guard's ends that way: 88 of its 206 triangles drawn,
+# the guard at 0.7 of its width, a 1-2 pixel stick. tests/test_census_item_faces.py keeps SURFACE_FLOOR equal to that
+# pass's own floor.
+ROOM_ITEM_FACES_PATH = Path(__file__).resolve().parents[1] / 'config/room-item-faces.json'
+SURFACE_FLOOR = .05
+
+
+def room_item_faces(room, path=None):
+    """{model path (meshes/..., lower case): entry} of config/room-item-faces.json for ROOM, every entry validated
+    (ValueError naming it): the room, the model, extra_faces (the triangles it may keep beyond the surface floor), a
+    reason, the measured cost (before + added = total, added at most extra_faces) and the Pi check."""
+    data = json.loads(Path(path or ROOM_ITEM_FACES_PATH).read_text(encoding='utf-8'))
+    if data.get('schema') != 1 or not isinstance(data.get('entries'), list):
+        raise ValueError('room-item-faces: schema 1 with an entries list expected')
+    out, seen = {}, set()
+    for entry in data['entries']:
+        model = str(entry.get('model', '')).strip().replace('\\', '/').lower()
+        where = str(entry.get('room', '')).strip().lower()
+        extra = entry.get('extra_faces')
+        cost = entry.get('cost') or {}
+        if not model.startswith('meshes/') or not where:
+            raise ValueError('room-item-faces: entry without a room or a meshes/ model: %r' % entry)
+        if type(extra) is not int or extra <= 0:
+            raise ValueError('room-item-faces: %s: extra_faces must be a positive integer' % model)
+        if not str(entry.get('reason', '')).strip():
+            raise ValueError('room-item-faces: %s: a reason is required' % model)
+        if not all(type(cost.get(k)) is int for k in ('before', 'added', 'total')) or \
+                cost['before'] + cost['added'] != cost['total'] or cost['added'] > extra:
+            raise ValueError('room-item-faces: %s: cost must be before + added = total, added <= extra_faces' % model)
+        if not str(entry.get('pi_check', '')).strip():
+            raise ValueError('room-item-faces: %s: pi_check (pending or the bench that passed) is required' % model)
+        if (where, model) in seen:
+            raise ValueError('room-item-faces: %s listed twice for %s' % (model, where))
+        seen.add((where, model))
+        if where == room:
+            out[model] = entry
+    return out
+
+
+def small_polygons(v, f, floor=SURFACE_FLOOR):
+    """The triangles of V F (vertices x y z u v, faces a b c material) that the surface pass leaves out (doubled area
+    under FLOOR at the quarter scale), each a polygon of its own in that pass's form: (points, material, texture axes,
+    texture offset, normal). Degenerate triangles stay out."""
+    out = []
+    for face in np.asarray(f):
+        p = np.asarray(v, float)[face[:3], :3] * .25
+        uv = np.asarray(v, float)[face[:3], 3:5]
+        n = np.cross(p[1] - p[0], p[2] - p[0])
+        area = float(np.linalg.norm(n))
+        if area >= floor or area < 1e-9:
+            continue
+        n = n / area
+        try:
+            axes = np.linalg.solve(np.vstack((p[1] - p[0], p[2] - p[0], n)),
+                                   np.vstack((uv[1] - uv[0], uv[2] - uv[0], [0, 0])))
+        except np.linalg.LinAlgError:
+            continue
+        out.append((p, int(face[3]), axes, uv[0] - p[0] @ axes, n))
+    return out
+
+
+def drawn_measure(polys):
+    """The drawn box (per axis low and high) and the drawn area of surface polygons (points at the quarter scale)."""
+    points = np.concatenate([np.asarray(poly, float) for poly, *_ in polys]) if polys else np.zeros((1, 3))
+    area = 0.
+    for poly, *_ in polys:
+        q = np.asarray(poly, float)
+        for k in range(1, len(q) - 1):     # a convex polygon: the fan of its triangles
+            area += float(np.linalg.norm(np.cross(q[k] - q[0], q[k + 1] - q[0]))) / 2
+    return points.min(axis=0), points.max(axis=0), area
+
+
+def source_measure(v, f):
+    """The box and the area of the source triangles at the quarter scale (degenerate ones left out), as drawn_measure."""
+    v = np.asarray(v, float)[:, :3] * .25
+    tris = v[np.asarray(f)[:, :3].astype(int)]
+    cross = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+    used = v[np.unique(np.asarray(f)[:, :3])]
+    return used.min(axis=0), used.max(axis=0), float(np.linalg.norm(cross, axis=1).sum()) / 2
+
+
+def keep_small_faces(task, entry):
+    """prepare_mesh_bsp._prepare_model for an item model of config/room-item-faces.json, in this process: the surface
+    pass also keeps the triangles under its floor (small_polygons). Refuses (ValueError) when it keeps more than the
+    entry's extra_faces, or when the drawn model is not the source's size (every axis of its box at 0.99 or more,
+    its area at 0.99 or more): the census stage stops in its first seconds, never ships a thinner model."""
+    import prepare_mesh_bsp
+    plain = prepare_mesh_bsp.surface_polygons
+    added = []
+
+    def polygons(v, f, geometry_only=False, snap=None, stats=None):
+        polys = plain(v, f, geometry_only, snap, stats)
+        if snap is None and not geometry_only:
+            extra = small_polygons(v, f)
+            added.append(len(extra))
+            polys = list(polys) + extra
+        return polys
+    prepare_mesh_bsp.surface_polygons = polygons
+    try:
+        mi, (v, f, polys, pieces, lod) = prepare_mesh_bsp._prepare_model(task)
+    finally:
+        prepare_mesh_bsp.surface_polygons = plain
+    name = task[1]['source']
+    kept = sum(added)
+    if not added:
+        raise ValueError('room-item-faces: %s: its surface pass did not run as planned (snapped or merged faces)' % name)
+    if kept > entry['extra_faces']:
+        raise ValueError('room-item-faces: %s keeps %d triangles under the floor, its entry allows %d'
+                         % (name, kept, entry['extra_faces']))
+    low, high, area = drawn_measure(polys)
+    s_low, s_high, s_area = source_measure(v, f)
+    widths = [float(high[k] - low[k]) / float(s_high[k] - s_low[k]) if s_high[k] > s_low[k] else 1. for k in range(3)]
+    record = {'kept_under_floor': kept, 'faces': len(polys), 'extra_faces': entry['extra_faces'],
+              'drawn_width_ratio': [round(w, 4) for w in widths],
+              'drawn_area_ratio': round(float(area) / float(s_area), 4) if s_area else 1.}
+    if min(widths) < .99 or record['drawn_area_ratio'] < .99:
+        raise ValueError('room-item-faces: %s is drawn smaller than its source: %r' % (name, record))
+    lod['room_item_faces'] = record
+    return mi, (v, f, polys, pieces, lod)
+
+
+@contextlib.contextmanager
+def items_keep_small_faces(entries):
+    """The office's item models of ENTRIES (room_item_faces) are prepared by keep_small_faces, in this process; every
+    other model as before, in the converter's workers. Scoped to this converter (prepare_mesh_bsp's ordered_map is
+    restored on the way out), so no other map changes. Yields {model: record} of what each kept."""
+    import prepare_mesh_bsp
+    kept = {}
+    if not entries:
+        yield kept
+        return
+    real = prepare_mesh_bsp.ordered_map
+
+    def ordered_map(function, items, *args, **kwargs):
+        if function is not prepare_mesh_bsp._prepare_model:
+            yield from real(function, items, *args, **kwargs)
+            return
+        items = list(items)
+        listed = {i for i, t in enumerate(items) if t[1]['source'].lower() in entries}
+        rest = real(function, [t for i, t in enumerate(items) if i not in listed], *args, **kwargs)
+        for i, t in enumerate(items):
+            if i in listed:
+                result = keep_small_faces(t, entries[t[1]['source'].lower()])
+                kept[t[1]['source'].lower()] = result[1][4]['room_item_faces']
+                yield result
+            else:
+                yield next(rest)
+    prepare_mesh_bsp.ordered_map = ordered_map
+    try:
+        yield kept
+    finally:
+        prepare_mesh_bsp.ordered_map = real
+
+
 # The engine's MAX_MODELS is 512 (ENGINE-MODEL-TABLE-58: a 16-bit model index on the local path); the office keeps a
 # margin under it.
 CENSUS_MODEL_LIMIT = 480
@@ -147,9 +305,15 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     for exe,args in [(qbsp,['-nopercent','census.map']),(vis,vis_args('census.bsp',resolve_jobs(jobs),vis_mode)),(light,light_args('-minlight','24','census.bsp'))]:
         subprocess.run([str(Path(exe).resolve()),*args],cwd=scene,check=True)
     base=scene/'census-base.bsp';(scene/'census.bsp').rename(base);rebuild_world_hull(base,scene/'census.map',qbsp)
+    faces=room_item_faces('census')
     with items_share_models(taken):
-        report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
-                             retain_dressing=interior_dressing())
+        with items_keep_small_faces(faces) as kept_faces:
+            report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,
+                                 jobs=jobs,retain_dressing=interior_dressing())
+    # every entry's model is an office model that kept its faces (a renamed mesh must not pass unnoticed)
+    if set(faces)-set(kept_faces):
+        raise ValueError('room-item-faces: no census model for '+', '.join(sorted(set(faces)-set(kept_faces))))
+    report['room_item_faces']=kept_faces
     netnames=names.result();entities=[]
     for identifier,stem,role in CENSUS_ACTORS:
         ref=next(r for r in cell['refs'] if r['id'].casefold()==identifier and not r.get('deleted'))

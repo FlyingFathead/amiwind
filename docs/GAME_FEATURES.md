@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.69-dev6 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -44,7 +44,7 @@ tools/mwscript/functions.py (the compiler's own table, counted in the builder co
 | Of those, carried out | used: pending |
 | Scripts in the three masters | 1,207 |
 | Scripts that compile | 1,207 |
-| Scripts that run whole (24 November 2026, v0.0.68; 9 more are carried by the game's own code) | 1,063 (88.1 %) |
+| Scripts that run whole (27 November 2026, v0.0.69-dev6; 8 more are AmiWind adaptations) | 1,065 (88.2 %) |
 
 used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 462 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57). By master (24 November 2026, v0.0.68): Morrowind.esm 616 scripts = 519 run, 9 carried by the game's own code, 88 that nothing in the original names or starts; Tribunal.esm 255 = 236 used, 235 run, 1 only in an add-on world, 19 not used; Bloodmoon.esm 336 = 310 used, 309 run, 1 only in an add-on world, 26 not used. The counts are those of docs/MWSCRIPT_FEATURES.md.
 
@@ -55,7 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 4 of 29 done, 21 partial, 4 missing |
-| [MWScript features](MWSCRIPT_FEATURES.md) | 1063 of 1207 scripts run, 0 use a function the interpreter lacks |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 1066 of 1207 scripts run, 0 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |
@@ -147,7 +147,7 @@ Each has its own source file and its own check.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | MWScript compiler | done | All 1,207 scripts of the three masters compile to the compact bytecode, with the original's quirks kept. | OpenMW 0.51 script compiler (behaviour only); UESP Morrowind:Scripting | tests/test_mwscript.py; docs/MWSCRIPT_BYTECODE.md (1,207 of 1,207 compiled, none refused). | - | - | - |
 | MWScript functions | partial | The compiler knows 504 functions and instructions; the interpreter and the host carry out 462 of them (v0.0.62: the player's control switches, the small functions such as Move, MoveWorld, SetPos, Face and GetLOS, the placing family PlaceAtPC, PlaceAtMe, PlaceItem and PlaceItemCell, the fades, the forced sneak, the resistances and the crimes; v0.0.63: the moons, HasItemEquipped, the forced run, ExplodeSpell, the werewolf set, the scale functions, the water breathing functions, the effect family Chameleon to DefendBonus, the game hour and moon phases, the view switches, the armour type, SameFaction, RemoveEffects, the soul gems, and the console group callable from scripts: Show, ShowVars, ToggleAI, ResetActors, OutputRefInfo and the console aliases; v0.0.68: SetWaterLevel and ModWaterLevel), the rest compile to the not-yet call. The game's scripts use 251 distinct functions. | OpenMW 0.51 script extensions (behaviour); UESP Morrowind:Script Functions | tools/mwscript/functions.py (the table and its RUN and HOST sets); tests/test_mwscript.py; tests/aga_controls_test.c; tests/aga_move_rules_test.c; tests/aga_crime_rules_test.c. | 42 table functions are not carried out, each with its reason on the console commands page (the drawing switches, the path grid, the fog of war, the wind, the vision bonus, the levelled list edits, the skipped animation). How many of the 251 used ones are among them is pending a measurement run; since v0.0.68 no script of the game lacks a function (the last two, in Mournhold, raise and lower a room's water). | MWSCRIPT-MORE-57, ACTORS-ON-57, MWSCRIPT-PLAYER-CONTROL-62, MWSCRIPT-SMALL-FUNCTIONS-62, MWSCRIPT-PLACE-OBJECTS-62, CRIME-59, MWSCRIPT-GAPS-63, MW-CONSOLE-COMMANDS-62 | [MWSCRIPT-MISSING-FUNCTIONS-63](bugs/MWSCRIPT-MISSING-FUNCTIONS-63.md), [MWSCRIPT-CONSOLE-LOCAL-NAMES-63](bugs/MWSCRIPT-CONSOLE-LOCAL-NAMES-63.md) |
-| Scripts that run whole | partial | 1,063 of the 1,074 scripts the original uses run as scripts and 9 more are carried by the game's own code (the character creation scripts, compared step by step with it, and Main). Every Vvardenfell script the original uses runs, and so do all of Tribunal's Mournhold and Bloodmoon's Solstheim but one each: of Morrowind.esm's 616 scripts, 519 run, 9 are carried and 88 are not used (nothing in the original names or starts them); of Tribunal.esm's 255, 236 are used and 235 run; of Bloodmoon.esm's 336, 310 are used and 309 run. All 7,411 dialogue result scripts run. | the original scripts run under OpenMW 0.51 | docs/MWSCRIPT_FEATURES.md and docs/mwscript-features.json (measured 24 November 2026, v0.0.68); tests/test_mwscript.py. | Two scripts, one of Tribunal and one of Bloodmoon, are placed only in add-on cells the image does not carry; the exact counts are on the MWScript tracker. The census tray smoke test is not run. | MWSCRIPT-MORE-57, MWSCRIPT-TRAY-SMOKE-58, ACTORS-ON-57, SCRIPTS-BY-MASTER-63 | - |
+| Scripts that run whole | partial | 1,065 of the 1,074 scripts the original uses run as scripts and 8 more are AmiWind adaptations: the game's own code does every step of the script (the character creation scripts, compared step by step with it). Of Morrowind.esm's 616 scripts, 519 run, 8 are adaptations, 1 (Main) is done by the game's own code with a step open and 88 are not used (nothing in the original names or starts them; they never run there either); of Tribunal.esm's 255, 236 are used and all 236 run; of Bloodmoon.esm's 336, 310 are used and all 310 run. All 7,411 dialogue result scripts run. | the original scripts run under OpenMW 0.51 | docs/MWSCRIPT_FEATURES.md and docs/mwscript-features.json (measured 27 November 2026, v0.0.69-dev6); tests/test_mwscript.py. | The game's Main script never rolls the global Random100, which it sets every frame in the original. A script that runs is not yet a script that plays as the original: of the 259 functions the scripts call, 161 have the original's effect in play in full, 92 in part and 6 none (the MWScript tracker, Effect in play). The census tray smoke test is not run. | MWSCRIPT-MORE-57, MWSCRIPT-TRAY-SMOKE-58, ACTORS-ON-57, SCRIPTS-BY-MASTER-63 | - |
 
 ### Sound, music and the interface
 

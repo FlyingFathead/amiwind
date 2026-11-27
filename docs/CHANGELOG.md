@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev7: seventh snapshot of v0.0.69, 27 November 2026](#v0069-dev7-seventh-snapshot-of-v0069-27-november-2026)
 - [v0.0.69-dev6: sixth snapshot of v0.0.69, 26 November 2026](#v0069-dev6-sixth-snapshot-of-v0069-26-november-2026)
 - [v0.0.69-dev5: fifth snapshot of v0.0.69, 26 November 2026](#v0069-dev5-fifth-snapshot-of-v0069-26-november-2026)
 - [v0.0.69-dev4: fourth snapshot of v0.0.69, 25 November 2026](#v0069-dev4-fourth-snapshot-of-v0069-25-november-2026)
@@ -226,6 +227,49 @@ _Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.69-dev7: seventh snapshot of v0.0.69, 27 November 2026
+
+The seventh development snapshot of v0.0.69, "Fix The World After You Put It Together" ([release notes](releases/notes/RELEASE-v0.0.69-dev7.md)). Emulator presets:
+`AmiWind-v0.0.69-dev7-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev7-WinUAE.uae`, both with 32 MB of Fast RAM. Every change is
+covered by tests and the gate of its commit; none has been seen in play yet.
+
+**Fixed**
+
+- Plants, mushrooms, egg sacks, kollops, spore pods and ore rocks are picked with one press, with the pick sound and no
+  window; the option Plant and mushroom picking has the values AmiWind (default) and Original (the container window);
+  stashes keep their window (PLANT-PICK-DIRECT-DEFAULT-69).
+- Items without a name are aimed at and taken as in OpenMW, so the Temple Sewers' burned-out torches can be picked up
+  (ITEM-NAMELESS-NOT-TAKEN-69). Plants carry their measured aim boxes (PLANT-BOX-AIM-69), outdoor items are drawn once
+  (OUTDOOR-ITEM-CHIM-COPY-STAYS-69), and Fargoth's stash in the stump opens (FARGOTH-STASH-STUMP-69).
+- The census office keeps the small faces of its table models, so the Iron Dagger is drawn whole (ITEM-AIM-UNDER-OTHERS-69).
+  The opening's item sweep reads the placed list under the room's own number (OPENING-SWEEP-BEFORE-STAMP-69).
+- Each actor holds the weapon and shield its own record has equipped, through its row in the actor table, and ranged
+  fighters with a tag hold their bow, crossbow or thrown weapon (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69,
+  ACTOR-RANGED-WEAPON-NOT-HELD-69).
+- 47 of the 58 armed creature records hold their own weapon and shield; the rieklings and the lich king wait for the next
+  rebuild of the world (CREATURE-COMBAT-WEAPON-54, CREATURE-OWN-TABLE-NO-ITEM-BONES-69).
+- Every armed person draws its weapon when the item tag tables are full (HELD-ITEM-TABLE-FULL-69).
+- Each swing and shot lasts its own weapon's animation and lands on the shown hit or release moment; the AmiWind dodge and
+  block on a miss stay the default (ACTOR-ATTACK-ONE-CLOCK-69).
+- The weapon and shield appear at the draw's attach moment and go at the put-away's detach moment, and a draw while moving
+  plays on the torso so the legs keep walking (ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69, ACTOR-DRAW-STOPS-LEGS-69).
+- The prison ship's dock-side guards and props go by the scripts' own Disable, and the census office captain's dialogue values
+  are kept (CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69).
+- A creature collides only up to its drawn height, so no invisible wall stands in the open sea off Solstheim, and the
+  world's seams and store edges are checked by a gate test (SOL-SEA-INVISIBLE-BLOCKER-68, ACTOR-CLIP-ABOVE-DRAWN-BODY-69).
+- The actor checks judge every placed actor on the model it stands in (ACTOR-CHECKS-MISS-PLACED-MODELS-69).
+- The script feature page is measured again (MWSCRIPT-EFFECT-PARITY-69, MWSCRIPT-TRACKER-ADDON-NO-FUNCTION-NOT-IN-IMAGE-69), and
+  the werewolf's kill count starts at zero again (WEREWOLF-KILLS-NOT-RESET-69).
+- `dbg tp lordvivec` takes the player to Lord Vivec in his palace
+  (DBG-TP-LORDVIVEC-69).
+
+**Known**
+
+- The open items of v0.0.69-dev6 stand ([its Known list](releases/notes/RELEASE-v0.0.69-dev6.md#known-in-this-build)); NPC
+  weapon use beyond the grip, the held weapon and the swing's length (NPC-WEAPON-USE-PARITY-69), the combat playground's
+  ranged fighters without ammunition (ARENA-RANGED-NO-AMMO-69), the plant pick's outdoor plants and small mushrooms
+  (PLANT-PICK-COMPLETION-69) and the open entries of v0.0.68's Known list are open.
 
 ## v0.0.69-dev6: sixth snapshot of v0.0.69, 26 November 2026
 

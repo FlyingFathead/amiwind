@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -70,8 +70,10 @@ world is not drawn while Options is open.
 ```text
 [ Prefs ]  [ Audio ]  [ Controls ]  [ Video ]
 Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Mouse cursor,
-          Gold frame, UI font, Voice speaker names, Dialogue style, Aimed NPC names,
-          NPC (name place), Objects (name place), Autosave history
+          Gold frame, UI font, Voice speaker names, Dialogue style, Text box,
+          Topic colours, Aimed NPC names, NPC (name place), Objects (name place),
+          Name labels, Always use best attack, Plant and mushroom picking,
+          Autosave history
 Audio     Master, Music, Effects, Dialogue (sliders)
 Controls  Mouse sensitivity (slider), Invert Y axis, the gameplay actions,
           Combat style, Dice rolls, Blocking, Weapon sway, Reset to defaults
@@ -99,6 +101,20 @@ game data (`textures/tx_cursor.dds`) when the image is built; AmiWind is the
 small drawn cursor of earlier releases. An image built without the original's
 pointer always shows AmiWind's. `dbg cursortype 2` and `dbg cursortype 1` do the
 same from the console; the choice is saved in `config.cfg` (`aw_cursor_type`).
+
+Prefs > Plant and mushroom picking chooses what the use key does with a plant.
+AmiWind (the default) picks it with one press: what it holds goes into the
+inventory with the pick sound and a "Picked up" line, no window opens, and the
+plant is not offered again until it grows back (the plants that regrow do so as
+in the original game). In a room the picked plant is taken out of the view;
+outdoors it stays drawn for now. This covers the plants, the kwama egg sacks, the
+kollops, the spore pods and the ore and gem rocks (a rock always stays drawn).
+Original opens the container window of each one, as the original game does.
+Stashes keep their window under both values: Fargoth's hollow treestump in Seyda
+Neen, Ahnassi's two barrels and the guild supply chests. The small mushrooms and
+the bracket fungi keep their one-press pick under both values for now.
+`dbg plantpick 1` and `dbg plantpick 0` do the same from the console; the choice
+is saved in `config.cfg` (`aw_plant_pick`).
 
 ## Options > Controls
 

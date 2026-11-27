@@ -175,6 +175,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [LOOKBOOK-NO-COLOUR-CHECK-68](LOOKBOOK-NO-COLOUR-CHECK-68.md): The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked
+- [OPENING-SWEEP-BEFORE-STAMP-69](OPENING-SWEEP-BEFORE-STAMP-69.md): The image step's opening item check read the prison ship's room maps before their room numbers were written and stopped the build on 79 items the game can take
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it

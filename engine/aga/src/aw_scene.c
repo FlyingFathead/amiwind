@@ -505,6 +505,9 @@ static int aimed_door(void);
 static float door_aim=-1;                 /* where aimed_door met its door (map units from the eye), -1 none */
 float (*aw_hinged_aim)(void);             /* aw_hinged_door.c: the aimed hinged door's distance, -1 none */
 static int focus_held_kind;
+/* PLANT-BOX-AIM-69: 1 when the thing of this frame's focus is the plant to pick (aw_harvest_runtime.c), not the item or
+ * container (AW_PlantFirst): the use, the title and the action line go to the plant */
+static int focus_plant_first;
 static double focus_actor_seen;
 aw_focus_aim_t aw_focus_last;             /* the numbers of the last choice, for `aw_placed aim` */
 /* the ray against TARGET's whole model's box (every frame's bounds) within the reach of the talk, a wall in front ends it;
@@ -527,7 +530,7 @@ static int focus_kind(void) {
     static int stamp=-1,cached_count;static edict_t *cached_player,*cached_edicts;static vec3_t cached_angles;
     edict_t *p,*e;aw_focus_aim_t aim;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected){
-        focus_held_kind=AW_FOCUS_NONE;focus_actor=NULL;return AW_FOCUS_NONE;}
+        focus_held_kind=AW_FOCUS_NONE;focus_actor=NULL;focus_plant_first=0;return AW_FOCUS_NONE;}
     p=svs.clients[0].edict;
     /* same frame, player, view and edict table (a scene load replaces it) */
     if(stamp==host_framecount && cached_player==p && cached_edicts==sv.edicts && cached_count==sv.num_edicts &&
@@ -541,9 +544,19 @@ static int focus_kind(void) {
             actor_whole_box(p,focus_actor,&aim.actor_near,&aim.actor_far))
         e=focus_actor;
     if(!e)aim.actor_near=aim.actor_far=-1;
-    aim.thing=AW_ActivateNearest(AW_InventoryAimDistance(),AW_HarvestAimDistance());
     aim.door=aimed_door()>=0?door_aim:-1;
     aim.hinged=aw_hinged_aim?aw_hinged_aim():-1;
+    /* PLANT-BOX-AIM-69: the item or container and the plant to pick, the nearer of them (AW_PlantFirst: a plant met
+     * inside a container's measured box is in it and wins too); a person or a door the ray meets inside the measured
+     * box of the container aimed at stands in it, so the box gives way (AW_PlacedAimHolds: a bush's box reaches past
+     * the person beside it) */
+    {float item=AW_InventoryAimDistance(),plant=AW_HarvestAimDistance();
+     focus_plant_first=AW_PlantFirst(item,plant,plant>=0 && item>=0 && AW_PlacedAimHolds(plant));
+     aim.thing=focus_plant_first?plant:item;
+     if(!focus_plant_first && item>=0 && ((aim.actor_far>=0 && AW_PlacedAimHolds(aim.actor_near)) ||
+                                          (aim.door>=0 && AW_PlacedAimHolds(aim.door)) ||
+                                          (aim.hinged>=0 && AW_PlacedAimHolds(aim.hinged))))
+         aim.thing=-1;}
     focus_held_kind=AW_FocusChoose(&aim,focus_held_kind);
     focus_actor=focus_held_kind==AW_FOCUS_ACTOR?e:NULL;aw_focus_last=aim;
     stamp=host_framecount;cached_player=p;cached_edicts=sv.edicts;cached_count=sv.num_edicts;
@@ -571,7 +584,7 @@ const char *AW_SceneTargetName(void) {
      if(npc)return npc;
      /* HUD-TEXTS-OVERLAP-67: an item's or plant's name never beside a door that has the frame's focus */
      {int kind=focus_kind();if(kind==AW_FOCUS_DOOR || kind==AW_FOCUS_HINGED)return NULL;}
-     item=AW_InventoryHint();return item?item:AW_HarvestHint();}
+     item=focus_plant_first?NULL:AW_InventoryHint();return item?item:AW_HarvestHint();}   /* PLANT-BOX-AIM-69 */
 }
 const char *AW_SceneWorldModel(const char *name) {
     FILE *f=NULL;const char *region;
@@ -1464,8 +1477,10 @@ int AW_SceneUse(void) {
     if(!travel_by_talk() && travel_use())return 1;
     /* PRISON-SHIP-ITEMS-TAKEABLE-65: a plant is a container too (OpenMW 0.53 Container::activate refuses its harvest
      * while the Inventory window is not allowed) */
+    /* PLANT-BOX-AIM-69: a plant to pick nearer than the item or container (or inside its measured box) first */
     if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED &&
-       (AW_InventoryUse() || ((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse())))return 1;
+       (focus_plant_first?((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse()) || AW_InventoryUse():
+        AW_InventoryUse() || ((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse())))return 1;
     i=kind==AW_FOCUS_DOOR?aimed_door():-1;
     /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
     if(i<0)return kind==AW_FOCUS_HINGED && aw_hinged_use?aw_hinged_use():0;
@@ -1534,7 +1549,11 @@ int (*aw_cstrip_open_now)(void);
 static void focus_title_draw(const char *title,int style) {
     if(title && *title && (!AW_UISpeakerAtRight() || style!=2))AW_UIObjectName(title,style);
 }
+/* PLANT-PICK-DIRECT-DEFAULT-69: the aimed plant the AmiWind pick takes (aw_inventory.c), NULL none */
+const char *AW_PlacedPlantHint(int *owned);
 void AW_SceneDraw(void) {
+    /* the pick's action line, the mushrooms' and the plants' (PLANT-PICK-DIRECT-DEFAULT-69) */
+    static const char pick_action[]="E: Pick";
     static int red=-1;int i,y,w,cw,npc=0,steal=0,ami=AW_SceneNameLabelsAmiWind(),focus_owned=0,kind;
     char line[80],take[48],focus_weight[48],focus_value[48];edict_t *driver;const char *name=NULL,*action=NULL,*focus_title=NULL;extern int scr_copyeverything;
     const char *who;
@@ -1559,7 +1578,8 @@ void AW_SceneDraw(void) {
     {
         const char *focus_name;
         /* HUD-TEXTS-OVERLAP-67: a door that has the focus takes the title; no placed thing's beside it */
-        if(!driver && !npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED &&
+        /* PLANT-BOX-AIM-69: nor the container's when the plant to pick is the focus (its name is the plant's) */
+        if(!driver && !npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && !focus_plant_first &&
            (AW_InventoryFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned) ||
             AW_PlacedFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned)))
             focus_title=focus_name;
@@ -1567,14 +1587,21 @@ void AW_SceneDraw(void) {
     if(!driver && aw_corpse_prompt && aw_corpse_prompt(take,sizeof(take),&name)){action=take;npc=1;}   /* CORPSE-LOOT-60 */
     else if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
     /* STEAL-PROMPT-58: an aimed takeable item (its name is in the focus box): "E: Take", or "E: Steal" in red */
-    else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && AW_ItemPrompt(take,sizeof(take),&steal)){
+    else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && !focus_plant_first &&
+            AW_ItemPrompt(take,sizeof(take),&steal)){
         /* the AmiWind style puts the item's or container's title with its action line below the view */
         if(focus_title && (!ami || !AW_InventoryHint())){name=focus_title;npc=0;}else{name="";npc=1;}
         action=take;
     }
+    /* PLANT-PICK-DIRECT-DEFAULT-69: a plant the AmiWind pick takes (aw_inventory.c plant_pick): its name as an object's
+     * title (the focus box in the Morrowind style), the mushrooms' action line, red when picking it is theft */
+    else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && !focus_plant_first &&
+            (name=AW_PlacedPlantHint(&steal))!=NULL){
+        if(focus_title)name=focus_title;
+        action=pick_action;npc=0;}
     else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && (!aw_inventory_allowed || aw_inventory_allowed()) &&
             (name=AW_HarvestHint())!=NULL){
-        action="E: Pick";npc=1;}
+        action=pick_action;npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=kind==AW_FOCUS_DOOR?aimed_door():-1;   /* HUD-TEXTS-OVERLAP-67: never a door behind the person shown */
         if(i>=0){
@@ -2230,7 +2257,9 @@ static void scene_help(void) {
  * place puts the player. A map of "global" is an outdoor place: x y z are original Morrowind global coordinates, z the
  * height to land at or below (the route of dbg tp X Y Z). A map of "-" is a place this image does not hold (the
  * expansions' arrivals, tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66): its label says why and the caller
- * moves nothing. 1 with R filled when NAME is listed and its map is valid (or "-"). */
+ * moves nothing. A map of "being" is a person or creature (DBG-TP-LORDVIVEC-69: dbg tp lordvivec): the label is its
+ * record id, x y z and the yaw are unused, and the caller takes the list's own Beings row of that id (beside it,
+ * facing it). 1 with R filled when NAME is listed and its map is valid (or "-", "global" or "being"). */
 static int named_place(const char *name,aw_scene_link_t *r) {
     FILE *f;char line[192],key[24],map[16],label[96];float x,y,z,yaw;int found=0;
     COM_FOpenFile("teleport-names.txt",&f);
@@ -2239,7 +2268,8 @@ static int named_place(const char *name,aw_scene_link_t *r) {
     while(!found && fgets(line,sizeof(line),f)) {
         if(line[0]=='#')continue;
         if(Q_sscanf(line,"%23[^|]|%15[^|]|%f %f %f|%f|%95[^\r\n]",key,map,&x,&y,&z,&yaw,label)!=7)continue;
-        if(Q_strcasecmp(key,(char *)name) || (strcmp(map,"global") && strcmp(map,"-") && !map_valid(map)))continue;
+        if(Q_strcasecmp(key,(char *)name) ||
+           (strcmp(map,"being") && strcmp(map,"global") && strcmp(map,"-") && !map_valid(map)))continue;
         memset(r,0,sizeof(*r));copy_name(r->target,sizeof(r->target),map);copy_name(r->label,sizeof(r->label),label);
         r->arrival[0]=x;r->arrival[1]=y;r->arrival[2]=z;r->yaw=yaw;found=1;
     }
@@ -2279,6 +2309,14 @@ static void scene_command(void) {
     /* listed there, a town's map name too takes its street arrival (balmora: the map start was a roof edge,
      * TPNAMES-HEIGHTS-56); a map name not listed loads its map as before */
     if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && named_place(s,&r)){
+        /* a person or creature (DBG-TP-LORDVIVEC-69: dbg tp lordvivec, Vivec in his palace): the label is its record
+         * id; its Beings row of the list is taken as the box takes it (aw_tpplaces.c AW_TpBeingByIdGo: beside it,
+         * facing it). A disk whose list has no such row says so through the one dbg tp refusal path; nothing moves. */
+        if(!strcmp(r.target,"being")){
+            if(AW_TpBeingByIdGo(r.label))return;
+            Con_Printf("dbg tp %s: %s is not in this disk's teleport list; player state unchanged.\n",s,r.label);
+            tp_refused(AW_LOADERR_NOT_ON_DISK,s,r.label,NULL,"the being is not in this disk's teleport list");return;
+        }
         /* a place this image does not hold: the expansion is not in the build, or the place not yet; nothing moves.
          * The refusal goes through the one dbg tp refusal path (the box), as a place this build leaves out. */
         if(!strcmp(r.target,"-")){

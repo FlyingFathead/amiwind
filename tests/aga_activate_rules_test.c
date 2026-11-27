@@ -238,6 +238,60 @@ int main(void){
         assert(!AW_ActorPersonHull(player_lo,player_hi) && !AW_ActorPersonHull(none,none) && !AW_ActorPersonHull(NULL,hull_hi));
         printf("a person's use box: one frame narrowed, a body low, creatures and more frames as stored ok\n");
     }
+    /* 7. PLANT-BOX-AIM-69: a container aimed by its measured box (a plant's box holds its leaves and stems whole) gives
+     * way to what the view ray meets inside that box. Numbers from the three masters (game units, the boxes as
+     * tools/prepare_focus.py CONTAINER_BOXES measures them, turned by nothing here): */
+    {
+        /* a Slough Fern west of Seyda Neen (flora_bc_fern_01: half axes 174 x 158.6 x 103, centre 0 0 0) with a
+         * Bungler's Bane growing in it 60 to the side; the eye 300 out on the fern's +x side, 80 up */
+        const float fern[3]={0,0,0},fern_axis[3][3]={{174,0,0},{0,158.6f,0},{0,0,103}};
+        const float mushroom[3]={-20,60,-70},behind[3]={-260,0,0},beside[3]={0,190,0},corner[3]={174,158.6f,103};
+        const float eye[3]={300,0,80};
+        float dir[3],n,fern_hit,mushroom_hit;int j;
+        for(j=0;j<3;j++)dir[j]=mushroom[j]-eye[j];
+        n=length3(dir);for(j=0;j<3;j++)dir[j]/=n;
+        mushroom_hit=n;
+        /* the ray enters the fern's box first (its +x face, about 141 from the eye), the mushroom lies 358 along it */
+        {float lo[3],hi[3];for(j=0;j<3;j++){lo[j]=fern[j]-fern_axis[j][j];hi[j]=fern[j]+fern_axis[j][j];}
+         assert(AW_RayBox(eye,dir,lo,hi,&fern_hit,&far_hit) && fern_hit<mushroom_hit && mushroom_hit<far_hit);}
+        printf("fern box at %.1f, the mushroom in it at %.1f\n",fern_hit,mushroom_hit);
+        assert(AW_BoxHolds(fern,fern_axis,mushroom) && AW_BoxHolds(fern,fern_axis,fern) && AW_BoxHolds(fern,fern_axis,corner));
+        assert(!AW_BoxHolds(fern,fern_axis,behind) && !AW_BoxHolds(fern,fern_axis,beside));
+        /* a degenerate box holds nothing, not even its centre */
+        {const float flat[3][3]={{174,0,0},{0,0,0},{0,0,103}};assert(!AW_BoxHolds(fern,flat,fern));}
+        assert(!AW_BoxHolds(NULL,fern_axis,fern) && !AW_BoxHolds(fern,fern_axis,NULL));
+        /* the plant to pick inside the fern's box takes the use from the fern, nearer or not (before: the fern, an item
+         * or container always went first); with no box around it, the nearer: */
+        assert(AW_PlantFirst(fern_hit,mushroom_hit,1));
+        assert(!AW_PlantFirst(fern_hit,mushroom_hit,0));
+        assert(AW_PlantFirst(90,40,0) && !AW_PlantFirst(40,90,0) && AW_PlantFirst(-1,40,0) && !AW_PlantFirst(40,-1,1));
+        assert(!AW_PlantFirst(-1,-1,0));
+        /* among the placed rows (placed_target): the fern met first (none before it) takes the aim; the mushroom's own
+         * row (a harvest kind keeps one, aimed at its point) met farther but inside the fern's box takes it from the
+         * fern; and the other way round, the fern met nearer does not take it from the mushroom standing in it */
+        assert(AW_AimTakes(fern_hit,48*4,48*4,0,0,0));
+        assert(AW_AimTakes(mushroom_hit,fern_hit,1e9f,1,1,0));
+        assert(!AW_AimTakes(fern_hit,mushroom_hit,1e9f,1,0,1));
+        /* a chest behind the fern, outside its box: the fern hides it (the nearer keeps the aim), as before */
+        assert(!AW_AimTakes(400,fern_hit,1e9f,1,0,0));
+        /* no box around either: the nearer, a tie to the later row (as placed_target always did), never past the reach */
+        assert(AW_AimTakes(30,40,48,1,0,0) && !AW_AimTakes(50,40,48,1,0,0) && AW_AimTakes(40,40,48,1,0,0));
+        assert(!AW_AimTakes(60,48,48,0,0,0) && !AW_AimTakes(60,40,48,1,1,0) && !AW_AimTakes(-1,40,48,1,1,0));
+    }
+    {
+        /* Shara Atinsabia standing in a Hackle-lo by the road (flora_hackle-lo_01, half axes 96.1 x 96.2 x 128.5), a
+         * signpost board inside a Trama Root's box on the road west of Balmora (contain_tramaroot_01, 116 x 42.8 x 56.1):
+         * the focus choice is made after the box gave way (aw_scene.c focus_kind sets the thing to -1 when the actor's
+         * or the door's point lies inside the box of the container aimed at): the actor or the door, as without the plant */
+        aw_focus_aim_t a;
+        a.actor_near=60;a.actor_far=75;a.thing=20;a.door=-1;a.hinged=-1;
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_THING);        /* the box would take her focus */
+        a.thing=-1;
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_ACTOR && AW_FocusChoose(&a,AW_FOCUS_THING)==AW_FOCUS_ACTOR);
+        a.actor_near=a.actor_far=-1;a.door=55;
+        assert(AW_FocusChoose(&a,AW_FOCUS_THING)==AW_FOCUS_DOOR);
+        printf("plant boxes: the mushroom in the fern, a person and a door in a plant's box ok\n");
+    }
     printf("activate rules ok\n");
     return 0;
 }

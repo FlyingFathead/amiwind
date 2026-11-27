@@ -229,13 +229,29 @@ def scripting_block(script_doc):
     used = len(rows) - st['inert']
     meas = script_doc.get('measured') or {}
     out = ['Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured %s for AmiWind v%s '
-           'with the builder\'s own compiler: %s of the %s scripts the original game uses run as scripts or are carried '
-           'by AmiWind\'s own code (%s run, %s carried); %s script records are bound to placed objects.' % (
+           'with the builder\'s own compiler: %s of the %s scripts the original game uses run as scripts or are AmiWind '
+           'adaptations (%s run, %s adaptations: AmiWind\'s own code does every step of the script); %s script records '
+           'are bound to placed objects.' % (
                long_date(meas.get('date') or script_doc['updated']), script_doc['version'], n(st['runs'] + st['carried']),
                n(used), n(st['runs']), n(st['carried']), n(meas.get('bindings'))), '']
     out += table(['State', 'Scripts'], [(mf.LABELS[s], n(st[s])) for s in mf.STATES if s != 'inert' and st[s]])
-    return out + ['', '%s more scripts are never named by anything in the original game (test and example scripts, '
-                  'replaced versions, cut content) and are listed apart on that page.' % n(st['inert']), '']
+    # MWSCRIPT-EFFECT-PARITY-69: the same per game file, and the functions' effect in play beside it, so "runs" is
+    # not read as "plays as the original"
+    summary = mf.script_summary(script_doc)
+    out += ['', 'Per game file (not yet = every other state: own code with steps open, a function missing, not '
+            'attached, not in the image, not converted):', '']
+    out += table(['Game file', 'Used in the original', 'Run', 'AmiWind adaptation', 'Not yet',
+                  'Not used in the original (never runs there either)'],
+                 [(x['game'], n(x['used']), n(x['run']), n(x['adaptation']), n(x['not_yet']), n(x['unused']))
+                  for x in summary['masters'] + [dict(summary['all'], game='**All**')]])
+    f = summary['functions']
+    out += ['', 'A script that runs is not yet a script that plays as the original. Of the %s functions the scripts '
+            'call, %s have the original\'s effect in play in full, %s in part and %s none; %s have something seen in '
+            'play so far (the rest is read from the source or kept by a test).' % (
+                n(f['called']), n(f['full']), n(f['part']), n(f['none']), n(f['seen_in_play']))]
+    return out + ['', '%s more scripts are not used in the original game (they never run there either: test and '
+                  'example scripts, replaced versions, cut content); they are not counted toward completion and are '
+                  'listed apart on that page.' % n(st['inert']), '']
 
 
 def build_rows(state):

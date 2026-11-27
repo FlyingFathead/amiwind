@@ -54,8 +54,9 @@ class ActorVsActor(unittest.TestCase):
         self.assertNotIn('aw_combat_killed', strike)              # no crime of the player's
         self.assertNotIn('you.', strike)
         outcome = body(self.c, 'static int victim_outcome(slot_t *v,edict_t *attacker,const aw_swing_t *out) {')
+        # the hit recovery through start_hit since v0.0.69 (its own hitN's time, ACTOR-ATTACK-ONE-CLOCK-69)
         for part in ('set_state(v,S_DEAD,G_DEATH)', 'aw_combat_actor_died(v->e)', 'essential_death(v->e)',
-                     'set_state(v,S_KNOCK,G_KNOCK)', 'set_state(v,S_HIT,G_HIT)', 'start_block(v)'):
+                     'set_state(v,S_KNOCK,G_KNOCK)', 'start_hit(v)', 'start_block(v)'):
             self.assertIn(part, outcome)
 
     def test_engage_against_keeps_a_fight_with_the_player(self):

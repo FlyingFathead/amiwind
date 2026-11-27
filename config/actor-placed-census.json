@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "note": "The placed actor census of the image step (tools/actor_placed_census.py): how many actor rows of an image may show each finding, with the register entry that tracks it. A count over its row, or a finding kind without a row, stops the image. The counts only go down: a fix lowers its row in the same commit.",
+  "allow": {
+    "opening role kept": {
+      "rows": 8,
+      "register": "OPENING-SHIP-DOCK-ACTORS-ROLE-EXCLUDED-69",
+      "why": "the five people of the prison ship and the Seyda Neen dock, on eight map rows"
+    },
+    "fight groups only on the fight model": {
+      "rows": 16,
+      "register": "OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69",
+      "parts": {
+        "the opening's eight people on eleven map rows, standing in their own 21-frame models": 11,
+        "the storm atronach, four actor table bases and its one placement in the world's frames (vf1292): the skeletal bake refuses its mesh, so it keeps a standing and a fight model (docs/ACTOR_RECORDS.md); the first full image with this census counted the placement too": 5
+      },
+      "why": "the opening's people, tracked by the register entry, and the storm atronach's documented fallback"
+    },
+    "no item tag on the standing model": {
+      "rows": 10,
+      "register": "OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69",
+      "why": "seven of the opening's eight people carry a weapon only on the model worn in a fight"
+    },
+    "no layout": {
+      "rows": 1,
+      "by_design": "docs/SCRIPTED_ACTORS.md",
+      "why": "Vivec in his palace: eight frames of his meditation, idle only by design"
+    }
+  }
+}

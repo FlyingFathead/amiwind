@@ -13,9 +13,12 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 
 # the census office's scripts (Morrowind.esm), in the order they come off the list
 OFF_THE_LIST = ('chargendoorentercaptain', 'chargendoorexit', 'chargendoorexitcaptain', 'chargenfatiguebarrel',
-               'chargendoorguardtalker', 'chargenclassnpc', 'chargenstatssheet', 'chargen_ring_keley')
+               'chargendoorguardtalker', 'chargenclassnpc', 'chargenstatssheet', 'chargen_ring_keley',
+               # v0.0.69, CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69: the captain's hint script, whose values state and NoLore
+               # his conversation reads and sets (a script that does not run has none)
+               'chargendialoguemessage')
 STILL_HANDWRITTEN = ('chargen', 'chargenboatnpc', 'chargenboatwomen',
-                     'chargendialoguemessage', 'chargendisable', 'chargennamenpc',
+                     'chargendisable', 'chargennamenpc',
                      'chargenracenpc', 'chargenwalknpc')
 # v0.0.63 (the tracker's parity check, config/mwscript-counterparts.json): the engine's own opening never carried
 # these message boxes, the bed's rest or the dagger's equip hint, so they run as the game's scripts
@@ -52,7 +55,7 @@ class CensusScripts(unittest.TestCase):
         held = engine_list()
         self.assertEqual([n for n in OFF_THE_LIST if n not in held], [])
         self.assertEqual([n for n in CENSUS if not self.handwritten(n) and n not in held], [])
-        self.assertEqual(len(held), 8)   # the eight census office scripts this item moves
+        self.assertEqual(len(held), 9)   # the eight census office scripts of v0.0.62 and the captain's hint script
 
 
 if __name__ == '__main__':

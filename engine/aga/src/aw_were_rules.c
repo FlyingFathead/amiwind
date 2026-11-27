@@ -17,6 +17,10 @@ int AW_WereChange(aw_were_t *w,int set,aw_state_t *s,const aw_inventory_item_t *
     if(!w || !s || (w->player!=0)==set){if(out)*out=r;return 0;}   /* 1884-1886: already so */
     r.changed=1;
     w->player=set;                                                     /* 1894 */
+    /* WEREWOLF-KILLS-NOT-RESET-69 (OpenMW 0.53 mwmechanics/npcstats.cpp NpcStats::setWerewolf): the werewolf kills
+     * start again at 0 at every change into the form, so GetWerewolfKills reads this night's kills (the hunger of
+     * Bloodmoon's werewolf nights asks for them); the change back leaves the count to be read */
+    if(set)w->kills=0;
     if(set){
         /* 1900, inventorystore.cpp unequipAll: every slot; a worn item's constant effects end with it at once (the
          * worn effects' frame would end them a frame later, after the stats below were kept) */

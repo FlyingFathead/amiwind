@@ -1,20 +1,20 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Why the others do not run](#why-the-others-do-not-run)
-- [Carried by AmiWind's own code](#carried-by-amiwinds-own-code)
+- [AmiWind adaptations](#amiwind-adaptations)
   - [CharGen](#chargen)
   - [CharGenBoatNPC](#chargenboatnpc)
   - [CharGenBoatWomen](#chargenboatwomen)
-  - [CharGenDialogueMessage](#chargendialoguemessage)
   - [CharGenDisable](#chargendisable)
   - [CharGenNameNPC](#chargennamenpc)
   - [CharGenRaceNPC](#chargenracenpc)
   - [CharGenWalkNPC](#chargenwalknpc)
+  - [Main](#main)
 - [Follows OpenMW's fix](#follows-openmws-fix)
 - [By area](#by-area)
 - [By function](#by-function)
@@ -32,28 +32,29 @@ _Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- Generated whole by tools/mwscript_features.py render from docs/mwscript-features.json; do not edit by hand. -->
 
-One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
+One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script playing as in the original, which means every function the scripts call with the original's effect in play (the section Effect in play) and every script AmiWind's own code does an adaptation with no step open.
 
-Of the 1,074 scripts the original game uses, **1,063 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 0 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 2 are placed only in add-on cells the image does not carry, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
+Of the 1,074 scripts the original game uses, **1,066 run** as scripts and **7 are AmiWind adaptations** (AmiWind's own code does every step of the script). The rest, by state: done by AmiWind's own code with steps still open 1, using a function the interpreter lacks 0, attached but not run 0, compiled but not attached 0, placed only in add-on cells the image does not carry 0, not converted 0. A script that runs is not yet a script that plays as the original: Effect in play, under By function, says for each function the scripts call how much of the original's effect the engine has. The 133 scripts not used in the original game (they never run there either: test and example scripts, replaced versions, cut content) are not counted toward completion and are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 1,063 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
-| carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
+| runs | 1,066 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| AmiWind adaptation | 7 | not run as a script because AmiWind's own code does what it does, feature complete: every step the original's script does is carried out (the section AmiWind adaptations names the code and compares it step by step) |
+| AmiWind's own code, steps open | 1 | not run as a script; AmiWind's own code does part of what it does, and at least one step of the script is missing or different: a gap, not an adaptation (its open steps are in the section AmiWind adaptations) |
 | uses a function the interpreter lacks | 0 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
-| only in an add-on world | 2 | compiles whole, but its records are placed (or made by scripts) only in cells of Mournhold or Solstheim that the image does not carry (the image's own districts and rooms count as carried: the measurement reads them from the build) |
+| only in an add-on world | 0 | compiles whole, but its records are placed (or made by scripts) only in cells of Mournhold or Solstheim that the image does not carry (the image's own districts and rooms count as carried: the measurement reads them from the build) |
 | not converted | 0 | does not compile |
 | **Used in the original game** | **1,074** | |
-| Not used in the original game (listed apart) | 133 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
+| Not used in the original game (never runs there either; not counted toward completion) | 133 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
 | **All script records** | **1,207** | |
 
-| Game file | All | Used in the original | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Morrowind.esm | 616 | 528 | 519 | 9 | 0 | 0 | 0 | 0 | 0 | 88 |
-| Tribunal.esm | 255 | 236 | 235 | 0 | 0 | 0 | 0 | 1 | 0 | 19 |
-| Bloodmoon.esm | 336 | 310 | 309 | 0 | 0 | 0 | 0 | 1 | 0 | 26 |
+| Game file | All | Used in the original | Runs | Adaptation | Own code, steps open | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Morrowind.esm | 616 | 528 | 520 | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 88 |
+| Tribunal.esm | 255 | 236 | 236 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 19 |
+| Bloodmoon.esm | 336 | 310 | 310 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
 
@@ -67,9 +68,9 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 26 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 27 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.69-dev5. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 593 add-on exterior cells, and 2,447 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,220). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.69-dev6. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 593 add-on exterior cells, and 2,447 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,220). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 
@@ -79,22 +80,22 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 | --- | --- | ---: | ---: | ---: |
 | named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
-| only in an add-on world | placed only in cells of an add-on world that the image does not carry | 0 | 2 | 2 |
+| AmiWind's own code, steps open | engine/aga/src/aw_mwvm.c AW_MwvmNewGame (the game always runs it, OpenMW GlobalScripts::addStartup) does it, but 1 of its 3 steps is not as the script: every frame | 1 | 0 | 1 |
 
-## Carried by AmiWind's own code
+## AmiWind adaptations
 
-The game scripts AmiWind carries with its own code instead of running them, each with the code that does it and a step-by-step comparison with the script (the tracker of these is config/mwscript-counterparts.json, checked by its test). Decided for the project: the opening from the prison ship to the census office is AmiWind's own implementation.
+The game scripts whose work AmiWind's own code does instead of running them, each with the code that does it and a step-by-step comparison with the script (the tracker of these is config/mwscript-counterparts.json, checked by its test). A script is an **AmiWind adaptation** only when it is feature complete: every step the original's script does is carried out. With a step that is missing or different it is not an adaptation but a gap, counted as "AmiWind's own code, steps open", and its open steps are listed under its name below. Of the 8 scripts here, 7 are adaptations and 1 have open steps. Decided for the project: the opening from the prison ship to the census office is AmiWind's own implementation.
 
-| Script | What it does | AmiWind counterpart | Parity | In game | Register |
-| --- | --- | --- | --- | --- | --- |
-| CharGen | the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10 | engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) | same | not yet | OPENING-WEATHER-NOT-CLOUDY-63, CHARGENSTATE-START-VALUE-63, OPENING-FIGHTING-ON-BEFORE-PAPERS-66 |
-| CharGenBoatNPC | the guard on deck: sends the player down to the dock, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps | same | not yet | - |
-| CharGenBoatWomen | the woman on the upper deck: hurries the player, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps | same | not yet | - |
-| CharGenDialogueMessage | the hint about talking to the captain when the player comes near him | engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint | same | not yet | OPENING-CAPTAIN-HINT-SUBTITLE-63 |
-| CharGenDisable | the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after | engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) | same | not yet | OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 |
-| CharGenNameNPC | Jiub on the ship: wakes the player, asks the name, talks about the storm, warns of the guard, repeats his warning | engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps | same | not yet | - |
-| CharGenRaceNPC | the dock guard: walks to the plank, greets the player, the race window, leads him to the office door, repeats | engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps | same | not yet | INTRO-DOCK-GUARD-BLOCKS-DOOR-62 |
-| CharGenWalkNPC | the ship's guard: comes to the player, the movement hint, leads him to the deck hatch, repeats his order | engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps | same | not yet | OPENING-SHIP-GUARD-STEPS-63 |
+| Script | What it does | AmiWind counterpart | State | Open steps | Seen in play | Register |
+| --- | --- | --- | --- | ---: | --- | --- |
+| CharGen | the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10 | engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) | AmiWind adaptation | 0 | not yet | OPENING-WEATHER-NOT-CLOUDY-63, CHARGENSTATE-START-VALUE-63, OPENING-FIGHTING-ON-BEFORE-PAPERS-66 |
+| CharGenBoatNPC | the guard on deck: sends the player down to the dock, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps | AmiWind adaptation | 0 | not yet | - |
+| CharGenBoatWomen | the woman on the upper deck: hurries the player, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps | AmiWind adaptation | 0 | not yet | - |
+| CharGenDisable | the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after | engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) | AmiWind adaptation | 0 | not yet | OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 |
+| CharGenNameNPC | Jiub on the ship: wakes the player, asks the name, talks about the storm, warns of the guard, repeats his warning | engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps | AmiWind adaptation | 0 | not yet | - |
+| CharGenRaceNPC | the dock guard: walks to the plank, greets the player, the race window, leads him to the office door, repeats | engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps | AmiWind adaptation | 0 | not yet | INTRO-DOCK-GUARD-BLOCKS-DOOR-62 |
+| CharGenWalkNPC | the ship's guard: comes to the player, the movement hint, leads him to the deck hatch, repeats his order | engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps | AmiWind adaptation | 0 | not yet | OPENING-SHIP-GUARD-STEPS-63 |
+| Main | the script the game always runs: it rolls the global Random100 every frame and starts the new game's scripts | engine/aga/src/aw_mwvm.c AW_MwvmNewGame | AmiWind's own code, steps open | 1 | not yet | - |
 
 Functions whose work AmiWind's own code does (the script calls into it):
 
@@ -149,6 +150,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 i
 | --- | --- | --- | --- |
 | first | the player within 180, no line playing: CharGenBoat1 | within 45 map units (180 original), no line playing: chargenboat1 | same |
 | repeat | every 6 s near: CharGenBoat2 | every 6 s near: chargenboat2 | same |
+| the use key | the script reads OnActivate and does nothing with it: the player cannot talk to him | a person with a part in the opening is not offered for talk (aw_talk.c AW_TalkFacts) | same |
 
 ### CharGenBoatWomen
 
@@ -156,12 +158,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 i
 | --- | --- | --- | --- |
 | first | the player within 180, no line playing: CharGenWoman1 | within 45 map units, after the hatch is open: chargenwoman1 | same |
 | repeat | every 6 s near, the last line done: CharGenWoman2 | the same; its timer advances only while the player is near and no line plays (fixed in v0.0.63) | same |
-
-### CharGenDialogueMessage
-
-| Step | Original | AmiWind | Same? |
-| --- | --- | --- | --- |
-| once | the player within 300: a message box with an Ok button | within 75 map units (300 original): the same text in a message box with an Ok button (v0.0.63) | same |
+| the use key | the script reads OnActivate and does nothing with it: the player cannot talk to her | a person with a part in the opening is not offered for talk (aw_talk.c AW_TalkFacts) | same |
 
 ### CharGenDisable
 
@@ -178,6 +175,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 i
 | 20 | 1 s after the window: CharGenName2 | 1 s after the name: chargenname2 | same |
 | 40 | line done and the second guard within 400: CharGenName3 | the second guard within 100 map units (400 original): chargenname3 | same |
 | -1 | every 14 s the player stays within 150: CharGenName4 | the same; its timer advances only while the player is near (fixed in v0.0.63) | same |
+| the use key | the script reads OnActivate and does nothing with it: the player cannot talk to him | a person with a part in the opening is not offered for talk (aw_talk.c AW_TalkFacts) | same |
 
 ### CharGenRaceNPC
 
@@ -188,6 +186,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 i
 | 40 | 1.5 s after the window: CharGenDock2 | 1.5 s after the race is accepted: chargendock2 | same |
 | 50 | line done: controls on, AITravel next to the door (-9944, -72481) | line done: the player free (the switch on, v0.0.66), the route to the script's own point next to the door, standing as the walk leaves him (v0.0.63). Measured in the dock map's units against the shipped door table: his box x 322.68..337.32, y -207.37..-193.13; the office door's box x 308.86..332.61, y -173.38..-149.62; no overlap, 19.75 units between them, wider than the player's box (14.64), so the player can pass between him and the door (INTRO-DOCK-GUARD-BLOCKS-DOOR-62 not brought back) | same |
 | -1 | every 6 s near: CharGenDock3 | every 6 s near: chargendock3 | same |
+| the use key | the script reads OnActivate and does nothing with it: the player cannot talk to him | a person with a part in the opening is not offered for talk (aw_talk.c AW_TalkFacts) | same |
 
 ### CharGenWalkNPC
 
@@ -199,6 +198,15 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 i
 | 40-57 | EnablePlayerControls, AIEscort to 195, 100, 170, then AITravel 185, 174, 170 | the controls free (the switch on, v0.0.66), the route to 195, 100, 170, then to 185, 174, 170 | same |
 | 60 | the player within 200: CharGenWalk2 | within 50 map units (200 original): chargenwalk2 | same |
 | -1 | every 6 s the player stays within 150: CharGenWalk3 | the same; its timer advances only while the player is near (fixed in v0.0.63) | same |
+| the use key | the script reads OnActivate and does nothing with it: the player cannot talk to him | a person with a part in the opening is not offered for talk (aw_talk.c AW_TalkFacts) | same |
+
+### Main
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| every frame | outside the menus: Random100 set to a roll of 0 to 100 | not done: a script that reads the global Random100 reads 0 (the dialogue rolls its own Random100 for each line it picks, aw_glut.c) | different |
+| a new game | CharGenState 1: StartScript Startup and VampireCheck | both started once when a new game begins (the compiler's list of them, AW_MwvmNewGame) | same |
+| character creation | StartScript CharGen unless it runs already | CharGen is an AmiWind adaptation (its own entry) | same |
 
 ## Follows OpenMW's fix
 
@@ -215,31 +223,31 @@ Where OpenMW 0.51 deliberately differs from the original engine in what a script
 
 The area of a script is where most of its placed references stand: the region for the exteriors, the region its doors lead out to for an interior. Scripts with no placed reference are grouped by what starts them.
 
-| Area | Scripts | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mournhold (tribunal) | 194 | 193 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-| named by nothing | 123 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
-| ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| hirstaang forest region | 103 | 102 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-| dialogue only | 82 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| records not placed | 69 | 58 | 0 | 0 | 0 | 0 | 0 | 11 | 0 |
-| ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| isinfier plains region | 48 | 48 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| felsaad coast region | 45 | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| bitter coast region | 41 | 34 | 7 | 0 | 0 | 0 | 0 | 0 | 0 |
-| molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| global scripts | 33 | 32 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| red mountain region | 22 | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| thirsk region | 20 | 20 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| moesring mountains region | 17 | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| solstheim (bloodmoon) | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| brodir grove region | 7 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **1063** | **9** | **0** | **0** | **0** | **2** | **133** | **0** |
+| Area | Scripts | Runs | Adaptation | Own code, steps open | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mournhold (tribunal) | 194 | 194 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| named by nothing | 123 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
+| ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| hirstaang forest region | 103 | 103 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dialogue only | 82 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| records not placed | 69 | 58 | 0 | 0 | 0 | 0 | 0 | 0 | 11 | 0 |
+| ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| isinfier plains region | 48 | 48 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| felsaad coast region | 45 | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| bitter coast region | 41 | 35 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| global scripts | 33 | 32 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| red mountain region | 22 | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| thirsk region | 20 | 20 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| moesring mountains region | 17 | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| solstheim (bloodmoon) | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brodir grove region | 7 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **All** | **1207** | **1066** | **7** | **1** | **0** | **0** | **0** | **0** | **133** | **0** |
 
 ## By function
 
@@ -265,7 +273,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | activate | world | yes | full | 118 | 146 | 0 | 0 | 0 | 0 | 0 |
 | startcombat | combat | yes | full | 106 | 205 | 0 | 0 | 0 | 138 | 0 |
 | getdeadcount | stats | yes | full | 105 | 247 | 102 | 0 | 0 | 0 | 0 |
-| forcegreeting | dialogue | host | in part | 98 | 134 | 0 | 0 | 0 | 25 | 0 |
+| forcegreeting | dialogue | host | full | 98 | 134 | 0 | 0 | 0 | 25 | 0 |
 | removeitem | inventory | yes | full | 81 | 239 | 0 | 0 | 0 | 782 | 0 |
 | say | audio | yes | full | 79 | 182 | 0 | 0 | 0 | 0 | 0 |
 | additem | inventory | yes | in part | 77 | 157 | 0 | 0 | 0 | 1135 | 0 |
@@ -319,7 +327,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modreputation | dialogue | host | in part | 12 | 15 | 0 | 0 | 0 | 175 | 0 |
 | getpcsleep | stats | host | full | 11 | 13 | 11 | 0 | 0 | 0 | 0 |
 | getdetected | ai | host | in part | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
-| playbink | ui | host | in part | 10 | 50 | 0 | 0 | 0 | 0 | 0 |
+| playbink | ui | host | full | 10 | 50 | 0 | 0 | 0 | 0 | 0 |
 | resurrect | stats | host | in part | 10 | 16 | 0 | 0 | 0 | 0 | 0 |
 | setdelete | world | host | full | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | xbox | core | yes | full | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
@@ -351,7 +359,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | move | position | host | in part | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | moveworld | position | host | in part | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
 | onknockout | combat | host | full | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
-| onmurder | combat | host | in part | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
+| onmurder | combat | host | full | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
 | pcraiserank | stats | host | full | 5 | 9 | 0 | 0 | 0 | 55 | 0 |
 | playloopsound3d | audio | yes | in part | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
 | setfatigue | stats | yes | in part | 5 | 6 | 0 | 0 | 0 | 1 | 0 |
@@ -384,7 +392,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modwillpower | stats | yes | in part | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
 | setmagicka | stats | yes | full | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
 | setmarksman | stats | yes | in part | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
-| setwaterlevel | world | host | in part | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| setwaterlevel | world | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | setwerewolfacrobatics | stats | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | disablelevitation | control | host | none | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
 | enablelevitation | control | host | none | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -471,7 +479,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modpersonality | stats | yes | full | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
 | modshortblade | stats | yes | in part | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
 | modspear | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modwaterlevel | world | host | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modwaterlevel | world | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | payfine | stats | host | in part | 1 | 1 | 0 | 0 | 0 | 3 | 0 |
 | pcclearexpelled | stats | host | full | 1 | 1 | 0 | 0 | 0 | 23 | 0 |
 | pcexpelled | stats | host | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -511,113 +519,115 @@ Every function the game's scripts call. Scripts: the script records that call it
 
 ### Effect in play
 
-Carried out says that a call is executed; Effect in play says whether what the engine then does is what the original game does. Of the 259 functions the game's scripts call, 156 have the original's effect in full, 97 in part and 6 have none yet (the call is accepted and nothing of its effect happens). How each class is known: 255 read from the source against the original's rules, 4 kept by a test, 0 checked in play. A class read from the source is not yet proven in play.
+Carried out says that a call is executed; Effect in play says whether what the engine then does is what the original game does. Of the 259 functions the game's scripts call, 161 have the original's effect in full, 92 in part and 6 have none yet (the call is accepted and nothing of its effect happens). How each class is known: 251 read from the source against the original's rules, 6 kept by a test, 2 checked in play. A class read from the source is not yet proven in play. Seen in play: what of a function's effect a play session has shown, with its build and date; 4 functions have such a note, and a note covers only what it says, not the whole function. The rows were last checked against the source and the register for AmiWind v0.0.69-dev6 (27 November 2026).
 
-| Function | Effect | Scripts | Dialogue | What is missing | Known from | Register |
-| --- | --- | ---: | ---: | --- | --- | --- |
-| cellchanged | in part | 201 | 0 | A global script sees it only when another map loads, and an object's script when its object is attached or comes into range; walking from one outdoor cell into the next within the same map does not set it. | source | - |
-| forcegreeting | in part | 98 | 25 | A creature opens no conversation: the dialogue table holds rows for people only. | test | DIALOGUE-CREATURE-SPEAKERS-66 |
-| additem | in part | 77 | 1135 | A person given an item does not put it on when it is better than what it wears, as people do in the original; the count itself is right for the player, people, creatures and containers. | source | - |
-| aiwander | in part | 73 | 101 | A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes. | source | - |
-| positioncell | in part | 57 | 14 | An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no actor moves only within the place the player is in, not to another place. A player move into a room the image lacks does nothing. | source | MWSCRIPT-POSITIONCELL-OUTDOOR-62 |
-| cast | in part | 53 | 5 | A spell cast at the player lands only when every effect is a stat change, a cure or a plain effect, and its fire, frost, shock and poison damage lands with no resistance. Cast by the player himself does nothing. A Target spell lands at once with no bolt flying. | source | - |
-| addspell | in part | 52 | 50 | The spell joins the actor's list and can be cast, and resistances, water breathing and similar effects of an ability count where they are read, but the attribute, skill, health, magicka and fatigue effects of an ability, disease or curse added this way (a disease's drain, vampirism's gains) are never applied to the stats. | source | - |
-| getcurrentaipackage | in part | 48 | 0 | After a follow or an escort has ended, the actor reads 1 (travel) where the original keeps reading the package that ran last (3 or 2). | source | - |
-| stopcombat | in part | 40 | 8 | Only the actor's own fight ends: an actor it was fighting, and that actor's allies, go on fighting it. | source | - |
-| getsoundplaying | in part | 40 | 0 | It asks only about sounds the same script started: a sound another script or the game started on that object reads as not playing, and an object named before the call is not looked at. | source | - |
-| playloopsound3dvp | in part | 39 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. A loop started on another object starts again at the script's own object once its first sample ends. | source | - |
-| getpos | in part | 37 | 0 | An object named by its id that is drawn as scenery without its own entity and is no scripted mover reads 0 on every axis. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| sethello | none | 30 | 5 | The value is kept and read back by GetHello, but nothing uses it: the distance at which a person greets the player stays the one from its game data. | source | - |
-| playgroup | in part | 29 | 0 | Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read. | source | - |
-| startscript | in part | 28 | 140 | A global script started from an object's script or from a conversation does not take that object or speaker as its own, so its calls that name no object act on nothing. | source | - |
-| placeitem | in part | 24 | 0 | An object no map converted is made and runs its script but is not drawn; a full map leaves it out. | source | MWSCRIPT-PLACE-OTHER-KINDS-62 |
-| geteffect | in part | 21 | 0 | Only the player is asked: on any NPC or creature it reads 0. An effect of an ability, disease or curse the player has (not cast) reads 0. | source | - |
-| rotate | in part | 21 | 0 | Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity is back at its angle when its map loads again or a game is loaded. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| becomewerewolf | in part | 18 | 0 | The player's stats change, his gear comes off, the hidden werewolf robe is worn, the readied spell and temporary effects end, the inventory and magic windows stay shut and the werewolf's body and arms are drawn (in source in v0.0.68, to be seen in play); his health, the witnesses, the refusals to use things, talk and sleep, the camera height and the screen overlay are not handled. An NPC it turns is drawn as the werewolf, with the player's werewolf body and animation, at its race's size, holds nothing, fights with its claws only and stays a werewolf after death, and the player in the form fights with his claws at his race's size (in source in v0.0.68, to be seen in play); silver weapons, the werewolf's own sounds and the readier attack on a werewolf are not handled. | source | WEREWOLF-BODY-NOT-DRAWN-63, WEREWOLF-RUN-SPEED-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
-| placeatpc | in part | 15 | 7 | An object no map converted is made but not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out. | source | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
-| getangle | in part | 15 | 0 | On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, so a script that turns such an object from its own reading goes wrong. | source | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| position | in part | 14 | 0 | The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object without the actor rules goes back when its map loads again. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| getstandingpc | in part | 13 | 0 | Only an object with its own entity is asked; scenery without one (pressure plates and platforms drawn with the world) reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| modreputation | in part | 12 | 175 | Only the player's reputation changes: on a person (the speaker of a conversation, or the script's own object when no one is named) nothing happens. | source | - |
-| getdetected | in part | 10 | 0 | When the observer is not a person (a creature or an object), only people nearby are asked whether they notice the actor; creatures nearby, the observer itself included, are not. | source | - |
-| playbink | in part | 10 | 0 | The video plays over the game and the game goes on after it, but the second argument is ignored: every video can be skipped, also those the original does not let the player skip. | source | - |
-| resurrect | in part | 10 | 0 | Only an NPC or creature loaded in the player's map is brought back; one elsewhere, or the player, is not. | source | - |
-| setpos | in part | 8 | 0 | A changed place of an object with its own entity is not kept when its map loads again or a game is loaded. Scenery without an entity that is no scripted mover does not move. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| setangle | in part | 7 | 0 | On the player the angle about z is set 90 degrees off from the original's. A changed angle of an object with its own entity is not kept when its map loads again or a game is loaded. | source | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| modfatigue | in part | 6 | 0 | An NPC or creature whose fatigue falls below zero this way falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | - |
-| setscale | in part | 6 | 0 | The new size is not kept: a room or area load builds the object at the game data's size again, and a saved game does not hold it. An object without its own entity is not scaled. Collision keeps its size. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| stopsound | in part | 6 | 0 | It stops only a sound the same script started: a sound another script started on that object goes on, and an object named before the call is not looked at. | source | - |
-| setfatigue | in part | 5 | 1 | An NPC or creature set below zero fatigue falls unconscious only if it is fighting. While the player fights, the new value is lost. | source | - |
-| explodespell | in part | 5 | 0 | The Self and Touch effects with an area reach the actors around the object, but the spell's Target effects are not sent off as a bolt. Called on an actor or on the player it explodes at once where they stand instead of the actor casting the spell itself (the player only readies it in the original). | source | - |
-| getattacked | in part | 5 | 0 | Only an attack by the player marks the actor; an attack by another person or creature does not, and the mark goes when the fight ends instead of staying until the crime is settled. It is not kept in a saved game. | source | - |
-| loopgroup | in part | 5 | 0 | Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read. | source | - |
-| move | in part | 5 | 0 | A scripted object drawn as scenery without its own entity does not move along its own axes (only along the world's axes). A moved object with its own entity goes back to its place when its map loads again or a game is loaded. Only the player is carried along when standing on it. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| moveworld | in part | 5 | 0 | A moved object with its own entity goes back to its place when its map loads again or a game is loaded; only the player is carried along when standing on it. Scenery without an entity that is no scripted mover does not move. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| onmurder | in part | 5 | 0 | The murder mark is not kept in a saved game: a script that asks after a load reads 0. | source | CRIME-SAVE-PURSUERS-62 |
-| playloopsound3d | in part | 5 | 0 | A loop started on another object (named before the call) starts again at the script's own object once its first sample ends. | source | - |
-| setflee | in part | 5 | 0 | The new Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | - |
-| undowerewolf | in part | 5 | 0 | The player's own stats and body come back, the werewolf robe is removed, temporary effects end and the windows open again (in source in v0.0.68, to be seen in play); the form's health is not handled. An NPC is drawn with its own body again (in source in v0.0.68, to be seen in play). | source | WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
-| clearforcesneak | in part | 4 | 4 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | - |
-| modstrength | in part | 4 | 2 | Maximum fatigue does not follow the new Strength. On an NPC or creature the change does not reach its fighting: its damage keeps the game data's Strength. | source | - |
-| enableteleporting | none | 4 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to allow again. | source | - |
-| forcesneak | in part | 4 | 0 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | - |
-| modspeed | in part | 4 | 0 | On an NPC or creature the change counts for its walking but not in a fight, where it moves at the game data's Speed. | source | - |
-| playsound3dvp | in part | 4 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | - |
-| disableteleporting | none | 3 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to stop. | source | - |
-| getspelleffects | in part | 3 | 0 | Reads 1 only while effects of the spell that were cast are active; an ability, disease or curse the actor carries (always active in the original) reads 0. | source | - |
-| hurtcollidingactor | in part | 3 | 0 | Only the player touching the object is hurt; people and creatures touching it are not. | source | - |
-| modwillpower | in part | 3 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC or creature it counts for its spellcasting and its resistance to spells, not for its fatigue in a fight. | source | - |
-| setmarksman | in part | 3 | 0 | On an NPC the change does not reach its fighting with bows and thrown weapons. | source | - |
-| setwaterlevel | in part | 3 | 0 | The water moves only in a room whose water is one flat level of its map; a room built otherwise keeps its water where it was built. | source | MWSCRIPT-WATER-LEVEL-STATIC-67 |
-| setpccrimelevel | in part | 2 | 34 | The bounty changes and pursuit ends at 0, but a crime level set to 0 does not clear the marks the crime left on the witnesses (their alarm and the disposition change). | source | - |
-| disablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to stop. | source | - |
-| enablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to allow again. | source | - |
-| getcollidingpc | in part | 2 | 0 | Scenery without its own entity reads 0, except the invisible walls built as barrier boxes. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| getinterior | in part | 2 | 0 | In the Mournhold districts shown as outdoor areas it reads 0, where the original reads 1 (they are interior cells that behave like outdoors). | source | - |
-| getpctraveling | none | 2 | 0 | Always reads 0: the frame right after a paid travel, in which the original reads 1, is never given. | source | - |
-| hitonme | in part | 2 | 0 | Only a blow with the player's weapon is recorded: a blow by another person's or creature's weapon is not, and the player's own HitOnMe always reads 0. | source | - |
-| hurtstandingactor | in part | 2 | 0 | Only the player standing on the object is hurt; people and creatures standing on it are not, and scenery drawn without an entity hurts no one. | source | - |
-| modagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC or creature the change does not reach its fighting (hit chance, evasion and block keep the game data's Agility). | source | - |
-| modblock | in part | 2 | 0 | On an NPC or creature the change does not reach its blocking in a fight, which keeps the game data's skill. | source | - |
-| modcurrentfatigue | in part | 2 | 0 | An NPC or creature whose fatigue a script takes below zero falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | - |
-| modendurance | in part | 2 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC or creature the change does not reach its fighting (fatigue return in a fight keeps the game data's value). | source | - |
-| modmediumarmor | in part | 2 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | - |
-| placeatme | in part | 2 | 0 | An object no map converted (a record placed only by scripts) is made where it should be and runs its script, but it is not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out. | source | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
-| setagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC the change does not reach its fighting. | source | - |
-| setathletics | in part | 2 | 0 | On an NPC the change does not reach its movement in a fight. | source | - |
-| setblock | in part | 2 | 0 | On an NPC the change does not reach its blocking in a fight. | source | - |
-| setlongblade | in part | 2 | 0 | On an NPC the change does not reach its fighting with long blades. | source | - |
-| setspeed | in part | 2 | 0 | On an NPC the change counts for its walking but not in a fight. | source | - |
-| setstrength | in part | 2 | 0 | Maximum fatigue does not follow the new Strength. On an NPC the change does not reach its damage in a fight. | source | - |
-| setwillpower | in part | 2 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC it counts for spellcasting and spell resistance, not for its fatigue in a fight. | source | - |
-| payfine | in part | 1 | 3 | The bounty goes, stolen goods are taken and the witnesses calm down, but the player's weapon or spell is not put away as in the original. | source | - |
-| modaxe | in part | 1 | 1 | On an NPC or creature the change does not reach its fighting: its axe attacks keep the game data's skill. | source | - |
-| face | in part | 1 | 0 | The actor turns to the point at once instead of turning there at its turning speed. | source | - |
-| forcerun | in part | 1 | 0 | A person or creature runs by it only on its wander and travel walks: as a follower or an escort it keeps its own pace. | source | - |
-| getcollidingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| getdisposition | in part | 1 | 0 | It reads the person's own base disposition, without the race, faction, reputation, personality and temporary changes the original adds, and without the limit to 0 to 100. | source | - |
-| getstandingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
-| getweapontype | in part | 1 | 0 | A lockpick or a probe in the player's hand reads -1 instead of -2 or -3, and a person reads the weapon of its game data rather than the one it holds now. | source | - |
-| modathletics | in part | 1 | 0 | On an NPC or creature the change does not reach its movement in a fight, which keeps the game data's Athletics. | source | - |
-| modbluntweapon | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with blunt weapons. | source | - |
-| modheavyarmor | in part | 1 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | - |
-| modintelligence | in part | 1 | 0 | Maximum magicka does not follow the new Intelligence (the original recalculates it at once). | source | - |
-| modlongblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with long blades. | source | - |
-| modmarksman | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with bows and thrown weapons. | source | - |
-| modshortblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with short blades. | source | - |
-| modspear | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with spears. | source | - |
-| modwaterlevel | in part | 1 | 0 | The water moves only in a room whose water is one flat level of its map; a room built otherwise (lava carved under its water) keeps its water where it was built. | source | MWSCRIPT-WATER-LEVEL-STATIC-67 |
-| placeitemcell | in part | 1 | 0 | An object no map converted is made but not drawn. A placement into an outdoor place appears only while that place's area is loaded. | source | MWSCRIPT-POSITIONCELL-OUTDOOR-62, MWSCRIPT-PLACE-OTHER-KINDS-62 |
-| playsoundvp | in part | 1 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | - |
-| rotateworld | in part | 1 | 0 | Scenery without its own entity that is no scripted mover does not turn, and a turned object with its own entity is back at its angle when its map loads again or a game is loaded. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| setaxe | in part | 1 | 0 | On an NPC the change does not reach its fighting with axes. | source | - |
-| setbluntweapon | in part | 1 | 0 | On an NPC the change does not reach its fighting with blunt weapons. | source | - |
-| setendurance | in part | 1 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC the change does not reach its fighting. | source | - |
-| setheavyarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | - |
-| setmediumarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | - |
-| setspear | in part | 1 | 0 | On an NPC the change does not reach its fighting with spears. | source | - |
-| pcexpell | in part | 0 | 11 | The player is marked expelled, but the message that tells him he was expelled from the faction is not shown. | source | - |
-| modflee | in part | 0 | 3 | The changed Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | - |
+| Function | Effect | Scripts | Dialogue | What is missing | Known from | Seen in play | Register |
+| --- | --- | ---: | ---: | --- | --- | --- | --- |
+| cellchanged | in part | 201 | 0 | A global script sees it only when another map loads, and an object's script when its object is attached or comes into range; walking from one outdoor cell into the next within the same map does not set it. | source | not yet | MWSCRIPT-CELLCHANGED-OUTDOOR-STEP-68, MWSCRIPT-CELLCHANGED-VOLATILE-54 |
+| additem | in part | 77 | 1135 | A person given an item does not put it on when it is better than what it wears, as people do in the original; the count itself is right for the player, people, creatures and containers. | source | not yet | MWSCRIPT-ADDITEM-NO-EQUIP-68 |
+| aiwander | in part | 73 | 101 | A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes, and an actor that is not loaded when the call comes takes no wander. | source | not yet | MWSCRIPT-AIWANDER-NOT-SAVED-68 |
+| positioncell | in part | 57 | 14 | An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no person or creature moves only within the place the player is in, not to another place, and one drawn without its own entity does not move at all. A player move into a room the image lacks does nothing. | source | not yet | MWSCRIPT-POSITIONCELL-OUTDOOR-62, MWSCRIPT-ROTATE-NO-ENTITY-59, MWSCRIPT-POSITIONCELL-NPC-62 |
+| cast | in part | 53 | 5 | A spell cast at the player lands only when every effect is a stat change, a cure or a plain effect; then all of its effects land on him, also those meant for the caster, and its fire, frost, shock and poison damage lands with no resistance. A Target spell lands at once with no bolt flying. Cast by the player himself does nothing, where the original makes it his selected spell. | source | not yet | MWSCRIPT-CAST-PARTIAL-68 |
+| addspell | in part | 52 | 50 | The spell joins the actor's list and can be cast, and resistances, water breathing and similar effects of an ability count where they are read, but the attribute, skill, health, magicka and fatigue effects of an ability, disease or curse added this way (a disease's drain, vampirism's gains) are never applied to the stats. | source | not yet | MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68 |
+| getcurrentaipackage | in part | 48 | 0 | After a travel, a follow or an escort has ended, the actor goes on reading 1 (travel) and its package stays done; the original goes on to the package under it (its own wander reads 0), or reads -1 when none is left. | source | not yet | MWSCRIPT-AIWANDER-NOT-SAVED-68 |
+| stopcombat | in part | 40 | 8 | Only the actor's own fight ends: an actor it was fighting, and that actor's allies, go on fighting it. | source | not yet | MWSCRIPT-STOPCOMBAT-OTHER-SIDE-68, MWSCRIPT-STOPCOMBAT-UNWIRED-62 |
+| getsoundplaying | in part | 40 | 0 | It asks only about sounds the same script started: a sound another script or the game started on that object reads as not playing, and an object named before the call is not looked at. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| playloopsound3dvp | in part | 39 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. A loop started on another object starts again at the script's own object once its first sample ends. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| getpos | in part | 37 | 0 | An object named by its id reads 0 on every axis when it is drawn as scenery without its own entity and is no scripted mover, or when it is in another place than the player's, where the original reads where it stands there. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| sethello | none | 30 | 5 | The value is kept and read back by GetHello (a value over 255 as 255), but nothing uses it: the distance at which a person greets the player stays the one from its game data. | source | not yet | MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68, ACTOR-HELLO-CLAMPED-61 |
+| playgroup | in part | 29 | 0 | A person or creature with a converted skeleton plays the group, but its start-mode argument is not read. An animated object in a room (a door, a lever) is not seen moving: when the group's time has passed it shows the group's last pose and keeps it, also in a saved game. An object outside the rooms and the player play nothing. | source | not yet | MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68, MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68 |
+| startscript | in part | 28 | 140 | A global script started from an object's script or from a conversation does not take that object or speaker as its own, so its calls that name no object act on nothing. | source | not yet | MWSCRIPT-STARTSCRIPT-NO-TARGET-68 |
+| placeitem | in part | 24 | 0 | An object no map converted is made and runs its script but is not drawn; an activator, static or container the world draws as scenery is not made. Past the copies the build plans, a copy's script does not run, and a full map leaves it out. | source | not yet | MWSCRIPT-PLACE-OTHER-KINDS-62, MWVM-PLACE-COPIES-FOUR-66 |
+| geteffect | in part | 21 | 0 | Only the player is asked: on any NPC or creature it reads 0. An effect of an ability, disease or curse the player has (not cast) reads 0. | source | not yet | MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68, GETEFFECT-TABLE-84-OF-143-68 |
+| rotate | in part | 21 | 0 | Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity that is no person or creature that is no person or creature is back at its angle when its map loads again or a game is loaded. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| becomewerewolf | in part | 18 | 0 | Not handled: the doubled health; the witnesses of the change, the known-werewolf state and its bounty; people attacking a werewolf on sight and guards leaving him alone; the refusal to take, open, loot, read or use things and to sleep, with the game's message and sounds (the inventory and magic windows, spell casting and talk are refused); skills not improving in the form; carried weight not counting, and the run bonus applying only with the claws put away; the camera height, view angle, screen border and hand icon of the form; silver weapons doing double damage to a werewolf; the werewolf's own swing, hit, readying and running sounds; the werewolf name over a turned NPC, and attacks on a turned NPC not being a crime. Carried in source and not yet seen in play: the stats' values, the run bonus, and the form kept in a saved game. | source | the player's werewolf body and claws are drawn in first and third person at his race's size, his gear comes off, the inventory and magic windows stay shut and the use key talks to nobody (v0.0.68-dev8, 23 November 2026); an NPC a script turns is drawn as the werewolf, holds nothing, fights with its claws only and cannot be talked to (v0.0.68-dev8, 23 November 2026) | WEREWOLF-BODY-NOT-DRAWN-63, WEREWOLF-RUN-SPEED-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66, WEREWOLF-FIGHT-RULES-LEFT-68 |
+| placeatpc | in part | 15 | 7 | An object no map converted is made but not drawn, and an activator, static or container the world draws as scenery is not made. Past the script-made copies the build plans for one map (four of each record), a further copy appears but its script does not run, and a full map leaves a made object out. | source | not yet | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| getangle | in part | 15 | 0 | On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, also one that SetAngle or Rotate has turned, and so does an object in another place than the player's; a script that turns such an object from its own reading goes wrong. | source | not yet | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| position | in part | 14 | 0 | The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object that is no person or creature goes back when its map loads again. Scenery drawn without its own entity is not moved. | source | not yet | WORLD-OBJECT-STATE-NOT-SAVED-59, MWSCRIPT-POSITION-ROOM-ROTATION-68, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getstandingpc | in part | 13 | 0 | Only an object with its own entity is asked; scenery without one (pressure plates and platforms drawn with the world) reads 0. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| modreputation | in part | 12 | 175 | Only the player's reputation changes: on a person (the speaker of a conversation, or the script's own object when no one is named) nothing happens. | source | not yet | MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68 |
+| getdetected | in part | 10 | 0 | When the observer is not a person (a creature or an object), only people nearby are asked whether they notice the actor; creatures nearby, the observer itself included, are not. | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68 |
+| resurrect | in part | 10 | 0 | Only an NPC or creature loaded in the player's map is brought back; one elsewhere, or the player, is not. A living one is reset to its game data too, where the original leaves it alone. In a room the one brought back does not stand up where it fell: it is gone until the room is entered again, then stands where the game data puts it. | source | not yet | MWSCRIPT-RESURRECT-LOADED-ONLY-68 |
+| setpos | in part | 8 | 0 | A changed place of an object with its own entity that is no person or creature that is no person or creature is not kept when its map loads again or a game is loaded. Scenery without an entity that is no scripted mover does not move. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59, SETPOS-MOVER-NO-ENTITY-68 |
+| setangle | in part | 7 | 0 | On the player the angle about z is set 90 degrees off from the original's. Scenery drawn without its own entity turns only when its script reacts to its use or another script names it. A changed angle of an object that is no person or creature is not kept when its map loads again or a game is loaded. | source | not yet | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, WORLD-OBJECT-STATE-NOT-SAVED-59, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| modfatigue | in part | 6 | 0 | An NPC or creature whose fatigue falls below zero this way falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | not yet | MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68 |
+| setscale | in part | 6 | 0 | The new size is not kept: a room or area load builds the object at the game data's size again, and a saved game does not hold it. An object without its own entity is not scaled. Collision keeps its size. | source | not yet | WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| stopsound | in part | 6 | 0 | It stops only a sound the same script started: a sound another script started on that object goes on, and an object named before the call is not looked at. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| setfatigue | in part | 5 | 1 | An NPC or creature set below zero fatigue falls unconscious only if it is fighting. While the player fights, the new value is lost. | source | not yet | MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68 |
+| explodespell | in part | 5 | 0 | The Self and Touch effects with an area reach the actors around the object, but the spell's Target effects are not sent off as a bolt. Called on an actor or on the player it explodes at once where they stand, where the original has the actor cast the spell at itself and only makes it the player's selected spell. | source | not yet | MWSCRIPT-CAST-PARTIAL-68 |
+| getattacked | in part | 5 | 0 | Only an attack by the player marks the actor; an attack by another person or creature does not, and the mark goes when the fight ends instead of staying until the crime is settled. It is not kept in a saved game. | source | not yet | MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68 |
+| loopgroup | in part | 5 | 0 | A person or creature with a converted skeleton plays the group, but its start-mode argument is not read. An animated object in a room is not seen moving: once its loops have played it shows the group's last pose and keeps it, also in a saved game. After the ice wall of the Halls of Penumbra breaks, the passage behind it stays blocked. An object outside the rooms and the player play nothing. | source | not yet | MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68, MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68, PENUMBRA-ICE-WALL-NO-PASSAGE-68 |
+| move | in part | 5 | 0 | A scripted object drawn as scenery without its own entity does not move along its own axes (only along the world's axes). A moved object with its own entity that is no person or creature that is no person or creature goes back to its place when its map loads again or a game is loaded. Only the player is carried along when standing on it. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59, MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67 |
+| moveworld | in part | 5 | 0 | A moved object that is no person or creature goes back to its place when its map loads again or a game is loaded; only the player is carried along when standing on it. Scenery drawn without its own entity moves only when its script reacts to its use or to the water, or another script names it, and then carries no one standing on it. | source | not yet | WORLD-OBJECT-STATE-NOT-SAVED-59, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| playloopsound3d | in part | 5 | 0 | A loop started on another object (named before the call) starts again at the script's own object once its first sample ends. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| setflee | in part | 5 | 0 | The new Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | not yet | MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68 |
+| undowerewolf | in part | 5 | 0 | Not handled: the health going back from the doubled amount, the witnesses of the change back, and damage to the stats being healed on the change back. | source | the player's own body, arms and stats come back, the werewolf robe is taken off and away, the windows open again and the items he wore stay in the inventory, as in the original (v0.0.68-dev8, 23 November 2026); an NPC is drawn with its own body again and fights with its own weapon (v0.0.68-dev8, 23 November 2026) | WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
+| clearforcesneak | in part | 4 | 4 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | not yet | MWSCRIPT-FORCED-STANCE-ACTORS-68 |
+| modstrength | in part | 4 | 2 | Maximum fatigue does not follow the new Strength. On an NPC or creature only the load it carries in a fight follows the change; its damage keeps the game data's Strength. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| enableteleporting | none | 4 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to allow again. | source | not yet | MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68 |
+| forcesneak | in part | 4 | 0 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | not yet | MWSCRIPT-FORCED-STANCE-ACTORS-68 |
+| modspeed | in part | 4 | 0 | On an NPC or creature the change counts for its walking but not in a fight, where it moves at the game data's Speed. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| playsound3dvp | in part | 4 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| disableteleporting | none | 3 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to stop. | source | not yet | MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68 |
+| getspelleffects | in part | 3 | 0 | Reads 1 only while effects of the spell that were cast are active; an ability, disease or curse the actor carries (always active in the original) reads 0. | source | not yet | MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68 |
+| hurtcollidingactor | in part | 3 | 0 | Only the player touching the object is hurt; people and creatures touching it are not. An object drawn without its own entity hurts no one, and every object the game uses this on is one: the spikes, dicers and tenderizers of the Clockwork City do no harm. | source | not yet | MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| modwillpower | in part | 3 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC or creature it counts for its spellcasting and its resistance to spells, not for its fatigue in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| setmarksman | in part | 3 | 0 | On an NPC the change does not reach its fighting with bows and thrown weapons. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setpccrimelevel | in part | 2 | 34 | The bounty changes and pursuit ends at 0, but a crime level set to 0 does not calm the witnesses as a paid fine does: their alarm and the disposition change stay, and those who attacked the player for the crime go on fighting him. | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68 |
+| disablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: a Levitate spell still lands and stays on the player, where the original ends it with a message that levitation is not allowed here. The engine has no Levitate movement for the switch to stop: a Levitate effect only spares the player fall damage. | source | not yet | MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68 |
+| enablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Levitate movement for it to allow again, and a Levitate effect only spares the player fall damage. | source | not yet | MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68 |
+| getcollidingpc | in part | 2 | 0 | Scenery without its own entity reads 0, except the invisible walls built as barrier boxes. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getinterior | in part | 2 | 0 | In the Mournhold districts shown as outdoor areas it reads 0, where the original reads 1 (they are interior cells that behave like outdoors). | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68 |
+| getpctraveling | none | 2 | 0 | Always reads 0: the frame right after a paid travel, in which the original reads 1, is never given. | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68 |
+| hitonme | in part | 2 | 0 | Only a blow with the player's weapon is recorded: a blow by another person's or creature's weapon is not, and the player's own HitOnMe always reads 0. | source | not yet | MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68 |
+| hurtstandingactor | in part | 2 | 0 | Only the player standing on the object is hurt; people and creatures standing on it are not. Scenery drawn without its own entity, which is every placement the game uses this on, hurts no one through this call; the lava hurts the player by the engine's own lava rule instead. | source | not yet | MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| modagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC or creature the change does not reach its fighting (hit chance, evasion and block keep the game data's Agility). | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| modblock | in part | 2 | 0 | On an NPC or creature the change does not reach its blocking in a fight, which keeps the game data's skill. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modcurrentfatigue | in part | 2 | 0 | An NPC or creature whose fatigue a script takes below zero falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | not yet | MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68 |
+| modendurance | in part | 2 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC or creature the change does not reach its fighting (fatigue return in a fight keeps the game data's value). | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| modmediumarmor | in part | 2 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| placeatme | in part | 2 | 0 | An object no map converted (a record placed only by scripts) is made where it should be and runs its script, but it is not drawn. An activator, static or container the world draws as scenery is not made. Past the script-made copies the build plans for one map (four of each record), a further copy appears but its script does not run, and a full map leaves a made object out. | source | not yet | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| setagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC the change does not reach its fighting. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| setathletics | in part | 2 | 0 | On an NPC the change does not reach its movement in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setblock | in part | 2 | 0 | On an NPC the change does not reach its blocking in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setlongblade | in part | 2 | 0 | On an NPC the change does not reach its fighting with long blades. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setspeed | in part | 2 | 0 | On an NPC the change counts for its walking but not in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setstrength | in part | 2 | 0 | Maximum fatigue does not follow the new Strength. On an NPC or creature only the load it carries in a fight follows the change; its damage keeps the game data's Strength. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| setwillpower | in part | 2 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC it counts for spellcasting and spell resistance, not for its fatigue in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| payfine | in part | 1 | 3 | The bounty goes, stolen goods are taken and the witnesses calm down, but the player's weapon or spell is not put away as in the original. | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68 |
+| modaxe | in part | 1 | 1 | On an NPC or creature the change does not reach its fighting: its axe attacks keep the game data's skill. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| face | in part | 1 | 0 | The actor turns to the point at once instead of turning there at its turning speed. | source | not yet | MWSCRIPT-AIWANDER-NOT-SAVED-68 |
+| forcerun | in part | 1 | 0 | A person or creature given it does not run: the flag is kept, saved and read back, but its walks keep their walking speed, on its wander and travel walks as when it follows or escorts. | source | not yet | MWSCRIPT-FORCED-STANCE-ACTORS-68 |
+| getcollidingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getdisposition | in part | 1 | 0 | It reads the person's own base disposition, without the race, faction, reputation, personality and temporary changes the original adds, and without the limit to 0 to 100. | source | not yet | MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68 |
+| getstandingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getweapontype | in part | 1 | 0 | Lockpicks and probes cannot be held yet, and any held item that is not a weapon reads -1 where the original reads -2 for a lockpick and -3 for a probe. A person reads the weapon of its game data rather than the one it holds now. | source | not yet | MWSCRIPT-SMALL-DIFFERENCES-68, INVENTORY-EQUIP-KINDS-NOT-YET-67 |
+| modathletics | in part | 1 | 0 | On an NPC or creature the change does not reach its movement in a fight, which keeps the game data's Athletics. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modbluntweapon | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with blunt weapons. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modheavyarmor | in part | 1 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modintelligence | in part | 1 | 0 | Maximum magicka does not follow the new Intelligence (the original recalculates it at once). | source | not yet | MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| modlongblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with long blades. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modmarksman | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with bows and thrown weapons. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modshortblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with short blades. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| modspear | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with spears. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| placeitemcell | in part | 1 | 0 | An object no map converted is made but not drawn, and an activator, static or container the world draws as scenery is not made. Past the copies the build plans, a copy's script does not run, and a full map leaves a made object out. | source | not yet | MWSCRIPT-PLACE-OTHER-KINDS-62, MWVM-PLACE-COPIES-FOUR-66 |
+| playsoundvp | in part | 1 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | not yet | MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68 |
+| rotateworld | in part | 1 | 0 | Scenery without its own entity that is no scripted mover does not turn, and a turned object with its own entity that is no person or creature that is no person or creature is back at its angle when its map loads again or a game is loaded. | source | not yet | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| setaxe | in part | 1 | 0 | On an NPC the change does not reach its fighting with axes. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setbluntweapon | in part | 1 | 0 | On an NPC the change does not reach its fighting with blunt weapons. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setendurance | in part | 1 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC the change does not reach its fighting. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68, MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68 |
+| setheavyarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setmediumarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| setspear | in part | 1 | 0 | On an NPC the change does not reach its fighting with spears. | source | not yet | MWSCRIPT-NPC-STATS-SKIP-FIGHT-68 |
+| pcexpell | in part | 0 | 11 | The player is marked expelled, but the message that tells him he was expelled from the faction is not shown. | source | not yet | FACTION-EXPEL-MESSAGE-64, MWSCRIPT-SMALL-DIFFERENCES-68 |
+| modflee | in part | 0 | 3 | The changed Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | not yet | MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68 |
+
+Functions with the original's effect in full and a note of what was seen in play:
+
+| Function | Seen in play | Known from | Register |
+| --- | --- | --- | --- |
+| modwaterlevel | the water of the two Old Mournhold rooms rises and falls with their levers (v0.0.68-dev2, 20 November 2026) | play | MWSCRIPT-WATER-LEVEL-STATIC-67 |
+| setwaterlevel | the water of the two Old Mournhold rooms rises and falls with their levers (v0.0.68-dev2, 20 November 2026) | play | MWSCRIPT-WATER-LEVEL-STATIC-67 |
 
 ## Every script
 
@@ -876,23 +886,23 @@ Referenced by: the records that carry the script and their placed references per
 | Warp_Falen | azura's coast region | runs | 1 activator; placed 2 (Morrowind 2) | active_port_falen | getitemcount, menumode, messagebox, onactivate, playsound, positioncell | 3: getitemcount, menumode, onactivate | - | - |
 | BILL_MT_WritBrilnosu | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 1 dialogue results | brilnosu llarys | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | - |
 | CharGenBed | bitter coast region | runs | 1 activator; placed 1 (Morrowind 1) | chargen_bed | enablerest, menumode, messagebox, onactivate, showrestmenu, xbox | 4: local, menumode, onactivate, xbox | - | - |
-| CharGenBoatNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 1 | getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 8: getdisabled, getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps |
-| CharGenBoatWomen | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 3 | getdistance, getsecondspassed, menumode, onactivate, say, saydone | 7: getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps |
+| CharGenBoatNPC | bitter coast region | AmiWind adaptation | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 1 | getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 8: getdisabled, getdistance, local, menumode, onactivate, saydone | - | an AmiWind adaptation: engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps does every step of the script |
+| CharGenBoatWomen | bitter coast region | AmiWind adaptation | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 3 | getdistance, getsecondspassed, menumode, onactivate, say, saydone | 7: getdistance, local, menumode, onactivate, saydone | - | an AmiWind adaptation: engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps does every step of the script |
 | CharGenClassNPC | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen class | activate, disable, disableplayercontrols, enable, enablebirthmenu, enableclassmenu, enableplayercontrols, enableplayerviewswitch, enablestatreviewmenu, enablestatsmenu, enablevanitymode, getdistance, gethealth, getitemcount, getsecondspassed, menumode, messagebox, onactivate, say, saydone, sethello, startscript, xbox | 39: getdistance, gethealth, getitemcount, global, local, menumode, onactivate, other script, saydone, xbox | - | - |
 | CharGenCustomsDoor | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen_shipdoor | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
 | CharGenDagger | bitter coast region | runs | 1 WEAP; placed 1 (Morrowind 1) | chargen dagger | activate, messagebox, onactivate, xbox | 9: global, local, onactivate, xbox | - | - |
-| CharGenDialogueMessage | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen captain | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | carried by engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint |
-| CharGenDisable | bitter coast region | carried by AmiWind's own code | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | carried by engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) |
+| CharGenDialogueMessage | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen captain | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
+| CharGenDisable | bitter coast region | AmiWind adaptation | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | an AmiWind adaptation: engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) does every step of the script |
 | CharGenDoorEnterCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen door captain | activate, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorExitCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen exit door | activate, enableinventorymenu, enablemagicmenu, enablemapmenu, enableplayerfighting, enableplayermagic, enablestatsmenu, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorGuardTalker | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1) | chargen door guard | enableplayerfighting, enableplayermagic, getdistance, getitemcount, getsecondspassed, menumode, playsound3d, say, saydone, unlock | 8: getdistance, getitemcount, local, menumode, saydone | - | - |
 | CharGenFatigueBarrel | bitter coast region | runs | 1 container; placed 1 (Morrowind 1) | chargen barrel fatigue | enablemapmenu, enableplayerfighting, enableplayerjumping, enableplayermagic, getdistance, menumode, messagebox | 3: getdistance, local, menumode | - | - |
 | CharGenJournalMessage | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargendoorjournal | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
-| CharGenNameNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen name | enablenamemenu, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 17: getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps |
-| CharGenRaceNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen dock guard | aitravel, aiwander, disableplayercontrols, enableplayercontrols, enableracemenu, getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 16: getdisabled, getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps |
+| CharGenNameNPC | bitter coast region | AmiWind adaptation | 1 NPC; placed 1 (Morrowind 1) | chargen name | enablenamemenu, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 17: getdistance, local, menumode, onactivate, saydone | - | an AmiWind adaptation: engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps does every step of the script |
+| CharGenRaceNPC | bitter coast region | AmiWind adaptation | 1 NPC; placed 1 (Morrowind 1) | chargen dock guard | aitravel, aiwander, disableplayercontrols, enableplayercontrols, enableracemenu, getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 16: getdisabled, getdistance, local, menumode, onactivate, saydone | - | an AmiWind adaptation: engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps does every step of the script |
 | CharGenStatsSheet | bitter coast region | runs | 1 book; placed 1 (Morrowind 1) | chargen statssheet | activate, enableinventorymenu, enableplayerfighting, enableplayermagic, menumode, messagebox, onactivate, xbox | 7: local, menumode, onactivate, xbox | - | - |
 | CharGenStuffRoom | bitter coast region | runs | 1 activator; placed 1 (Morrowind 1) | chargen stuff room | getitemcount, getstandingpc, menumode, messagebox, xbox | 17: getitemcount, getstandingpc, global, local, menumode, xbox | - | - |
-| CharGenWalkNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 2 | aiescort, aitravel, enableplayercontrols, getaipackagedone, getdistance, getsecondspassed, menumode, messagebox, onactivate, say, saydone, xbox | 22: getaipackagedone, getdistance, local, menumode, onactivate, saydone, xbox | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps |
+| CharGenWalkNPC | bitter coast region | AmiWind adaptation | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 2 | aiescort, aitravel, enableplayercontrols, getaipackagedone, getdistance, getsecondspassed, menumode, messagebox, onactivate, say, saydone, xbox | 22: getaipackagedone, getdistance, local, menumode, onactivate, saydone, xbox | - | an AmiWind adaptation: engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps does every step of the script |
 | CorprusOnPC | bitter coast region | runs | 1 creature; placed 1 (Morrowind 1); speaker of 7 dialogue results | dagoth gares | addspell, forcegreeting, getdistance, journal, messagebox, ondeath | 3: getdistance, local, ondeath | - | - |
 | DaedraBoethiah | bitter coast region | runs | 2 activator; placed 1 (Morrowind 1) | active_dae_b_bo_head, active_dae_boethiah_ruin | addtopic, getdeadcount, getjournalindex, journal, menumode, onactivate, say, saydone | 10: getdeadcount, getjournalindex, local, menumode, onactivate, saydone | - | - |
 | DaedraBoethiah2 | bitter coast region | runs | 2 activator; placed 1 (Morrowind 1) | active_dae_boethiah, ex_dae_boethiah_fixed | additem, getjournalindex, journal, messagebox, onactivate, say, saydone | 7: getjournalindex, local, onactivate, saydone | - | - |
@@ -961,7 +971,7 @@ Referenced by: the records that carry the script and their placed references per
 | TopicsWebspinner | dialogue only | runs | started by 1 dialogue results | - | addtopic, stopscript | - | - | - |
 | All_Hortator | global scripts | runs | started by MoonAndStar | - | getjournalindex, journal, stopscript | 3: getjournalindex | - | - |
 | All_Nerevarine | global scripts | runs | started by MoonAndStar | - | getjournalindex, journal, stopscript | 4: getjournalindex | - | - |
-| CharGen | global scripts | carried by AmiWind's own code | started by Main | - | changeweather, disableplayercontrols, disableplayerfighting, disableplayerjumping, disableplayermagic, disableplayerviewswitch, disablevanitymode, positioncell, stopscript | - | - | carried by engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) |
+| CharGen | global scripts | AmiWind adaptation | started by Main | - | changeweather, disableplayercontrols, disableplayerfighting, disableplayerjumping, disableplayermagic, disableplayerviewswitch, disablevanitymode, positioncell, stopscript | - | - | an AmiWind adaptation: engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) does every step of the script |
 | CouncilorTopicsHlaalu | global scripts | runs | started by yellowBookScript; started by 2 dialogue results | - | addtopic, stopscript | - | - | - |
 | CouncilorTopicsRedoran | global scripts | runs | started by redBookScript | - | addtopic, stopscript | - | - | - |
 | CouncilorTopicsTelvanni | global scripts | runs | started by brownBookScript | - | addtopic | - | - | - |
@@ -1030,7 +1040,7 @@ Referenced by: the records that carry the script and their placed references per
 | LocalState | mournhold (tribunal) | runs | 17 activator, 1 NPC; placed 16 (Morrowind 3, Tribunal 13); speaker of 5 dialogue results | act_sotha_door10, act_sotha_door3, act_sotha_door9, act_sotha_mach_door1, act_sotha_mach_door2, act_sotha_oilbridge and 12 more | - | - | - | - |
 | nohello | mournhold (tribunal) | runs | 10 NPC; placed 10 (Morrowind 5, Tribunal 5) | anden thilarvel, arnas therethi, drals indobar, ervis ules, sadas mavandes, sarvil sadus and 4 more | - | - | - | nothing to run but its own locals, which the dialogue keeps on the speaker |
 | Sound_Bubbles | mournhold (tribunal) | runs | 1 activator; placed 9 (Tribunal 9) | sound_bubbles00 | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | - |
-| Main | named by nothing | carried by AmiWind's own code | - | - | menumode, random, scriptrunning, startscript | 3: global, menumode, scriptrunning | - | the game always runs it (OpenMW GlobalScripts::addStartup); AmiWind runs the new game scripts it starts (Startup, VampireCheck) and carries CharGen |
+| Main | named by nothing | AmiWind's own code, steps open | - | - | menumode, random, scriptrunning, startscript | 3: global, menumode, scriptrunning | - | engine/aga/src/aw_mwvm.c AW_MwvmNewGame (the game always runs it, OpenMW GlobalScripts::addStartup) does it, but 1 of its 3 steps is not as the script: every frame |
 | amuletAundaeScript | records not placed | runs | 1 clothing | amulet_aundae | getbuttonpressed, messagebox, positioncell | 10: global, local | - | runs while the player carries one of its items |
 | amuletBerneScript | records not placed | runs | 1 clothing | amulet_berne | getbuttonpressed, messagebox, positioncell | 10: global, local | - | runs while the player carries one of its items |
 | amuletDaedraScript | records not placed | runs | 1 clothing; held by placed containers and actors 1 | daedric_special | getbuttonpressed, messagebox, positioncell | 9: local | - | runs on the items placed containers and actors hold, while their area is loaded |
@@ -1321,7 +1331,7 @@ Referenced by: the records that carry the script and their placed references per
 | radacScript | mournhold (tribunal) | runs | 1 creature; placed 1 (Tribunal 1); speaker of 3 dialogue results | dwarven ghost_radac | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | - |
 | raiseWaterToOpen | mournhold (tribunal) | runs | 2 door; placed 2 (Tribunal 2) | ex_mh_swr_trapdr_blkd, in_m_sewer_trapdoor_01_blkd | activate, getwaterlevel, messagebox, onactivate | 3: local, onactivate | - | - |
 | replenishammoShock | mournhold (tribunal) | runs | 1 creature; placed 2 (Tribunal 2) | centurion_projectile_c | additem, getitemcount, menumode, ondeath | 4: getitemcount, local, menumode, ondeath | - | - |
-| rerlas | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | rerlas mon | - | - | - | placed only in cells of an add-on world that the image does not carry |
+| rerlas | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | rerlas mon | - | - | - | nothing to run but its own locals, which the dialogue keeps on the speaker |
 | rockslide | mournhold (tribunal) | runs | 1 activator; placed 1 (Tribunal 1) | act_rockslide01 | disable, getdisabled, getjournalindex, getpccell, getsecondspassed, playgroup, playsound | 6: getdisabled, getjournalindex, getpccell, local | - | - |
 | SadriDoor | mournhold (tribunal) | runs | 1 door; placed 1 (Tribunal 1) | ex_mh_sewer_trapdoor_sadri | activate, getjournalindex, journal, onactivate | 2: getjournalindex, onactivate | - | - |
 | SadriFight | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | golena sadri_a | additem, disable, forcegreeting, getdistance, getitemcount, getparalysis, journal, menumode, ondeath, removeitem | 10: getdistance, getitemcount, getparalysis, local, menumode, ondeath | - | - |
@@ -1563,7 +1573,7 @@ Referenced by: the records that carry the script and their placed references per
 | faustusScript | hirstaang forest region | runs | 1 NPC; placed 1 (Bloodmoon 1); speaker of 4 dialogue results | zeno faustus | - | 2: global, local | - | - |
 | fortDisableScript | hirstaang forest region | runs | 6 activator; placed 8 (Bloodmoon 8) | act_bm_imp_plat_01, act_bm_wall_01, act_bm_wall_arch_01, act_bm_wall_corner_01, act_bm_wall_corner_03, act_bm_well_01 | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | - |
 | fortEnableScript | hirstaang forest region | runs | 8 activator; placed 15 (Bloodmoon 15) | act_bm_imp_plat_02, act_bm_rubble_01, act_bm_rubble_02, act_bm_wall_02, act_bm_wall_03, act_bm_wall_arch_02 and 2 more | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | - |
-| fortloreboozeScript | hirstaang forest region | only in an add-on world | 3 NPC; placed 20 (Bloodmoon 20) | bm_imperial guard, raccan, vilbia herennia | - | - | - | placed only in cells of an add-on world that the image does not carry |
+| fortloreboozeScript | hirstaang forest region | runs | 3 NPC; placed 20 (Bloodmoon 20) | bm_imperial guard, raccan, vilbia herennia | - | - | - | nothing to run but its own locals, which the dialogue keeps on the speaker |
 | GaminScript | hirstaang forest region | runs | 1 NPC; placed 1 (Bloodmoon 1); speaker of 3 dialogue results | gamin girith | aifollow, aiwander, getdistance, getjournalindex, journal, ondeath, setalarm, setfight, startcombat | 9: getdistance, getjournalindex, local, ondeath | - | - |
 | GidarScript | hirstaang forest region | runs | 1 NPC; placed 1 (Bloodmoon 1); speaker of 7 dialogue results | gidar verothan | forcegreeting, getcurrentaipackage, getdistance, getjournalindex, journal, menumode, ondeath, setfight, startcombat | 9: getcurrentaipackage, getdistance, getjournalindex, local, menumode, ondeath | - | - |
 | HroldarScript | hirstaang forest region | runs | 1 NPC; placed 1 (Bloodmoon 1); speaker of 6 dialogue results | hroldar the strange | aitravel, aiwander, disable, enable, forcegreeting, getdisabled, getdistance, getfatigue, gethealth, getjournalindex, getpos, journal, ondeath, placeitem, position, setfight, startcombat, stopcombat | 36: getdisabled, getdistance, getjournalindex, global, local, ondeath | - | - |
@@ -1714,7 +1724,7 @@ Referenced by: the records that carry the script and their placed references per
 
 ## Not used in the original game
 
-Scripts that no object, character, item, dialogue line, start record or other script ever names or starts, so they never ran in the original game either: the developers' test and example scripts, earlier versions replaced by others, and cut content. They stay in the game as they are; the counts above count only the scripts the original uses, and the data file keeps every script with its state.
+Scripts that no object, character, item, dialogue line, start record or other script ever names or starts, so they never ran in the original game either: the developers' test and example scripts, earlier versions replaced by others, and cut content. They stay in the game as they are; the counts above count only the scripts the original uses, and the data file keeps every script with its state. The rule, checked for every script here: no record carries the script and no start record, StartScript or dialogue result names it; or the records that carry it are placed in no cell of the three masters, no levelled list gives them, no script or dialogue result makes one (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell), no container or character holds one, and they are not items a script could hand out (a script on an item always counts as used). Of the 133 scripts here, 122 are carried by no record at all and 11 by records that exist nowhere in the game (10 on activator records, 1 on creature records).
 
 ### Morrowind (88)
 

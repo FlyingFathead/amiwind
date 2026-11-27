@@ -591,6 +591,9 @@ void AW_AnimInit(void) {
 
 static int worn_slot(edict_t *e) {int i;for(i=0;i<MOVERS;i++)if(worn[i].e==e)return i;return -1;}
 int AW_AnimMoving(edict_t *e) {level_check();return e && worn_slot(e)>=0;}
+/* HELD-ITEM-TABLE-FULL-69: the model index an actor stands on under the mover it wears now (0: it wears none), so the
+ * item tables keep the entry of that model while nobody is drawn with it (aw_items.c table_slot), as reclaim() here. */
+int AW_AnimWornBase(edict_t *e) {int k;level_check();k=e?worn_slot(e):-1;return k<0?0:(int)worn[k].base;}
 int AW_AnimMover(edict_t *e,int on) {
     int i,k,index;const aw_anim_t *a;model_t *m;
     if(!e)return 0;

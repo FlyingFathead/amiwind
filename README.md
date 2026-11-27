@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -43,18 +43,19 @@ original's, with the disposition bar, the speaker's services and the name on the
 [changelog](docs/CHANGELOG.md). The release before it, **v0.0.67: Tribunal Introduced**, brought Tribunal and Mournhold
 into the game ([its notes](docs/releases/notes/RELEASE-v0.0.67.md)).
 
-The snapshot in development is **v0.0.69-dev6**, the sixth of **v0.0.69: Fix The World After You Put It Together**: walking residents no longer snap back, armed
-people hold their weapons in their hands, items can be dropped in every room, the census office's platter can be taken,
-voiced characters move their mouths, the sneak key toggles again and the third-person body walks at the player's pace
-([its notes](docs/releases/notes/RELEASE-v0.0.69-dev6.md)). The ones before it:
+The snapshot in development is **v0.0.69-dev7**, the seventh of **v0.0.69: Fix The World After You Put It Together**: plants
+and mushrooms are picked with one press again (the original's container window is an option), every armed person and most
+armed creatures hold their own weapon and shield, swings and shots last as long as the weapon's own animation, items
+without a name can be taken, and the open sea off Solstheim has no invisible wall
+([its notes](docs/releases/notes/RELEASE-v0.0.69-dev7.md)). The ones before it:
+[v0.0.69-dev6](docs/releases/notes/RELEASE-v0.0.69-dev6.md) steadies the walking residents and drops in every room,
 [v0.0.69-dev5](docs/releases/notes/RELEASE-v0.0.69-dev5.md) names the place and its map file in the failed-load box,
 [v0.0.69-dev4](docs/releases/notes/RELEASE-v0.0.69-dev4.md) reads the place's name from the map,
 [v0.0.69-dev3](docs/releases/notes/RELEASE-v0.0.69-dev3.md) plays story videos to their end,
 [v0.0.69-dev2](docs/releases/notes/RELEASE-v0.0.69-dev2.md) finds a usable screen mode on more graphics card setups, and
 [v0.0.69-dev1](docs/releases/notes/RELEASE-v0.0.69-dev1.md) shows a place on the world map as soon as any of its own
-cells is explored. The emulator presets are
-[`AmiWind-v0.0.69-dev6-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev6-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.69-dev6-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev6-WinUAE.uae), both with 32 MB of Fast RAM.
+cells is explored. The emulator presets are `AmiWind-v0.0.69-dev7-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev7-WinUAE.uae`, both
+with 32 MB of Fast RAM.
 
 ## What already works
 
@@ -86,8 +87,9 @@ cells is explored. The emulator presets are
   and the quest book, its indexes kept by the dialogue and the scripts so that quests progress, the entry of the ending
   each quest reaches, quests moving under the finished ones (success and failure alike), a restart entry that reopens a
   quest, and dates read as in the original; the topic pages of the journal carry working links.
-- **The game's scripts:** of the 1,074 scripts the original uses, 1,063 run and 9 more are carried by AmiWind's own code
-  ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
+- **The game's scripts:** of the 1,074 scripts the original uses, 1,065 run and 8 more are AmiWind adaptations, where
+  AmiWind's own code does every step of the script; of the 259 functions they call, 161 have the original's effect in
+  play in full so far and 92 in part ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
 - **Hardware:** the target is an A1200-class machine with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM, in
   emulators with JIT; accelerators such as the PiStorm are a route to real hardware. The figures so far come from
   emulators and the Raspberry Pi 4B ([real hardware](docs/REAL_HARDWARE.md)).

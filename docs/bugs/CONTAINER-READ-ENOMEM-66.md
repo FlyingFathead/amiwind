@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 28 times; something has to be done
+## PERSISTING: reported 31 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
@@ -32,6 +32,9 @@
 - Reported with v0.0.68-dev8 at 2026-11-23 09:39 +0200: Seen again in a gate smoke step: a read failed with Cannot allocate memory while a full build ran beside it; the smoke passed.
 - Reported with v0.0.69-dev1 at 2026-11-25 13:36 +0200: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
 - Reported with v0.0.69-dev5 at 2026-11-26 09:44 +0200: During the v0.0.69-dev5 build a register page render failed with a memory error on a file read; it passed when run again after the build.
+- Reported with v0.0.69-dev6 at 2026-11-27 03:42 +0200: Seen again: a register write in the development container printed a memory error once while reading a build receipt; the entry was written whole, with its build facts left as unknown.
+- Reported with v0.0.69-dev6 at 2026-11-27 07:10 +0200: Reads inside the shell container failed now and then with an out-of-memory error during a full build; each read passed when repeated.
+- Reported with v0.0.69-dev6 at 2026-11-27 09:13 +0200: Reads inside the shell container failed with an out-of-memory error during a full build while the virtual machine's memory was fragmented by its file cache; dropping the cache restored the large free blocks.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -91,6 +94,9 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-23 09:39 +0200: seen again in v0.0.68-dev8: Seen again in a gate smoke step: a read failed with Cannot allocate memory while a full build ran beside it; the smoke passed.
 - 2026-11-25 13:36 +0200: seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
 - 2026-11-26 09:44 +0200: seen again in v0.0.69-dev5: During the v0.0.69-dev5 build a register page render failed with a memory error on a file read; it passed when run again after the build.
+- 2026-11-27 03:42 +0200: seen again in v0.0.69-dev6: Seen again: a register write in the development container printed a memory error once while reading a build receipt; the entry was written whole, with its build facts left as unknown.
+- 2026-11-27 07:10 +0200: seen again in v0.0.69-dev6: Reads inside the shell container failed now and then with an out-of-memory error during a full build; each read passed when repeated.
+- 2026-11-27 09:13 +0200: seen again in v0.0.69-dev6: Reads inside the shell container failed with an out-of-memory error during a full build while the virtual machine's memory was fragmented by its file cache; dropping the cache restored the large free blocks.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -99,7 +105,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 28 times; something has to be done](#persisting-reported-28-times-something-has-to-be-done)
+- [PERSISTING: reported 31 times; something has to be done](#persisting-reported-31-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
@@ -258,6 +264,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked
+- [OPENING-SWEEP-BEFORE-STAMP-69](OPENING-SWEEP-BEFORE-STAMP-69.md): The image step's opening item check read the prison ship's room maps before their room numbers were written and stopped the build on 79 items the game can take
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it

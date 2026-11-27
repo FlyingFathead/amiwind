@@ -997,6 +997,8 @@ int AW_CensusLegacy(void);   /* 1: the old hand-written captain box instead of h
 int AW_CensusAmiwind(void);  /* 1: census type amiwind (the default): AmiWind's registration around the scripts */
 int AW_CensusType(void);
 extern int (*aw_opening_activate)(unsigned reference);   /* aw_mwhost.c: a reference's use as E (its OnActivate) */
+extern int (*aw_opening_disable)(unsigned reference);    /* aw_mwhost.c: a script's Disable of the reference; 1 done */
+unsigned long AW_OpeningShipRefsDisabled(void);          /* references the opening disabled that way (aw_intro_status) */
 void AW_CensusTypeCommand(void);
 void AW_CensusLegacyCommand(void);
 int AW_OpeningTakeRefused(void);

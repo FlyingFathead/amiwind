@@ -18,7 +18,7 @@
 | Where | Seyda Neen, Census and Excise Office: the shelf holding the bottle and the candle (local position about 38 -100 64, pinned: wall brush entity 40, source ref 119541, model x38) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66 (last seen) |
+| Persists in | fixed in v0.0.69-dev6 |
 | Severity | medium: an item the original lets the player take (a theft target) is not takeable |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | 2026_11_17_v0.0.66_full-v0.0.66-release-try2_ad5e9a0 |
@@ -38,6 +38,8 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.69-dev5 (f1bc715f) | 2026-11-26 | gate 13261 of the planning item CENSUS-SHELF-PLATE-BAKED-67 | The Limeware Platter standing in the census office's bookshelf is aimed at and taken: the aim looks past the furniture's collision hull to the item standing inside it; the opening rooms' item sweep runs in the image step |
+| shipped | the v0.0.69-dev6 snapshot build | v0.0.69-dev6 (317c49c0c) | 2026-11-27 | the dev6 build and delivery | the platter fix is in the delivered dev6 image |
+| confirmed in play | a scripted play session | v0.0.69-dev6 (317c49c0c) | 2026-11-27 | FS-UAE at 32 MB Fast: the census office bookshelf's Limeware Platter taken, dropped, aimed at on the floor and taken again | the platter is a takeable item: taken (counted as a theft), dropped at 39 units, aimed at on the floor and taken again |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -45,6 +47,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20 14:38 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release: the platter on the shelf of the first room is still drawn as part of the bookshelf and cannot be taken.
 - 2026-11-26: fixed in source: a gated commit, v0.0.69-dev5 (f1bc715f); gate 13261 of the planning item CENSUS-SHELF-PLATE-BAKED-67: The Limeware Platter standing in the census office's bookshelf is aimed at and taken: the aim looks past the furniture's collision hull to the item standing inside it; the opening rooms' item sweep runs in the image step
 - 2026-11-26 17:51 +0200: seen again in v0.0.69-dev5: Seen again in v0.0.69-dev5: the silver plate in the census office still belongs to the room geometry, so the player cannot take it.
+- 2026-11-27: shipped: the v0.0.69-dev6 snapshot build, v0.0.69-dev6 (317c49c0c); the dev6 build and delivery: the platter fix is in the delivered dev6 image
+- 2026-11-27: confirmed in play: a scripted play session, v0.0.69-dev6 (317c49c0c); FS-UAE at 32 MB Fast: the census office bookshelf's Limeware Platter taken, dropped, aimed at on the floor and taken again: the platter is a takeable item: taken (counted as a theft), dropped at 39 units, aimed at on the floor and taken again
 
 <!-- END GENERATED TIMELINE -->
 

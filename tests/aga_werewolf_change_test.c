@@ -159,6 +159,19 @@ int main (void)
     assert (AW_EffectsCountOn (p.reference) == 1 && !w.kept);
     printf ("50 changes: item rows %d as after the first, robe 0, worn 0, stats own, effects 1\n", AW_ItemCount (&aw_state));
 
+    /* WEREWOLF-KILLS-NOT-RESET-69 (OpenMW 0.53 mwmechanics/npcstats.cpp NpcStats::setWerewolf): the werewolf kills start
+     * again at 0 at every change into the form; a change that changes nothing and the change back leave the count, so
+     * a script reads this night's kills until the next change. Fails on the old rule: the count of an earlier night
+     * stayed (3 below), so every night after the first kill read as fed. */
+    w.kills = 3;                                                     /* an earlier night's */
+    assert (AW_WereChange (&w, 1, &aw_state, &robe, &p, numbers, 9, &r) && w.player && w.kills == 0);
+    w.kills = 2;                                                     /* two people killed this night */
+    assert (AW_WereChange (&w, 1, &aw_state, &robe, &p, numbers, 9, &r) == 0 && w.kills == 2);   /* already so */
+    assert (AW_WereChange (&w, 0, &aw_state, &robe, &p, NULL, 0, &r) && !w.player && w.kills == 2);
+    assert (AW_WereChange (&w, 1, &aw_state, &robe, &p, numbers, 9, &r) && w.kills == 0);        /* the next night */
+    assert (AW_WereChange (&w, 0, &aw_state, &robe, &p, NULL, 0, &r) && w.kills == 0);
+    printf ("kills: 0 at each change into the form, kept by the change back\n");
+
     /* a robe given by hand (dbg give werewolfrobe): the change adds one more and wears it; back: one taken away, the
      * given one stays, not worn (the original's add and remove of one) */
     assert (AW_ItemAdd (&aw_state, AW_WERE_ROBE, 1));

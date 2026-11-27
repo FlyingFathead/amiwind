@@ -14,7 +14,9 @@ Built once from the game data by the mwscript stage, written as sections of id1/
   AITM  32 bytes an item, shared by every actor that carries it and every script that names it:
           u16 id  u8 kind (ITEM_*)  u8 type (weapon or armour type)  u16 condition  u16 armour rating
           u8 damage[6] (chop, slash, thrust: min, max)  u16 flags (1 two-handed)  f32 weight  f32 speed  f32 reach
-          u16 enchantment (AENC row, 0xFFFF none; v0.0.61, the engine also reads the 28-byte rows before it)  u16 0
+          u16 enchantment (AENC row, 0xFFFF none; v0.0.61, the engine also reads the 28-byte rows before it)
+          u16 held model (string: the model an actor holding the item is drawn with, held_model; 0xFFFF none; a
+              weapon's and a shield's; written 0 and read by nothing before v0.0.69)
   ASPT  4 bytes a spell: u16 id  u8 type (0 spell, 1 ability, 2 blight, 3 disease, 4 curse, 5 power)
           u8 the SPDT flags (1 autocalc, 2 a starting spell of the player, 4 always succeeds; 0 before v0.0.61)
   AENC  16 bytes an enchantment (every ENCH record), sorted by its folded id (binary search by id; v0.0.61):
@@ -56,6 +58,19 @@ NONE = 0xFFFF
 TWO_HANDED = {2, 4, 5, 6, 8}
 GOLD = 'Gold_001'
 GOLD_ALIASES = ('gold_005', 'gold_010', 'gold_025', 'gold_100')
+
+
+SHIELD_TYPE = 8                 # AODT armour type of a shield
+
+
+def held_model(mesh):
+    """The model a held weapon or shield is drawn with (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69): the item model of its
+    mesh, the one the player holds and the world shows (the item model table: tools/prepare_item_models.py model_path
+    of tools/prepare_inventory.py mesh_key; the two lines are repeated here so this table reaches no baking code, and
+    tests/test_actor_held_model.py keeps them equal). '' for no mesh."""
+    import hashlib
+    key = str(mesh).replace('\\', '/').strip().casefold()
+    return 'progs/items/m%s.mdl' % hashlib.sha256(key.encode('utf-8')).hexdigest()[:16] if key else ''
 
 
 def item_id(ident):
@@ -258,7 +273,8 @@ class ActorTables:
         if key in self.item_index:
             return self.item_index[key]
         row = {'id': self.string(ident), 'kind': ITEM_UNKNOWN, 'type': 0, 'health': 0, 'rating': 0,
-               'damage': bytes(6), 'flags': 0, 'weight': 0.0, 'speed': 0.0, 'reach': 0.0, 'enchant': NONE}
+               'damage': bytes(6), 'flags': 0, 'weight': 0.0, 'speed': 0.0, 'reach': 0.0, 'enchant': NONE,
+               'held': ''}
         r = self.records
         for tag in ('WEAP', 'ARMO', 'CLOT', 'BOOK'):
             if key in r[tag]:
@@ -269,13 +285,16 @@ class ActorTables:
             if len(w) >= 28:
                 weight, _value, typ, health, speed, reach = struct.unpack_from('<fihhff', w, 0)[:6]
                 row.update(kind=ITEM_WEAPON, type=typ & 255, health=max(0, health), damage=bytes(w[22:28]),
-                           flags=1 if typ in TWO_HANDED else 0, weight=weight, speed=speed, reach=reach)
+                           flags=1 if typ in TWO_HANDED else 0, weight=weight, speed=speed, reach=reach,
+                           held=held_model(_text(_first(r['WEAP'][key], 'MODL'))))
         elif key in r['ARMO']:
             a = _first(r['ARMO'][key], 'AODT')
             if len(a) >= 24:
                 typ, weight, _value, health, _enchant, rating = struct.unpack_from('<ifiiii', a, 0)
                 row.update(kind=ITEM_ARMOR, type=typ & 255, health=min(0xFFFF, max(0, health)),
                            rating=min(0xFFFF, max(0, rating)), weight=weight)
+                if typ == SHIELD_TYPE:
+                    row['held'] = held_model(_text(_first(r['ARMO'][key], 'MODL')))
         elif key in r['CLOT']:
             c = _first(r['CLOT'][key], 'CTDT')
             row.update(kind=ITEM_CLOTHING, type=(struct.unpack_from('<i', c)[0] & 255) if len(c) >= 4 else 0,
@@ -491,9 +510,12 @@ class ActorTables:
                                 row['spell_first'], row['spell_count'], row['weapon_entry'], row['ctype'] & 255,
                                 *row['attack'], max(0, min(0xFFFF, row['soul'])))
         ainv = b''.join(struct.pack('>HhBB', i, c, f, 0) for i, c, f in self.inventory)
+        # the held models' paths are interned here, after every string the tables and the scripts named before
+        held = [s(r['held']) if r['held'] else NONE for r in self.items]
+        self.report['held_models'] = len({r['held'] for r in self.items if r['held']})
         aitm = b''.join(struct.pack('>HBBHH6sHfffHH', r['id'], r['kind'], r['type'], r['health'], r['rating'],
-                                    r['damage'], r['flags'], r['weight'], r['speed'], r['reach'], r['enchant'], 0)
-                        for r in self.items)
+                                    r['damage'], r['flags'], r['weight'], r['speed'], r['reach'], r['enchant'], h)
+                        for r, h in zip(self.items, held))
         aspt = b''.join(struct.pack('>HBB', r['id'], r['type'], r['flags']) for r in self.spells)
         aspl = b''.join(struct.pack('>H', i) for i in self.spell_list)
         aspc = b''.join(struct.pack('>HH', r['name'], r['cost']) for r in self.spells)

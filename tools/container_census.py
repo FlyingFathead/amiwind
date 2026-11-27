@@ -55,7 +55,7 @@ OWN_EXPORTS = ('opening-barrel-source', 'open-containers-source')
 ROOM_SOURCE_MASK = 0xFFFFFF
 # The engine's tables (aw_inventory.c): rows of one place (a room, or the 3 x 3 exterior cells) and their boxes
 FOCUS_ROWS = 1536
-FOCUS_BOARDS = 256
+FOCUS_BOARDS = 1536     # PLANT-BOX-AIM-69 (256 until v0.0.69-dev6: the plants' boxes took signposts out of the table)
 # The engine's rules (tests/test_container_census.py reads them against aw_inventory.c):
 # CONTAINER_EDICT_ROWS_KEPT: a container drawn as an edict of its own (a compiled room's func_wall with its aw_ref)
 # keeps its row (aimed at where the view ray meets that brush, or its box); False: the row is left to the edict, which
@@ -181,7 +181,10 @@ def census(data_files, masters=None):
                 'after_the_papers': interior and (cell or '').casefold() in AFTER_THE_PAPERS,
                 'reference': reference, 'master': split(reference)[0], 'cell': cell or '',
                 'grid': None if interior else list(grid), 'interior': interior, 'key': key, 'id': ident,
-                'name': rec['name'], 'model': rec['model'], 'organic': rec['organic'], 'script': rec['script'],
+                'name': rec['name'], 'model': rec['model'],
+                # FARGOTH-STASH-STUMP-69: only an organic container of a harvest kind is picked in the world; every
+                # other one opens its window (tools/prepare_focus.py harvest_picked) and is counted to open
+                'organic': rec['organic'] and pf.harvest_picked(rec['model']), 'script': rec['script'],
                 'on_activate': bool(rec['script'] and rec['script'] in takes), 'respawn': rec['respawn'],
                 'items': sum(1 for e in rec['entries'] if e[2] == 'item'),
                 'lists': sum(1 for e in rec['entries'] if e[2] == 'levelled'),
@@ -267,11 +270,33 @@ def read_area_containers(raw):
     return rows, conts
 
 
+def room_record_of(run, path):
+    """The CHIM room record a room map of RUN's image names, read (chim.room_records.read_room_record), or None for a
+    map that is not a CHIM room. The record is looked for beside the map in the image's id1 first, then in the CHIM
+    interiors stage of the run (RUN/chim-interiors/<store>/rooms/<room>.crm): an image whose room store sits on the
+    world partition holds no store in its boot id1 (CONTAINER-COUNT-LOOSE-ROOM-PATH-68: the count read only id1 and
+    stopped at the first room map). ValueError when neither holds it."""
+    from chim.room_records import read_room_record
+    from map_files import room_record
+    found = room_record(path)
+    if found is None:
+        return None
+    store, room = found
+    for root in (Path(path).parent.parent, Path(run) / STAGE_ROOMS):
+        candidate = root / store / 'rooms' / (room + '.crm')
+        if candidate.is_file():
+            return read_room_record(candidate.read_bytes())
+    raise ValueError('CHIM room map %s names %s/rooms/%s.crm, which neither the image nor the run holds'
+                     % (Path(path).name, store, room))
+
+
+STAGE_ROOMS = 'chim-interiors'      # the run's CHIM interiors stage (tools/chim/interior.py OUT/<store>/rooms)
+
+
 def map_rooms(run):
     """{room number: ('chim', {placed source numbers, as the room record has them}) | ('bsp', None)} of the image's
     room maps, and {reference: map name} of every brush (func_wall) that carries an aw_ref (any map)."""
     from chim.frame_map import entities
-    from chim.interior import installed_room
     from map_files import LEGACY_EXT, MAP_EXTS
     rooms, edicts = {}, {}
     for path in sorted((Path(run) / MAPS).iterdir()):
@@ -295,7 +320,7 @@ def map_rooms(run):
         if path.suffix == LEGACY_EXT:
             rooms.setdefault(int(number), ('bsp', None))
             continue
-        room = installed_room(path)
+        room = room_record_of(run, path)
         if room is not None:
             kind, placed = rooms.setdefault(int(number), ('chim', set()))
             if kind == 'chim':

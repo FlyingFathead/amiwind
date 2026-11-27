@@ -1267,7 +1267,11 @@ class ReleaseUiTests(unittest.TestCase):
         # under each land; without readiness the rows are as before, and the header block and its layout are unchanged.
         # 2026-11-20 (maintainer, TRACKER-ROOM-MAPS-NOT-READY-67): the line under each land names its special interiors (ready
         # rooms in the game as room maps of our own, from the data); the header block and its layout are unchanged.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), '1d2fed11812ee95e2608134d0b17d94976a99a5b5ec03c67bb93c975322c6e00')
+        # 2026-11-27 (maintainer, TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69): each land's block gains the game's scripts of its
+        # game file in the same style (ready, used in the original, run, AmiWind adaptation, not yet), the scripts the
+        # original never runs on a line of their own, never counted, and the All lands row the functions' effect in play;
+        # drawn only when the data carries the script summary; the header block and its layout are unchanged.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'd12a3340a7134d7bf62b2c072f12b7fb0848faf214c8cfb7fdb9243fa8347cfe')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their

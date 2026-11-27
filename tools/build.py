@@ -2480,6 +2480,23 @@ def container_count_step(args, run):
     return container_census.build_step(run, args.data_files, log=lambda line: print(line, flush=True))
 
 
+def world_item_count_step(args, run):
+    """WORLD-OBJECT-PLACEMENT-59: the world item count after a passed full image build (tools/room_item_census.py
+    world_build_step): every placed item of the game masters a player can take or steal against what this build makes
+    of it (drawn, aimable, takeable, its owner kept), in the run folder (world-item-census.json, the summary
+    docs/performance/WORLD_ITEMS.json is made from, and world-item-census-full.json, every item with a gap). A
+    measurement: it never fails the build; its verdict against the known gaps is printed, and the gate test holds the
+    committed measurement to them. A MiniWind holds a part of the world only: skipped."""
+    if args.stage != 'aga' or args.dry_run or not getattr(args, 'data_files', None) or getattr(args, 'miniwind', False):
+        print('World item count: skipped (%s)' % ('--dry-run' if args.dry_run else 'a MiniWind'
+                                                  if getattr(args, 'miniwind', False) else 'no image in this build'),
+              flush=True)
+        return None
+    import room_item_census
+    return room_item_census.world_build_step(run, args.data_files, log=lambda line: print(line, flush=True),
+                                             jobs=getattr(args, 'jobs', None))
+
+
 def model_census_step(args, run):
     """MODEL-CENSUS-TOOL-67: the model census after a passed image build (tools/model_census.py build_step): every
     placed model's original triangles, what each mesh method makes of it outdoors and in the rooms, whether it keeps
@@ -4273,6 +4290,7 @@ def _main(argv=None):
         inclusion.start()
         size_verdict = size_ledger_step(args, run)
         container_count_step(args, run)
+        world_item_count_step(args, run)
         model_census_step(args, run)
         resource_after_build(args, run)
         inclusion.join()

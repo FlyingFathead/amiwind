@@ -271,6 +271,19 @@ void AW_TpBeingGo(const aw_tp_place_t *row){
     }
     Cbuf_AddText("aw_tp_being_arrive\n");   /* a teleport inside the loaded map: no spawn follows */
 }
+/* DBG-TP-LORDVIVEC-69 (dbg tp lordvivec): a named place that is a being. Its row of tp-places.lut is found by the
+ * record id, row by row (aw_listbox_rules.c AW_TpPlacesBeingRow: one row's bytes on the stack, nothing allocated, the
+ * file closed before the teleport), and taken as the list's Beings row is: beside it, facing it. */
+int AW_TpBeingByIdGo(const char *id){
+    FILE *f=NULL;long size,row;aw_tp_place_t p;
+    size=COM_FOpenFile((char *)path,&f);
+    if(size<AW_TP_HEADER || !f){if(f)fclose(f);return 0;}
+    row=AW_TpPlacesBeingRow(f,ftell(f),size,id,&p);
+    fclose(f);
+    if(row<0)return 0;
+    AW_TpBeingGo(&p);
+    return 1;
+}
 static void reset_being(int new_game){(void)new_game;memset(&want,0,sizeof(want));}
 void AW_TpPlacesInit(void){
     Cvar_RegisterVariable(&lowmem);

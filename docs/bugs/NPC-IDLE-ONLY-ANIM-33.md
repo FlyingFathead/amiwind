@@ -86,29 +86,49 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 
 - ACTOR-AMBIENT-STALE-EDICT-57 (no report page): Teleporting from Seyda Neen to the Ascadian Isles crashes the game: NUM_FOR_EDICT: bad pointer (ambient slots of the old map)
 - ACTOR-AMBIENT-WALK-COST-59 (no report page): Walking residents can cost 170 to 300 ms each per think in Seyda Neen
+- [ACTOR-ANIM-PICK-SLOTS-RECYCLED-69](ACTOR-ANIM-PICK-SLOTS-RECYCLED-69.md): With more than 48 skeletal actors in view the animation state slots are reused, so a fighter can play its draw again
 - ACTOR-ANNOTATE-ROOM-REFERENCE-48 (no report page): The image step stopped on a room corpse: its actor annotation looked up the support class by id alone, but room actors are classified by reference
 - [ACTOR-ATTACK-ONE-CLOCK-69](ACTOR-ATTACK-ONE-CLOCK-69.md): Every weapon swing, shot and hit reaction of a person is timed by one hand-to-hand clip, so the blow lands off the moment the shown weapon strikes
 - [ACTOR-BAKE-CENTRE-SEAM-48](ACTOR-BAKE-CENTRE-SEAM-48.md): Bradil Elarven (Glassworker's Hall) left unbaked: his centre probe falls through the seam of two floor pieces
+- [ACTOR-BAKED-KIT-ONE-CHOP-69](ACTOR-BAKED-KIT-ONE-CHOP-69.md): Fighters without a skeletal table swing one chop for every attack type, never draw, and a two-handed hammer takes the staff stance
+- [ACTOR-BLOCK-RULES-DIFFER-69](ACTOR-BLOCK-RULES-DIFFER-69.md): An actor in the middle of its swing cannot block, and a block plays from its hit moment and holds the defender for the rest of the clip
+- [ACTOR-BROKEN-WEAPON-STAYS-DRAWN-69](ACTOR-BROKEN-WEAPON-STAYS-DRAWN-69.md): A weapon or shield that breaks in a fight, or a ranged weapon out of rounds, stays drawn and keeps its stance
 - [ACTOR-CHECKS-MISS-PLACED-MODELS-69](ACTOR-CHECKS-MISS-PLACED-MODELS-69.md): The build's actor checks cover 6 of about 3,100 placed actors and can judge a model no map uses: the animation coverage table reads only one kind of map file, and the record audit takes the first model it finds per record
 - [ACTOR-CLIP-ABOVE-DRAWN-BODY-69](ACTOR-CLIP-ABOVE-DRAWN-BODY-69.md): Every creature collides in a person-sized box, so a creature lower than a person has collision over its back where nothing is drawn, and a swimming creature's box stands above the water surface
+- [ACTOR-DRAW-STOPS-LEGS-69](ACTOR-DRAW-STOPS-LEGS-69.md): While a fighter draws its weapon the whole body takes the draw pose, so its legs stand still while it runs at its enemy
+- [ACTOR-FIGHT-IN-WATER-LAND-GROUPS-69](ACTOR-FIGHT-IN-WATER-LAND-GROUPS-69.md): A fighter in water plays the land hit, knockdown and death, and a swimmer never plays its swim attacks
+- [ACTOR-FIGHT-WEAPON-NEVER-RERATED-69](ACTOR-FIGHT-WEAPON-NEVER-RERATED-69.md): A fighter never changes weapon during a fight: an archer does not switch to its melee weapon up close or when out of rounds, and does not back away
 - ACTOR-GROUND-BAKE-CHIM-ROOMS-48 (no report page): The image step stopped in the actor ground bake: it loaded the batch-room shell maps as classic collision scenes, and its error named no map
 - [ACTOR-GROUNDING-CENSUS-CONFLICTS-67](ACTOR-GROUNDING-CENSUS-CONFLICTS-67.md): The exterior grounding census measures seven people listed as standing on the ground as off the ground, and cannot read five effect models as support
+- [ACTOR-HELD-ITEM-NOT-RACE-SCALED-69](ACTOR-HELD-ITEM-NOT-RACE-SCALED-69.md): A held weapon or shield keeps one size whatever the race size of the actor holding it
+- [ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69](ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69.md): What an actor holds is fixed per model when the game is built, not taken from what the actor has equipped in play
 - [ACTOR-HIT-CANCELS-OWN-ATTACK-69](ACTOR-HIT-CANCELS-OWN-ATTACK-69.md): A blow taken in the middle of an actor's own swing or spell cast cancels it
+- [ACTOR-KNOCKOUT-NO-GET-UP-69](ACTOR-KNOCKOUT-NO-GET-UP-69.md): A knocked-out actor snaps back to standing: the end of the knockout clip is not played
 - [ACTOR-LEVELLED-INVENTORY-ONE-PICK-66](ACTOR-LEVELLED-INVENTORY-ONE-PICK-66.md): An actor's levelled inventory is chosen once when the game is built, not when the actor is made
 - [ACTOR-LEVELLED-NO-WANDER-56](ACTOR-LEVELLED-NO-WANDER-56.md): Levelled creatures (most wild creatures) never wander or aggro: the Wander table held placed actors only
+- [ACTOR-NO-AIM-PITCH-69](ACTOR-NO-AIM-PITCH-69.md): A ranged fighter does not lean up or down toward a target above or below it while shooting
 - [ACTOR-PACK-GUAR-MESH-BROKEN-64](ACTOR-PACK-GUAR-MESH-BROKEN-64.md): The pack guar at Ahemmusa Camp is drawn with its body parts scattered apart
 - [ACTOR-PACKAGES-NOT-HELD-66](ACTOR-PACKAGES-NOT-HELD-66.md): Travel, follow and escort packages of the people and creature records are not carried by the build
 - [ACTOR-QUEUE-OTHER-MAP-67](ACTOR-QUEUE-OTHER-MAP-67.md): Actors still queued when the map changes spawn in the next map at the old map's coordinates
 - [ACTOR-RANGED-COMBAT-MISSING-66](ACTOR-RANGED-COMBAT-MISSING-66.md): People and creatures that carry a bow, crossbow or thrown weapon fight hand to hand or with a melee weapon
+- [ACTOR-RANGED-WEAPON-NOT-HELD-69](ACTOR-RANGED-WEAPON-NOT-HELD-69.md): A person who fights with a bow, crossbow or thrown weapon never holds it: the hand shows a melee weapon or nothing while the fight shoots
 - [ACTOR-RESPAWN-CORPSE-RULES-66](ACTOR-RESPAWN-CORPSE-RULES-66.md): Dead bodies are never cleared away; the death rules over time need the original numbers
+- [ACTOR-SHIELD-HIDDEN-OUT-OF-FIGHT-69](ACTOR-SHIELD-HIDDEN-OUT-OF-FIGHT-69.md): A person's shield is drawn only in a fight: outside one the arm is bare
+- [ACTOR-SHOT-FLIGHT-NUMBERS-69](ACTOR-SHOT-FLIGHT-NUMBERS-69.md): A shot's flight differs from the original's numbers: thrown weapons fly at arrow speeds, gravity is stronger, shots end after five seconds and archers aim above the target
+- [ACTOR-SHOT-NO-MODEL-69](ACTOR-SHOT-NO-MODEL-69.md): A ranged fighter has no arrow or bolt in the hand, and its shot or thrown weapon flies as a few particles instead of its model
+- [ACTOR-SHOTS-ONLY-AT-PLAYER-69](ACTOR-SHOTS-ONLY-AT-PLAYER-69.md): A ranged fighter never shoots at another actor: it strikes it in melee with the bow, and a shot is stopped by any body but hurts only the player
+- [ACTOR-SIDE-STEP-NO-STANCE-69](ACTOR-SIDE-STEP-NO-STANCE-69.md): A fighter's side step in a fight plays the plain walk without its weapon stance
 - [ACTOR-SPAWN-DROPTOFLOOR-49](ACTOR-SPAWN-DROPTOFLOOR-49.md): The resident spawn grounding as Quake's droptofloor, one rule with the build's room bake
 - [ACTOR-STATE-NOT-READ-ON-SPAWN-54](ACTOR-STATE-NOT-READ-ON-SPAWN-54.md): A spawned actor never reads its actor record back: a killed NPC respawns alive and lowered health resets on re-entry or load
 - [ACTOR-STATE-POOL-LIMITS-54](ACTOR-STATE-POOL-LIMITS-54.md): The actor record drops changes past 128 changed actors, 12 item changes or 8 spell changes per actor; package changes of the behaviour records and NPC positions are not saved
 - [ACTOR-STEP-STEEP-CONTACT-REFUSED-69](ACTOR-STEP-STEEP-CONTACT-REFUSED-69.md): A walking resident stops where its box touches a too-steep face (the foot of a rock or wall, the top edge of a crate), although the player walks on there
 - [ACTOR-STORM-POSE-51](ACTOR-STORM-POSE-51.md): Requested: characters shield their eyes in ash and blight storms (the idlestorm pose), as all regular NPCs and the player do in the original, often seen in Ald'ruhn
+- [ACTOR-SWING-FROM-80-PERCENT-REACH-69](ACTOR-SWING-FROM-80-PERCENT-REACH-69.md): An actor starts its swing only from 80 percent of its weapon's reach
 - [ACTOR-SWING-STRENGTH-NOT-SHOWN-69](ACTOR-SWING-STRENGTH-NOT-SHOWN-69.md): An actor's swing shows no wind-up by strength: the whole clip plays every time and always ends in the large follow-through
 - [ACTOR-TABLE-SAME-MAP-RELOAD-67](ACTOR-TABLE-SAME-MAP-RELOAD-67.md): A reload of the map in play joins none of its actor table cells: no creatures until the next map change
 - [ACTOR-WANDER-AGGRO-52](ACTOR-WANDER-AGGRO-52.md): Requested: NPCs and creatures wander, idle and aggro by their own record variables (AI packages, Fight), as the original game does
+- [ACTOR-WEAPON-ALWAYS-ORDINARY-69](ACTOR-WEAPON-ALWAYS-ORDINARY-69.md): An actor's weapon or round always counts as an ordinary weapon against a target that resists normal weapons
+- [ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69](ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69.md): A drawn weapon appears in the hand on the first frame of the draw and vanishes before the put-away plays, and a first swing can start under the draw pose
 - [AMBIENT-RESIDENTS-NOT-VISIBLE-54](AMBIENT-RESIDENTS-NOT-VISIBLE-54.md): From the matched pose OpenMW shows four residents on the Seyda Neen square, AmiWind one far figure
 - [AMBIENT-UNSTUCK-FLOOD-61](AMBIENT-UNSTUCK-FLOOD-61.md): Walking residents in Seyda Neen keep falling back to the stuck-movement retry
 - [AMBIENT-WALK-STUCK-COLLISION-54](AMBIENT-WALK-STUCK-COLLISION-54.md): Eight of 15 resident walks in the Seyda Neen MiniWind ended stuck: the step trace against the CHIM frame collision blocks most routes
@@ -117,6 +137,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [ANIMKIT-GROUND-CHECK-LAYOUT-35](ANIMKIT-GROUND-CHECK-LAYOUT-35.md): With the animation kit on, every image step stopped: the actor ground check refused resident models with more than 8 frames
 - [ANIMKIT-IMAGE-FORMATS-35](ANIMKIT-IMAGE-FORMATS-35.md): With the animation kit on, the image step stopped late on the kit's layout files: their format was unknown to the palette overlay
 - [ANIMKIT-ITEM-TAG-FRAMES-35](ANIMKIT-ITEM-TAG-FRAMES-35.md): With the animation kit on, residents fought without their weapon and shield: the item tag tables had one row per kit sample, not per model frame, and the mover model had none
+- [ARENA-RANGED-NO-AMMO-69](ARENA-RANGED-NO-AMMO-69.md): The combat playground's bow, crossbow and thrown fighters are out of ammunition at their first shot, though their records carry rounds
 - [AW-20260928-05](AW-20260928-05.md): Dock guard misses approach interception
 - [AW-20260929-01](AW-20260929-01.md): Player passes through town NPCs
 - AW25-10 (no report page): Actor-contact failures stopped image assembly only after terrain
@@ -127,14 +148,20 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [BUILD-ACTOR-SPEC-UNSPAWNABLE-67](BUILD-ACTOR-SPEC-UNSPAWNABLE-67.md): The actor spec check counted every actor table row outdoors as placed, also rows the game cannot spawn
 - [CAMERA-POV-TAP-LOST-36](CAMERA-POV-TAP-LOST-36.md): A Toggle POV (Tab) tap released before the next frame did not switch the view
 - [CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36](CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36.md): In combat, switching to third person (Tab) hides the NPC you are fighting; it reappears back in first person
+- [CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69](CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69.md): The census office captain's script values are not kept: his conversation's conditions on them always read zero and its results cannot set them
 - [CENSUS-CAPTAIN-OUT-OF-PLACE-69](CENSUS-CAPTAIN-OUT-OF-PLACE-69.md): Sellus Gravius (chargen captain) stands at a different spot than before in the second Census and Excise Office building
 - [CENSUS-GUARD-NO-PATH-TO-THIEF-65](CENSUS-GUARD-NO-PATH-TO-THIEF-65.md): A theft in the census office brings the guard only when he can walk to the player: across the table he cannot
 - [CENSUS-NPC-NO-ATTACK-ANIM-65](CENSUS-NPC-NO-ATTACK-ANIM-65.md): The opening's people fight back with no attack animation
 - CHARGEN-BIRTHSIGN-REVIEW-58 (no report page): Character creation on the v0.0.58-dev5 image: the birthsign step jumps to the confirm box, the review sheet shows an empty name, and Questions is not greyed out without Morrowind.ini
 - [CHIM-ACTOR-GROUNDING-POLICY-36](CHIM-ACTOR-GROUNDING-POLICY-36.md): A CHIM area outside the shipped towns stops at its chim-town stage: the NPC grounding policy lists only the shipped towns' NPCs, and the check runs 40 minutes into the build
 - [CHIM-ACTOR-TABLE-BEFORE-FRAME-MAPS-48](CHIM-ACTOR-TABLE-BEFORE-FRAME-MAPS-48.md): The CHIM actor table was written before any frame map existed, so even town residents in it carry no frame-map position (built_rows_used 0)
+- [COMBAT-ACTOR-EFFECTS-NOT-IN-BLOWS-69](COMBAT-ACTOR-EFFECTS-NOT-IN-BLOWS-69.md): An actor's Fortify and Damage effects on attributes and skills, and its Shield effect, do not count in the blows it deals and takes
 - [COMBAT-ACTOR-VS-ACTOR-62](COMBAT-ACTOR-VS-ACTOR-62.md): A dialogue answer that sets two characters against each other does nothing: only fights with the player are carried out
+- [COMBAT-ARMOUR-NEVER-WEARS-69](COMBAT-ARMOUR-NEVER-WEARS-69.md): Armour never wears in a fight, and the wear of an actor's weapon and shield is forgotten when the fight ends
+- [COMBAT-BLOW-PASSES-NO-DISEASE-69](COMBAT-BLOW-PASSES-NO-DISEASE-69.md): A diseased creature's or person's blow never passes its disease on
 - COMBAT-DEAD-ACTOR-RELOAD-59 (no report page): A killed actor briefly starts combat when its scene loads again
+- [COMBAT-DIFFICULTY-NOT-SCALED-69](COMBAT-DIFFICULTY-NOT-SCALED-69.md): There is no difficulty setting that scales the damage dealt and taken in melee
+- [COMBAT-ELEMENTAL-SHIELD-NO-RETURN-DAMAGE-69](COMBAT-ELEMENTAL-SHIELD-NO-RETURN-DAMAGE-69.md): A fire, frost or lightning shield does not hurt the attacker who strikes its bearer
 - COMBAT-FLYER-FLEES-57 (no report page): A cliff racer that turns hostile cannot reach the player and flees instead of diving to attack
 - [COMBAT-KNOCKDOWN-AFTER-ARMOUR-69](COMBAT-KNOCKDOWN-AFTER-ARMOUR-69.md): A knockdown is decided on the damage left after armour instead of the damage before it
 - [COMBAT-OPENING-BLOW-ALWAYS-CRITICAL-69](COMBAT-OPENING-BLOW-ALWAYS-CRITICAL-69.md): The player's first blow on any calm actor counts as a strike on an unaware target: critical damage and no evasion, without sneaking
@@ -146,6 +173,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [COMPANION-NO-RUN-ANIM-33](COMPANION-NO-RUN-ANIM-33.md): The companion slides instead of walking or running, and mimic mode does not mirror the gait
 - [CORPSE-CLOTHES-NOT-UPDATED-62](CORPSE-CLOTHES-NOT-UPDATED-62.md): Clothing, armour and held items taken from a body or a living actor stay drawn on it
 - [CORPSE-NEEDS-FIGHT-SLOT-68](CORPSE-NEEDS-FIGHT-SLOT-68.md): A dead actor's body is not laid down when every fight slot holds a living fighter: the body is missing and cannot be searched
+- [CORPSE-WEAPON-GONE-AFTER-FIGHT-69](CORPSE-WEAPON-GONE-AFTER-FIGHT-69.md): A fallen fighter's weapon disappears from its hand when its fight slot is given up or the area loads again
+- [CREATURE-ATTACK-PICTURE-DAMAGE-APART-69](CREATURE-ATTACK-PICTURE-DAMAGE-APART-69.md): A creature's shown attack and the attack whose damage lands are chosen separately, and every attack takes the first attack's timing
 - [CREATURE-BAKE-NIF-UNSUPPORTED-47](CREATURE-BAKE-NIF-UNSUPPORTED-47.md): The creature bake refuses 14 of the 39 creature meshes the outdoor world can show, the cliff racer, the rat, the guar and the nix-hound among them
 - [CREATURE-BONES-OVER-MAX-54](CREATURE-BONES-OVER-MAX-54.md): Four creature meshes have more bones than AW_SKEL_MAX_BONES (64): 67, 84, 69 and 74
 - [CREATURE-BOX-NOT-OWN-MODEL-69](CREATURE-BOX-NOT-OWN-MODEL-69.md): A creature collides in a box of a person's width, not in the box of its own model, so the player can walk into the drawn flank of a wide creature and combat reads a person's height
@@ -159,10 +188,12 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [CREATURE-HIT-CHANCE-STEALTH-VALUE-69](CREATURE-HIT-CHANCE-STEALTH-VALUE-69.md): A creature's chance to hit is worked out from its Stealth value where the original uses its Combat value
 - [CREATURE-NETCH-BULL-LEG-REDUCED-58](CREATURE-NETCH-BULL-LEG-REDUCED-58.md): The netch bull's reduced model loses a long stretch of one leg (up to 20 units from the source surface)
 - [CREATURE-NIXHOUND-HUMAN-MOVES-67](CREATURE-NIXHOUND-HUMAN-MOVES-67.md): A nix-hound moves like a person and attacks with a weapon swing, and its model looks wrong
+- [CREATURE-OWN-TABLE-NO-ITEM-BONES-69](CREATURE-OWN-TABLE-NO-ITEM-BONES-69.md): Armed creatures with their own skeleton lose the weapon and shield bones when their animation table is built
 - CREATURE-RACER-DRAWN-TINY-57 (no report page): The cliff racer is drawn many times too small: a dark speck the size of a bird while its hit box is a full cliff racer
 - [CREATURE-RACER-MESH-SPIKE-58](CREATURE-RACER-MESH-SPIKE-58.md): The cliff racer's model is drawn broken: the wings do not join the body, the parts sit apart, and a long spike runs far below
 - [CREATURE-SCALE-KEYS-54](CREATURE-SCALE-KEYS-54.md): The Heart of Lorkhan beats by a scale key, and the skeletal animation table format holds no scale
 - [CREATURE-SCALE-NOT-HELD-66](CREATURE-SCALE-NOT-HELD-66.md): A creature record's own size (scale) is not carried by the build
+- [CREATURE-SHIELD-NEVER-BLOCKS-69](CREATURE-SHIELD-NEVER-BLOCKS-69.md): A creature that carries a shield never blocks with it
 - [CREATURE-SUMMONED-62](CREATURE-SUMMONED-62.md): The 16 creatures that summoning spells call up are not built: a summoning has no creature to show
 - [CREATURE-TABLE-ROOT-TRAVEL-67](CREATURE-TABLE-ROOT-TRAVEL-67.md): A creature whose root bone is not named Bip01 keeps its walk and run travel in its own animation table: its drawn poses are coarse and it is drawn away from its place
 - [DAGOTH-IDLE-BASE-CHECK-66](DAGOTH-IDLE-BASE-CHECK-66.md): The image stage stopped on Dagoth Ur: its actor-frames check took his idle at frames 30 to 37 for a fault, though his map entity loops exactly that span
@@ -196,6 +227,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-BAKE-FALLBACK-62](NPC-BAKE-FALLBACK-62.md): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
 - [NPC-BOW-RIGHT-HAND-69](NPC-BOW-RIGHT-HAND-69.md): A bow carried by a person or creature is placed on the right hand: the original attaches a bow to the left hand's weapon bone
+- [NPC-CARRIED-LIGHTS-ONLY-GUARDS-69](NPC-CARRIED-LIGHTS-ONLY-GUARDS-69.md): Only guards carry a light, only the standard torch, never indoors, and at most two are lit at once
 - [NPC-CAST-MAGICKA-NOT-PAID-66](NPC-CAST-MAGICKA-NOT-PAID-66.md): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
 - [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
@@ -215,6 +247,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-STORY-DISABLED-AT-START-42](NPC-STORY-DISABLED-AT-START-42.md): Story NPCs the original disables at the start (the twelve town Dreamers, the Dreamer Prophet) stand in the world from the first minute
 - [NPC-TALK-MOUTH-STILL-69](NPC-TALK-MOUTH-STILL-69.md): Socucius Ergalla (chargen class) no longer moves his mouth while his voice lines play in the Census and Excise Office
 - [NPC-TALK-POSES-ONLY-OPENING-69](NPC-TALK-POSES-ONLY-OPENING-69.md): Only the eight hand-built characters of the opening move their mouths when they speak; every other voiced character, built on the shared body model, has no mouth shapes
+- [NPC-TORCH-NOT-PUT-AWAY-69](NPC-TORCH-NOT-PUT-AWAY-69.md): A torch carrier keeps its torch in the shield hand in a fight with a shield or a two-handed weapon, and under water
 - [NPC-VOICE-NONASCII-IDS-48](NPC-VOICE-NONASCII-IDS-48.md): Two Orc NPCs with accented letters in their record ids are left out of the voice table and stay silent
 - [NPC-VOICE-TABLE-ADDONS-54](NPC-VOICE-TABLE-ADDONS-54.md): The 368 Tribunal and Bloodmoon NPCs have no voices
 - [NPC-WALK-RUBBERBAND-69](NPC-WALK-RUBBERBAND-69.md): Walking residents in Seyda Neen (Indrele Rathryon, Eldafire) move forward and then snap back, again and again
@@ -224,6 +257,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-WEREWOLF-FIGHTS-ARMED-68](NPC-WEREWOLF-FIGHTS-ARMED-68.md): A character turned into a werewolf by a script is drawn holding nothing but still uses its own weapon and spells in a fight
 - [NPC-WEREWOLF-NO-MODEL-66](NPC-WEREWOLF-NO-MODEL-66.md): The werewolf NPCs of Bloodmoon get no model: their hair part has no attached geometry
 - [NPC-WEREWOLF-TALK-OFFERED-68](NPC-WEREWOLF-TALK-OFFERED-68.md): The use key offers to talk to a character that a script has turned into a werewolf
+- [OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69](OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69.md): The opening's eight people stand in a separate 21-frame model: no weapon or shield shown until a fight, no idle variants or turns, no footsteps, no run, hit or death of their own
+- [OPENING-PROTOTYPE-MODELS-SHIPPED-UNUSED-69](OPENING-PROTOTYPE-MODELS-SHIPPED-UNUSED-69.md): Four prototype actor models of the first Seyda Neen build are still baked and shipped although no map places them
 - [OPENING-SHIP-DOCK-ACTORS-ROLE-EXCLUDED-69](OPENING-SHIP-DOCK-ACTORS-ROLE-EXCLUDED-69.md): The five people of the prison ship and the Seyda Neen dock cannot be talked to, show no name, never greet or speak an idle line, and run no behaviour of their own
 - [OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69](OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69.md): The prison ship's and the dock's people are acted by hand-written opening code instead of their own scripts: fixed-speed walks with eight frames, lines from separate files, hidden by role instead of the script's Disable
 - [OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67](OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67.md): The dead bodies the original places outdoors show only when the player arrives in their cell, never when their cell joins around the player

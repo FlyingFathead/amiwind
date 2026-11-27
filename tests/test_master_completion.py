@@ -229,6 +229,49 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(start, sorted((r['id'] for r in script_doc['scripts']
                                         if r['master'] == 'Tribunal.esm' and r.get('start')), key=str.casefold))
 
+    def test_the_scripts_per_land_and_the_effect_in_play_for_the_headline(self):
+        """TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69: each land's block of the Toolkit's headline draws the game's scripts of
+        its game file (used in the original, run, AmiWind adaptation, not yet) and the scripts the original never runs
+        on a line of their own, never counted; beside them the functions' effect in play. The counts are the MWScript
+        tracker's, worked out at the ingest; before this the headline had no script count at all."""
+        import mwscript_features as mf
+        script_doc = MC.load_scripts(SCRIPTS)
+        rows = MC.scripts(json.loads(json.dumps(script_doc)))
+        s = rows['summary']
+        self.assertEqual(s['format'], MC.SCRIPTS_FORMAT)
+        self.assertEqual(set(s['lands']), {x['id'] for x in MC.LANDS})
+        mf.use(script_doc)
+        for land in MC.LANDS:
+            st = Counter(mf.state_of(r)[0] for r in script_doc['scripts'] if r['master'] == land['master'])
+            got = s['lands'][land['id']]
+            used = sum(st.values()) - st['inert']
+            self.assertEqual((got['used'], got['run'], got['adaptation'], got['unused']),
+                             (used, st['runs'], st['carried'], st['inert']), land['master'])
+            self.assertEqual(got['not_yet'], used - st['runs'] - st['carried'], land['master'])
+            self.assertEqual(got['done'], st['runs'] + st['carried'])        # the unused are never counted
+        self.assertEqual(s['all']['used'], sum(x['used'] for x in s['lands'].values()))
+        f = s['functions']
+        self.assertEqual(f, mf.effect_counts(doc=script_doc))
+        self.assertEqual(f['full'] + f['part'] + f['none'], f['called'])
+        # own code with a step open is not an adaptation: it is under "not yet"
+        gaps = sum(1 for r in script_doc['scripts'] if mf.state_of(r)[0] == 'adaptation-gap')
+        self.assertGreaterEqual(s['all']['not_yet'], gaps)
+        doc, census = fixture()
+        MC.attach(doc, census, rows)
+        self.assertEqual(doc['completion']['script_summary'], s)
+        MC.attach(doc, census, None)                  # no tracker given (a build's own stage): the part is absent
+        self.assertIsNone(doc['completion']['script_summary'])
+        # the generated progress page draws the same counts
+        import cell_progress_state as cps
+        block = '\n'.join(cps.scripting_block(script_doc))
+        self.assertIn('Not used in the original (never runs there either)', block)
+        self.assertIn('are not counted toward completion', block)
+        self.assertIn('effect in play in full', block)
+        for x in mf.script_summary(script_doc)['masters']:
+            self.assertIn('| %s | %s | %s | %s | %s | %s |' % (x['game'], cps.n(x['used']), cps.n(x['run']),
+                                                             cps.n(x['adaptation']), cps.n(x['not_yet']),
+                                                             cps.n(x['unused'])), block)
+
     def test_snapshot_readiness_matches_its_own_counts(self):
         state = json.loads((ROOT / 'docs' / 'chim' / 'progress-state.json').read_text(encoding='utf-8'))
         r = state.get('readiness')

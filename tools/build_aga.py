@@ -1854,6 +1854,10 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'// centre stops, so they walk apart; an arrival steps the player off an actor on the point\n'
                      b'// (DOOR-ARRIVAL-INSIDE-ACTOR-66). 0 = Quake\'s box clip / no step, the methods before v0.0.66.\n'
                      b'aw_body_overlap 1\naw_arrival_clear 1\n'
+                     b'// A creature collides only up to its drawn body, never in a column of air over a low creature\n'
+                     b'// or above the water over a swimming one; a step never lands on a body (SOL-SEA-INVISIBLE-\n'
+                     b'// BLOCKER-68). 0 = the person box for every actor, the method before v0.0.69.\n'
+                     b'aw_actor_clip 1\n'
                      b'// Fight slots (sixteen since v0.0.68): the actors that fight at a time. "dbg combat slots 4" in\n'
                      b'// the console gives the cap before, for a comparison (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68).\n'
                      b'aw_combat_slots 16\n')
@@ -2743,11 +2747,15 @@ def write_world_doors(args, id1, out, chim_frames):
     copies = world_doors.border_copies(rows, bounds, layer_frames)
     applied = world_doors.apply(id1, rows + copies, bounds)
     problems = world_doors.unresolved_problems(rows)
-    # the named places of dbg tp (teleport-names.txt) lead into rooms of this image too
+    # the named places of dbg tp (teleport-names.txt) lead into rooms of this image too, and a being place
+    # (DBG-TP-LORDVIVEC-69: dbg tp lordvivec) to exactly one being row of this image's teleport list, the table
+    # tp_places_rooms wrote above
     # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
     # (BUILD-SURVEY-KEY-CONFIG-35), and every stage would key the option history
+    from tp_places_lut import NAME as TP_PLACES_NAME, being_ids
+    beings = being_ids((id1/TP_PLACES_NAME).read_bytes()) if (id1/TP_PLACES_NAME).is_file() else None
     problems += world_doors.teleport_name_problems(
-        world_doors.teleport_names((ROOT/'config'/'teleport-names.txt').read_bytes()), rooms)
+        world_doors.teleport_names((ROOT/'config'/'teleport-names.txt').read_bytes()), rooms, beings)
     # dbg tp's arrivals in the expansions (tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66): the image's
     # teleport-names.txt gains a row per name of config/expansion-arrivals.json, a working destination when this build
     # selected the expansion and this image holds the place, else a row whose label says why (nothing moves)

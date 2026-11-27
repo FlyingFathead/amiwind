@@ -183,6 +183,35 @@ int AW_TpPlacesCategory(int flags) {
     if(flags&AW_TP_ROOM)return AW_TP_CAT_INTERIOR;
     return AW_TP_CAT_EXTERIOR;
 }
+/* a record id field (NUL-padded, at most AW_TP_ID bytes) against ID, ASCII case ignored, every character counted */
+static int same_id(const unsigned char *field,const char *id) {
+    int i,a,b;
+    for(i=0;i<AW_TP_ID;i++){
+        a=field[i];b=(unsigned char)id[i];
+        if(a>='A' && a<='Z')a+='a'-'A';
+        if(b>='A' && b<='Z')b+='a'-'A';
+        if(a!=b)return 0;
+        if(!a)return 1;
+    }
+    return 0;                                /* ID longer than the field holds */
+}
+long AW_TpPlacesBeingRow(FILE *f,long base,long size,const char *id,aw_tp_place_t *p) {
+    unsigned char one[AW_TP_HEADER+AW_TP_ROW3],*r=one+AW_TP_HEADER;long i,rows;
+    if(!f || !id || !*id || !p || fseek(f,base,SEEK_SET) || fread(one,1,AW_TP_HEADER,f)!=AW_TP_HEADER)return -1;
+    if(memcmp(one,"AWTP",4) || one[4] || one[5]!=3 || one[6] || one[7]!=AW_TP_ROW3)return -1;
+    rows=(long)be32(one+8);
+    if(rows>65535L || AW_TP_HEADER+rows*(long)AW_TP_ROW3!=size)return -1;
+    one[8]=one[9]=one[10]=0;one[11]=1;      /* each row read into a one-row table, read as AW_TpPlacesRow reads it */
+    for(i=0;i<rows;i++){
+        if(fread(r,1,AW_TP_ROW3,f)!=AW_TP_ROW3)return -1;
+        /* the flags after the name and the three points; the id after the map */
+        if((r[AW_TP_NAME+12]&(AW_TP_BEING|AW_TP_NEAREST))!=AW_TP_BEING ||
+           !same_id(r+AW_TP_NAME+16+AW_TP_MAP,id))continue;
+        AW_TpPlacesRow(one,0,p);
+        return i;
+    }
+    return -1;
+}
 /* --- the names list (aw_listbox.h AW_TpNames*) --- */
 #ifndef AW_TP_ALLOC
 #include <stdlib.h>

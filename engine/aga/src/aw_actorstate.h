@@ -214,6 +214,10 @@ int AW_ActorItems(const aw_actor_t *a,int *items,int *counts,int *equipped,int m
 int AW_ActorItemId(int item,char *out,int capacity);
 /* DBG-SPAWN-MENU-67: string INDEX of the table (a base's race, class or faction) as the game data writes it; 1 read */
 int AW_ActorString(int index,char *out,int capacity);
+/* The models the actor of ROW is drawn holding (its record's equipped weapon and shield; "" none): bit 0 a weapon
+ * path, bit 1 a shield path; -1 when the table cannot say (no such row, or a table without the items' held models). */
+#define AW_ACTOR_HELD_PATH 64
+int AW_ActorHeldModels(int row,char weapon[AW_ACTOR_HELD_PATH],char shield[AW_ACTOR_HELD_PATH]);
 /* Things sold to merchants that did not stock them (BARTER-SOLD-ITEM-LOST-58): per merchant REFERENCE and id, a
  * count; added (DELTA > 0) or bought back (< 0); carried in the saved game as an AWSL block. */
 /* Magic effects (AMGE, the MGEF records: flags, base cost, school) and a spell's effects (ASPE/AEFF, its ENAM);

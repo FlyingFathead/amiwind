@@ -187,6 +187,8 @@ static cvar_t *labels_option;
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else if(!strcmp(c->name,"aw_name_labels"))labels_option=c;else demo_option=c;c->value=atof(c->string);}
 /* dbg door roulette: the rooms this fixture's disk holds (bmcaius, census; 2 also mi5b8154939f7aa without a start) */
 static int roulette_fixture;
+/* DBG-TP-LORDVIVEC-69: this disk's teleport-names.txt holds two being places (lordvivec, nobody) */
+static int names_fixture;
 /* dbg door roulette [SEED] as the console routes it (aw_console.c): aw_teleport roulette [SEED]; the test sets
  * command_args[1..] as the roulette's own arguments */
 static void roulette(void){
@@ -318,6 +320,12 @@ int COM_FOpenFile(char *name,FILE **f){
     "aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 *1 11 0 1 40 0 30 0 0 0 Luminous Russula\n";
   *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
  }
+ /* DBG-TP-LORDVIVEC-69: named places that are beings (the map "being", the label the record id) */
+ if(names_fixture && !strcmp(name,"teleport-names.txt")){
+  const char *s="AWTN1\n# a person or creature: the label is its record id\n"
+                "lordvivec|being|0 0 0|0|vivec_god\nnobody|being|0 0 0|0|no_such_being\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
  if(!strcmp(name,"world/regions.awr")) {
   unsigned count=1;float town0[7]={-2816,-17920,0,-1024,-1024,1024,1024};
   float town1[7]={-5120,-3072,0,-1024,-1024,1024,1024};
@@ -342,6 +350,13 @@ int COM_FOpenFile(char *name,FILE **f){
  if(!strcmp(name,"balmora-regions.txt"))s="AWBR1 1 96 540 0 0 77 90 0 0 77 90\nbm000 -1024 -1024 1024 1024 -2048 -2048 2048 2048\n";
 #endif
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+}
+/* DBG-TP-LORDVIVEC-69: the being route (aw_tpplaces.c AW_TpBeingByIdGo) as this fixture's list answers it: the id
+ * asked; vivec_god is a row of the list, any other id is not */
+static char being_asked[32];static int being_calls;
+int AW_TpBeingByIdGo(const char *id){
+ being_calls++;snprintf(being_asked,sizeof(being_asked),"%s",id);
+ return !strcmp(id,"vivec_god");
 }
 static int door_arrival_lines;   /* DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63: "ROOM: at its door's arrival X Y Z." */
 static int arrival_steps,arrival_no_room;   /* DOOR-ARRIVAL-INSIDE-ACTOR-66: the arrival's step off an actor */
@@ -1525,6 +1540,37 @@ int main(void){
   queued[0]=0;command_args[1]="seydaneen";teleport();assert(!queued[0] && held_lines==lines+4);
   sv.active=false;AW_SceneTick();assert(!queued[0] && held_dropped==dropped+2 && held_runs==runs+2);sv.active=true;
   AW_SceneCancelTransition();key_dest=key_game;command_argc=1;
+ }
+ /* DBG-TP-LORDVIVEC-69: dbg tp lordvivec, a named place that is a being (teleport-names.txt map "being", the label
+  * the record id vivec_god) takes the teleport list's own row of that being (AW_TpBeingByIdGo: beside him, facing him,
+  * as choosing him under Beings does), never a map load of its own; the name in any case. A being place whose id the
+  * disk's list does not hold says so and goes through the one dbg tp refusal path (LF2, the box): nothing queued,
+  * nothing loading, the player where he was. */
+ {
+  vec3_t at;int calls;
+  assert(teleport);occluded=target_trace=travel_trace=0;door_duration=0;ship_available=1;roulette_fixture=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
+  strcpy(cl.levelname,"Seyda Neen");
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;cls.state=ca_connected;key_dest=key_game;
+  p.v.origin[0]=11;p.v.origin[1]=22;p.v.origin[2]=33;VectorCopy(p.v.origin,at);
+  while(AW_SceneLoadBoxTake());
+  names_fixture=1;calls=being_calls;being_asked[0]=0;
+  command_args[0]="aw_teleport";command_args[1]="lordvivec";command_argc=2;queued[0]=0;teleport();
+  assert(being_calls==calls+1 && !strcmp(being_asked,"vivec_god"));
+  assert(!queued[0] && !AW_SceneStarting() && !AW_SceneLoadBoxTake() && VectorCompare(p.v.origin,at));
+  command_args[1]="LordVivec";being_asked[0]=0;teleport();
+  assert(being_calls==calls+2 && !strcmp(being_asked,"vivec_god") && !queued[0] && !AW_SceneLoadBoxTake());
+  /* not in this disk's list: said, the box, nothing moved */
+  command_args[1]="nobody";being_asked[0]=0;teleport();
+  assert(being_calls==calls+3 && !strcmp(being_asked,"no_such_being"));
+  assert(!queued[0] && !AW_SceneStarting() && VectorCompare(p.v.origin,at) && p.v.health==73);
+  assert(AW_SceneLoadBoxTake()==1 && !AW_SceneLoadBoxTake());
+  assert(!strcmp(AW_SceneLoadBoxText(),
+                 "Map nobody (no_such_being) was not found.\nIt is not on this disk. Code LF2.\nYou are in Seyda Neen."));
+  /* without the names file, the being route is never asked */
+  names_fixture=0;command_args[1]="lordvivec";teleport();assert(being_calls==calls+3);
+  while(AW_SceneLoadBoxTake());
+  AW_SceneCancelTransition();command_argc=1;
  }
  /* SCENE-LOAD-FAIL-FALLBACK-67 / DBG-TP-NOT-FOUND-BOX-67: one catcher for every way into a place. A dbg tp refusal (a
   * name not found, a map this build leaves out, a point no map holds) leaves the player where he is and asks for the OK

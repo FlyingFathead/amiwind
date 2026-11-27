@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,7 +46,7 @@ _Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-24: newest ingested build **v0.0.68 (85116a7a)**, built 2026-11-24; the version in development, 0.0.69-dev6, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-24: newest ingested build **v0.0.68 (85116a7a)**, built 2026-11-24; the version in development, 0.0.69-dev7, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Ready, per land
 
@@ -94,15 +94,26 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 26 November 2026 for AmiWind v0.0.69-dev6 with the builder's own compiler: 1,072 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,063 run, 9 carried); 11,542 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 27 November 2026 for AmiWind v0.0.69-dev7 with the builder's own compiler: 1,073 of the 1,074 scripts the original game uses run as scripts or are AmiWind adaptations (1,066 run, 7 adaptations: AmiWind's own code does every step of the script); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
-| runs | 1,063 |
-| carried by AmiWind's own code | 9 |
-| only in an add-on world | 2 |
+| runs | 1,066 |
+| AmiWind adaptation | 7 |
+| AmiWind's own code, steps open | 1 |
 
-133 more scripts are never named by anything in the original game (test and example scripts, replaced versions, cut content) and are listed apart on that page.
+Per game file (not yet = every other state: own code with steps open, a function missing, not attached, not in the image, not converted):
+
+| Game file | Used in the original | Run | AmiWind adaptation | Not yet | Not used in the original (never runs there either) |
+| :-- | --: | --: | --: | --: | --: |
+| Morrowind (base game) | 528 | 520 | 7 | 1 | 88 |
+| Tribunal | 236 | 236 | 0 | 0 | 19 |
+| Bloodmoon | 310 | 310 | 0 | 0 | 26 |
+| **All** | 1,074 | 1,066 | 7 | 1 | 133 |
+
+A script that runs is not yet a script that plays as the original. Of the 259 functions the scripts call, 161 have the original's effect in play in full, 92 in part and 6 none; 4 have something seen in play so far (the rest is read from the source or kept by a test).
+
+133 more scripts are not used in the original game (they never run there either: test and example scripts, replaced versions, cut content); they are not counted toward completion and are listed apart on that page.
 
 ### Builds, newest first
 
@@ -401,8 +412,8 @@ For the chosen game it gives, by number, with every count opening the list behin
 
 1. **Cells and rooms:** the readiness count above, the special interiors by name, the rooms not ready by name and
    reason, and the districts counted as open terrain.
-2. **Scripts:** the game file's scripts by state (runs, carried by AmiWind's own code, uses a function the interpreter
-   lacks, only in an add-on world, named by nothing), each by name, from the [MWScript tracker](../MWSCRIPT_FEATURES.md)
+2. **Scripts:** the game file's scripts by state (runs, AmiWind adaptation, AmiWind's own code with steps open, uses a function
+   the interpreter lacks, only in an add-on world, named by nothing), each by name, from the [MWScript tracker](../MWSCRIPT_FEATURES.md)
    with its states worked out again from the interpreter's function table; a script that lacks a function names it.
 3. **Variables:** the game file's globals, its journal topics, and how many of them the save's state table carries and
    keeps: not measured yet; no measuring step counts them yet.

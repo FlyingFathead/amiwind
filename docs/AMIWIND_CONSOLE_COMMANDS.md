@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.69-dev6._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.69-dev7._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -70,6 +70,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg netstat` | - | [reset] the frame message: method (aw_net_method) and budget, room and its growth; the last frame's updates in sight, bytes wanted, sent, waiting; since the map or the reset: the fullest frame against the room, waits, frame time, the client's reading time; the models with the most bytes |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
 | `dbg opening dock` | - | [fixed / direct; no argument: the opening's state] the dock guard's walk in the opening (default fixed: along the middle of the pier to his place beside the census office door, then he faces you; direct: the earlier walk, for comparison; not saved); no argument prints the opening's state, the guard's place, walk and its check counts |
+| `dbg plantpick` | - | [1 or 0; no argument: query] plant and mushroom picking (default 1, saved; also Options > Prefs): 1 AmiWind, one press picks a plant, egg sack, kollop or ore rock, the pick sound, no window; 0 Original, its container window; stashes keep their window in both; small mushrooms and bracket fungi keep their pick in both |
 | `dbg race` | - | [N / NAME] [m / f] swap the race (number or name) and sex in place (docs/PLAYER_BODY.md); no argument: the races with numbers, the current race and sex; stats, class, level kept; what the new race cannot wear goes back to the inventory, a line per item; old body and arm parts released; model table read back (a save keeps it) |
 | `dbg recorder` | - | [on/off / start / stop / play FILE / status] gameplay recorder (docs/GAME_RECORDER.md): no argument arms it; Ctrl+R records from a save taken at the start, (RECORDING) on the version line, and names the file at the stop; play 001 replays recordings/001.awr, (PLAYBACK), checkpoints compared, one RECORDER RESULT line |
 | `dbg restartgame` | - | (ends the running game cleanly, memory back to the boot level, then the startup logo and the main menu, as at boot; also after a failed load) |
@@ -164,7 +165,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
 | `dbg superspeed` | - | [on/off, true/false or 1/0; no argument toggles; then the speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey), not the original's speed from Speed, Athletics and load; endless stamina; Speed, Athletics, Acrobatics read as 100 while on (default off; not saved; also plain superspeed) |
-| `dbg tp` | - | [X Y [Z] original coords (Z: floor at/below) / mark (map marker) / seydaneen / prisonship / balmora / vivec (the city, else the Arena) / teluvirith / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / mournhold / solstheim / ravenrock / skaal / a map, room or place; alone: list, All/Exteriors/Interiors/Beings; mid-load: runs on arrival] |
+| `dbg tp` | - | [X Y [Z] original coords (Z: floor at/below) / mark (map marker) / seydaneen / prisonship / balmora / vivec (city, else Arena) / lordvivec / teluvirith / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / mournhold / solstheim / ravenrock / skaal / a map, room or place; alone: list, All/Exteriors/Interiors/Beings; mid-load: on arrival] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument toggles] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |
@@ -249,6 +250,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg actorclip` | - | [on/off, true/false or 1/0; no argument toggles] creatures collide only up to their drawn body, not in a person-sized box (on in a default build; off: the person box for every actor) (not saved) |
 | `dbg all` | `dbg overlay` | on/off |
 | `dbg blockers` | - | - |
 | `dbg cell` | - | (original Morrowind cell here: exterior grid CELL x,y, or interior INT n with its full cell ID; the debug HUD shows the same at the end of its shorter row) |

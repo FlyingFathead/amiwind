@@ -240,7 +240,41 @@ class TeleportNames(unittest.TestCase):
             x, y, z = names[name][1]
             self.assertEqual((int(x // 8192), int(y // 8192)), (cx, cy))
         self.assertEqual(world_doors.teleport_name_problems(names, {'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed',
-                                                                    'vivec, arena pit': 'vai000'}), [])
+                                                                    'vivec, arena pit': 'vai000'},
+                                                            {'vivec_god': 1}), [])
+
+    def test_lordvivec_is_vivec_himself(self):
+        # DBG-TP-LORDVIVEC-69: a being place, the label Vivec's record id (the v0.0.69-dev6 image's teleport list has
+        # one being row of it: "Vivec", flags 25, room map vpi015)
+        names = world_doors.teleport_names((ROOT / 'config' / world_doors.TELEPORT_NAMES).read_bytes())
+        self.assertEqual(names['lordvivec'][0], world_doors.BEING_PLACE)
+        self.assertEqual(names['lordvivec'][3], 'vivec_god')
+        self.assertNotIn('vivec', names)          # dbg tp vivec stays the city
+
+    def test_a_being_place_needs_one_being_row_of_the_list(self):
+        names = {'lordvivec': (world_doors.BEING_PLACE, [0, 0, 0], 0.0, 'vivec_god')}
+        self.assertEqual(world_doors.teleport_name_problems(names, {}, {'vivec_god': 1}), [])
+        self.assertEqual(world_doors.teleport_name_problems(names, {}, {'VIVEC_GOD'.casefold(): 1}), [])
+        # the id not in the list (a missing id, an image without the room, an image without a list): refused, named
+        for beings in ({'fargoth': 1}, {}, None):
+            problems = world_doors.teleport_name_problems(names, {}, beings)
+            self.assertEqual(problems, ['named place lordvivec: being vivec_god is not in the teleport list'])
+        # on two rows (a being placed in two places): which one would be a guess, so refused
+        self.assertEqual(world_doors.teleport_name_problems(names, {}, {'vivec_god': 2}),
+                         ['named place lordvivec: being vivec_god is on 2 rows of the teleport list'])
+        # a being place is never checked as a room map, and a room place never as a being
+        self.assertEqual(world_doors.teleport_name_problems(
+            dict(names, heartchamber=('rifa4ef181ed', [0, 0, 0], 0.0, 'x')), {'c': 'rifa4ef181ed'},
+            {'vivec_god': 1}), [])
+
+    def test_the_image_step_checks_being_places_against_its_own_list(self):
+        build = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        doors = build[build.index('def write_world_doors('):build.index('def write_door_check(')]
+        # the list with its being rows is written first (tp_places_rooms), then the named places are checked against it
+        self.assertLess(doors.index('tp_places_rooms(id1, rooms, master_raw, out)'),
+                        doors.index('beings = being_ids((id1/TP_PLACES_NAME).read_bytes())'))
+        self.assertIn("world_doors.teleport_names((ROOT/'config'/'teleport-names.txt').read_bytes()), rooms, beings)",
+                      doors)
 
     def test_bad_lines_are_refused(self):
         for raw in (b'AWTN0\n', b'AWTN1\nname|map|1 2|90|label\n', b'AWTN1\nn|m|1 2 3|0|x\nN|m|1 2 3|0|y\n',

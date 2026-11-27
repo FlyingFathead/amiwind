@@ -1171,6 +1171,17 @@ void SV_WalkMove (edict_t *ent)
 // move down
 	downtrace = SV_PushEntity (ent, downmove);	// FIXME: don't link?
 
+	/* SOL-SEA-INVISIBLE-BLOCKER-68: a step never lands on a body (SOLID_SLIDEBOX: the player, an actor), as the
+	 * original's (OpenMW 0.53 apps/openmw/mwphysics/stepper.cpp canStepDown: no step down onto an actor) and as the
+	 * step rules above (SV_StepRulesStep lands on SOLID_BSP only). A creature collides only up to its drawn body now
+	 * (aw_actor_clip.c), low enough for a step: it is walked around, never climbed. */
+	if (downtrace.fraction < 1 && downtrace.ent && downtrace.ent->v.solid == SOLID_SLIDEBOX)
+	{
+		VectorCopy (nosteporg, ent->v.origin);
+		VectorCopy (nostepvel, ent->v.velocity);
+		return;
+	}
+
 	if (downtrace.plane.normal[2] >= AW_WALKABLE_Z)
 	{
 		if (downtrace.ent && downtrace.ent->v.solid == SOLID_BSP)

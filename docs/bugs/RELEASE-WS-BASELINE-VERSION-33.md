@@ -187,6 +187,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
 - [MESH-EXPORT-FULL-67](MESH-EXPORT-FULL-67.md): tools/mesh_export.py writes no texture names in its material file and no texture coordinates
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
+- [MWSCRIPT-TRACKER-ADDON-NO-FUNCTION-NOT-IN-IMAGE-69](MWSCRIPT-TRACKER-ADDON-NO-FUNCTION-NOT-IN-IMAGE-69.md): The script tracker lists two add-on scripts as placed only in cells the image does not carry, although their cells are in the image: scripts with no function have no binding, and only bindings were counted
 - [MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69](MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69.md): The script tracker's effect table still describes a function as it was before its fix
 - [MWSCRIPT-TRACKER-MAIN-INERT-63](MWSCRIPT-TRACKER-MAIN-INERT-63.md): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - [PACKAGE-PORTABILITY-28](PACKAGE-PORTABILITY-28.md): Rebundled ZIPs lost exec modes; Windows path aliases accepted
@@ -242,8 +243,10 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
 - [TRACK-FIXED-CLOSES-UMBRELLA-HOME-69](TRACK-FIXED-CLOSES-UMBRELLA-HOME-69.md): The tracker's fix command marks a work item done when any one of its bugs is fixed
+- [TRACK-FIXED-DONE-BEFORE-SHIPPED-69](TRACK-FIXED-DONE-BEFORE-SHIPPED-69.md): Recording a fix marks its work item done at once, while the bug entry waits for a shipped build, so the tracker check refuses every gate in between
 - [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
+- [TRACK-INTAKE-QUEUE-TIMEOUT-69](TRACK-INTAKE-QUEUE-TIMEOUT-69.md): Filings into the bug tracker queue behind each other and are refused after fifteen minutes when several are made at once
 - [TRACK-NEW-REGISTER-BEFORE-TODO-68](TRACK-NEW-REGISTER-BEFORE-TODO-68.md): A fault filed through the tracker intake stays without its planning item while the register renders, and an item made by hand in that time makes the intake refuse its own item as a duplicate
 - [TRACK-STEP-PRIVATE-PATH-NOT-REFUSED-69](TRACK-STEP-PRIVATE-PATH-NOT-REFUSED-69.md): A private folder path in a closure step's text reaches the public bug pages; only the release check stops it
 - [TRACK-UPDATE-MOVED-ITEM-FIRST-68](TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item

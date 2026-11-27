@@ -40,7 +40,32 @@ class DebugTeleportNameTests(unittest.TestCase):
 
     def test_console_page_lists_vivec(self):
         page = (ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
-        self.assertIn('vivec (the city, else the Arena)', page)    # shortened in v0.0.66 (the 384-byte line)
+        # shortened in v0.0.66 and again in v0.0.69 for lordvivec (the 384-byte line)
+        self.assertIn('vivec (city, else Arena) / lordvivec', page)
+
+    def test_lordvivec_is_a_being_place_and_vivec_stays_the_city(self):
+        # DBG-TP-LORDVIVEC-69: dbg tp lordvivec is a named place that points at Vivec's own record (vivec_god); the
+        # engine takes the teleport list's Beings row of that id, so the arrival is beside him, facing him (the
+        # builder's check of the row: tests/test_world_doors.py)
+        names = (ROOT / 'config' / 'teleport-names.txt').read_text(encoding='utf-8')
+        self.assertIn('\nlordvivec|being|0 0 0|0|vivec_god\n', names)
+        self.assertNotRegex(names, r'(?m)^vivec\|')    # the short name stays the city (scene_command)
+        text = SCENE.read_text(encoding='utf-8')
+        command = text[text.index('static void scene_command(void) {'):]
+        # the short name is resolved before any named place is read
+        self.assertLess(command.index('s="vivec_city";'), command.index('named_place(s,&r)'))
+        being = command[command.index('if(!strcmp(r.target,"being")){'):command.index('if(!strcmp(r.target,"-")){')]
+        self.assertIn('if(AW_TpBeingByIdGo(r.label))return;', being)
+        self.assertIn('tp_refused(AW_LOADERR_NOT_ON_DISK,s,r.label,NULL,', being)
+        self.assertNotIn('load_scene(', being)
+        places = (ROOT / 'engine' / 'aga' / 'src' / 'aw_tpplaces.c').read_text(encoding='utf-8')
+        go = places[places.index('int AW_TpBeingByIdGo(const char *id){'):places.index('static void reset_being(')]
+        self.assertIn('row=AW_TpPlacesBeingRow(f,ftell(f),size,id,&p);', go)
+        self.assertLess(go.index('fclose(f);'), go.index('AW_TpBeingGo(&p);'))     # the file closed first
+        catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
+        line = next(l for l in catalogue.splitlines() if l.startswith('WORLD / TRAVEL|tp|aw_teleport|'))
+        self.assertIn(' / lordvivec / ', line)
+        self.assertLessEqual(len(line.encode('utf-8')), 382)
 
 
 if __name__ == '__main__':

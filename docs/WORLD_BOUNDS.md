@@ -1,6 +1,6 @@
 # World bounds: the sea current at the edge of the world
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 An AmiWind extension: in the original game the open sea goes on past the islands. AmiWind's open world ends a
 little past its outermost cells (896 units, the overlap of the open-world maps), and until v0.0.36 an
@@ -111,3 +111,15 @@ directory, the public reference tracker (1,292 land cells, box -18,-16 to 23,27)
 "never trapped" (from every point of the band the push alone leads back in), the builder default (on) and
 `off` writing nothing, and the engine's rules compiled natively against the reference at 2,738 points
 (`tests/aga_bounds_test.c`).
+
+`tools/world_seams.py audit --run <build run> --out report.json` checks a whole build against this page and the
+original: the engine's cell table read from the image's three directories (no hole and no open side inside the
+map's box), every cell of the box in exactly one exterior store, the store edges, the creatures in the water,
+anything that collides without a drawn face, and every map closed by walls at its frame edge
+(`tests/test_world_seams.py`). On the v0.0.69-dev5 build: the box x -29 to 23, y -19 to 28, 2,544 cells, every one
+in one store (the base world 1,951 with the towns' frames, Solstheim's 153, its open sea 440), 132 store edges, the
+202 open sides all on the box's perimeter, and the 11 cells of Mournhold's districts as islands of their own outside
+the box. One town map closes its frame edge with walls, the Vivec city map, where travel to Vivec and Ebonheart
+arrives; its town row hands the player on into the open world 32 units past its core, which is 736 units inside the
+walls on every side, so walking, swimming or walking on water out of the city reaches the open world first
+(VIVEC-CITY-FRAME-EDGE-WALLS-69, to be shown in play). Mournhold's districts close their edges as the city's walls do.

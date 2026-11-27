@@ -1,0 +1,14 @@
+{
+ "schema": 1,
+ "about": "The item models of a compiled room that keep every drawn triangle: the converter's surface pass leaves out a triangle under its area floor, right for the world, but on a small item it takes the fine parts. Read by tools/prepare_census.py (room census) alone, so only that stage keys it. Each entry: the room, the model, the triangles it may keep beyond the floor (extra_faces), the reason, the measured cost in drawn faces (before, added, total) and the Pi check. The census stage refuses a kept model that is drawn smaller than its source.",
+ "entries": [
+  {
+   "room": "census",
+   "model": "meshes/w/w_iron_dagger.nif",
+   "extra_faces": 118,
+   "reason": "The Iron Dagger standing in the note on the office table is one of the opening's best-known props. The surface floor dropped 118 of its 206 triangles, the guard's ends among them: it was drawn at 0.67 of its width (1.70 of 2.55 room units) and 87 % of its surface, a stick of one or two pixels. Kept whole it is drawn at the original's size.",
+   "cost": {"before": 88, "added": 118, "total": 206},
+   "pi_check": "pending"
+  }
+ ]
+}

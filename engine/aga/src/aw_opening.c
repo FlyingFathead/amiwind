@@ -11,6 +11,7 @@
 /* OPENING-TUTORIAL-KEYS-65 (aw_textdef.c sets it): SOURCE's text defines filled in with the bound keys; NULL in fixtures */
 int (*aw_opening_defines)(const char *source,char *out,int capacity);
 static int route_started,route_failed,route_done;
+static unsigned long ship_refs_disabled;   /* references the dock map's starts put on the change list as disabled (below) */
 static int post_retries;static double post_retry;   /* the walk to his post tried again (OPENING-REGRESSION-64) */
 /* PIER-GUARD-WALKS-INTO-DOOR-65 (the maintainer's design, 12 November 2026): after the race form the dock guard walks to a
  * fixed point in front of the census office door, then steps aside to the side of the door and faces the sea, the pier
@@ -207,6 +208,9 @@ void AW_OpeningDockStatus(void)
 {
     edict_t *g=sv.active && !strcmp(sv.name,"seyda")?AW_IntroRole(5):NULL;
     float dx,dy;
+    /* OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69: how many of the ship's references this map's start put on the change
+     * list as disabled (0 before the census office, and on an engine without the hook) */
+    Con_Printf("Opening ship references disabled %lu (ship disabled %ld)\n",ship_refs_disabled,(long)aw_story.ship_disabled);
     if(!g){Con_Printf("Dock guard none\n");return;}
     dx=g->v.origin[0]-AW_PIER_GUARD_POST_X;dy=g->v.origin[1]-AW_PIER_GUARD_POST_Y;
     Con_Printf("Dock guard at %ld %ld %ld / leg %ld / route started %ld failed %ld done %ld / retries %ld",
@@ -223,6 +227,32 @@ static void hide(edict_t *e)
 {
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);
 }
+/* OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69: what the clerk's script disables at the player's first frame in the census
+ * office (CharGenClassNPC state 0: "CharGen Boat", "CharGen Boat Guard 1", "CharGen Boat Guard 2", "CharGen Dock
+ * Guard", the ship's props) is disabled as the script's Disable does it: a DISABLED row of the world change list per
+ * reference (aw_mwhost.c sets the hook), so the state is the same one every script, save and spawn reads (GetDisabled 1,
+ * no fight, the actor table spawns no copy of the two guards). Before, the two guards and the props were only hidden as
+ * edicts here, by their opening role or their story-hidden mark, and the change list knew nothing of it. The hide at the
+ * map's spawn stays (nothing of them is drawn in the first frame); the rows are written at the map's first tick, when
+ * the scripts' reference table of the map is ready. Without the hook (a fixture) the hide alone stands, as before. */
+int (*aw_opening_disable)(unsigned reference);
+static int ship_refs_pending;
+unsigned long AW_OpeningShipRefsDisabled(void){return ship_refs_disabled;}
+static void ship_refs_disable(void)
+{
+    int i;edict_t *e;eval_t *v;
+    ship_refs_pending=0;
+    if(!aw_opening_disable || strcmp(sv.name,"seyda") || !aw_story.ship_disabled)return;
+    for(i=1;i<sv.num_edicts;i++){
+        unsigned reference;
+        e=EDICT_NUM(i);
+        if(e->free)continue;
+        v=GetEdictFieldValue(e,"aw_story_hidden");
+        if(!(v && v->_float) && e!=AW_IntroRole(4) && e!=AW_IntroRole(5))continue;
+        v=GetEdictFieldValue(e,"aw_ref");reference=v && v->_float>0?(unsigned)v->_float:0;
+        if(reference && aw_opening_disable(reference))ship_refs_disabled++;
+    }
+}
 /* The rule for "aw_story_hidden" below, for CHIM placements flagged story
  * hidden (chim/chim_chunks.c, world format 0.5). */
 int AW_OpeningStoryHidden(void)
@@ -233,6 +263,7 @@ void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
     route_started=route_failed=route_done=0;captain_papers=-1;post_retries=0;post_retry=0;post_leg=0;
+    ship_refs_pending=0;
     if(!strcmp(sv.name,"seyda"))AW_NavFixedReset();   /* the walks' check counts from the dock map's start */
     if(aw_story.stage==AW_STAGE_DEMO)return;
     if(!strcmp(sv.name,"census") && aw_story.stage>=AW_STAGE_OFFICE)aw_story.ship_disabled=1;
@@ -251,6 +282,7 @@ void AW_OpeningSpawn(void)
     if(aw_story.ship_disabled && !strcmp(sv.name,"seyda")){
         if(AW_IntroRole(4))hide(AW_IntroRole(4));
         if(AW_IntroRole(5))hide(AW_IntroRole(5));
+        ship_refs_pending=1;   /* and their Disable on the change list at the first tick (ship_refs_disable) */
     }
 }
 int AW_OpeningLocked(void)
@@ -274,6 +306,7 @@ static void show_papers(void)
 int AW_OpeningTick(void)
 {
     double dt=host_frametime;int result,done;
+    if(ship_refs_pending)ship_refs_disable();   /* also after the opening: a later visit to the dock, a loaded game */
     if(AW_ReaderActive())return 1;
     if(!AW_StoryRestricted())return 0;
     result=AW_ReaderResult();
@@ -367,7 +400,11 @@ int AW_OpeningTick(void)
         }
     }
     if(strcmp(sv.name,"census") || aw_story.stage<AW_STAGE_OFFICE)return 0;
-    if(!aw_story.captain_hint && near_actor(7)<75){   /* CharGenDialogueMessage: GetDistance Player < 300 */
+    /* CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69: the captain's script CharGenDialogueMessage runs as compiled (off the
+     * hand-written list, config/mwscript.json): it shows this box itself, and its locals (state, NoLore) are his own, so
+     * his conversation reads and sets them. The hand-written box below stays for census type legacy, where the engine
+     * holds the script (aw_mwhost.c census_scripts). */
+    if(AW_CensusLegacy() && !aw_story.captain_hint && near_actor(7)<75){   /* CharGenDialogueMessage: GetDistance Player < 300 */
         aw_story.captain_hint=1;
         /* CharGenDialogueMessage's own message box with its Ok button (OPENING-CAPTAIN-HINT-SUBTITLE-63) */
         /* OPENING-TUTORIAL-KEYS-65: the bound activate key, not a fixed E (the box fills ^ActionActivate in) */

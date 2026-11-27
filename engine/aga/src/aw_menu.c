@@ -120,12 +120,15 @@ static int tab,focus;
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
     ROW_AUTOSAVE,ROW_FOG,ROW_FOG_AUTO,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
-    ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX,ROW_ROOMFOG,ROW_FOG_INDOORS,ROW_TREES};
+    ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX,ROW_ROOMFOG,ROW_FOG_INDOORS,ROW_TREES,ROW_PLANTS};
 /* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices.
  * Always use best attack (BEST-ATTACK-OPTION-62): the original's Preferences setting, the same saved value as the
- * console's aw_combat_best_attack and dbg combat bestattack (aw_combat.c); on by default (an AmiWind default). */
+ * console's aw_combat_best_attack and dbg combat bestattack (aw_combat.c); on by default (an AmiWind default).
+ * Plant and mushroom picking (PLANT-PICK-DIRECT-DEFAULT-69): AmiWind (the default: one press picks a plant, the pick
+ * sound, no window) or Original (its container window), the same saved value as the console's aw_plant_pick and dbg
+ * plantpick (aw_cstrip.c, aw_inventory.c plant_pick). */
 static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
-    ROW_DIALOGUE,ROW_TEXTBOX,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};
+    ROW_DIALOGUE,ROW_TEXTBOX,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_PLANTS,ROW_AUTOSAVE};
 /* Fog in large rooms and the indoor fog distance (LARGE-ROOM-FOG-SETTING-64): aw_fog_large_rooms (on by default) and
  * aw_fog_distance_interior (arrows 10 units, Shift 1; Enter steps 150, 300, 540, 1000), both saved (aw_fog.c); the
  * Fog distance row above is the outdoor one (aw_drawdistance).
@@ -412,6 +415,7 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_OBJECTS:AW_SceneUIOption(2,direction);break;
     case ROW_LABELS:AW_SceneUIOption(3,1);break;   /* two settings: any key switches (INFO-BOX-TEXT-CUT-62) */
     case ROW_BEST:Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1);break;
+    case ROW_PLANTS:Cvar_SetValue("aw_plant_pick",Cvar_VariableValue("aw_plant_pick")?0:1);break;
     case ROW_AUTOSAVE:if(enter)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);else AW_SetAutosaveCount(AW_AutosaveCount()+direction);break;
     case ROW_FOG:
         if(AW_DrawDistanceAuto())break;   /* greyed: the region's own default while Auto is on */
@@ -717,6 +721,12 @@ static void prefs_video_line(int id,char *line){
         int on=Cvar_VariableValue("aw_combat_best_attack")!=0;
         strcpy(line,on?"Always use best attack: On":"Always use best attack: Off");
         if(AW_UIWidth(line)>LIST_W-4){strcpy(line,on?"Best attack: On":"Best attack: Off");}
+        break;
+    }
+    case ROW_PLANTS:{
+        int ami=Cvar_VariableValue("aw_plant_pick")!=0;
+        strcpy(line,ami?"Plant and mushroom picking: AmiWind":"Plant and mushroom picking: Original");
+        if(AW_UIWidth(line)>LIST_W-4){strcpy(line,ami?"Plant picking: AmiWind":"Plant picking: Original");}
         break;
     }
     case ROW_FOG:sprintf(line,"Fog distance outdoors: %ld",(long)AW_DrawDistance());break;

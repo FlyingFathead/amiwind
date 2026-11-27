@@ -178,7 +178,11 @@ class ActivateSourceTests(unittest.TestCase):
         # view ray meets it, go to the one rule; the actor's hold uses his whole model's box for a moment only
         choice = body('aw_scene.c', 'static int focus_kind(void) {')
         for part in ('e=AW_NPCTarget(p,cl.viewangles);aim.actor_near=npc_aim_near;aim.actor_far=npc_aim_far;',
-                     'aim.thing=AW_ActivateNearest(AW_InventoryAimDistance(),AW_HarvestAimDistance());',
+                     # PLANT-BOX-AIM-69: the item or container and the plant to pick, the nearer of them (and a plant
+                     # inside the container's measured box), AW_PlantFirst (host tested)
+                     'float item=AW_InventoryAimDistance(),plant=AW_HarvestAimDistance();',
+                     'focus_plant_first=AW_PlantFirst(item,plant,plant>=0 && item>=0 && AW_PlacedAimHolds(plant));',
+                     'aim.thing=focus_plant_first?plant:item;',
                      'aim.door=aimed_door()>=0?door_aim:-1;', 'aim.hinged=aw_hinged_aim?aw_hinged_aim():-1;',
                      'focus_held_kind=AW_FocusChoose(&aim,focus_held_kind);',
                      'realtime>focus_actor_seen && realtime-focus_actor_seen<AW_FOCUS_HOLD_SECONDS'):
@@ -256,7 +260,7 @@ class ActivateSourceTests(unittest.TestCase):
                       placed)
         self.assertIn('nearest=view_hit;best=i;continue;', placed)
         self.assertIn('(hit=aw_room_ray(row->reference,eye,f))>=0 && hit<along)rank=hit;', placed)
-        self.assertIn('if(rank>nearest)continue;', placed)
+        self.assertIn('if(!aim_takes(i,rank,best,nearest,reach,shift,eye,f))continue;', placed)   # PLANT-BOX-AIM-69
         self.assertIn('nearest=rank;best=i;', placed)
         self.assertNotIn('nearest=along;best=i;', placed)
         view = body('aw_inventory.c', 'static unsigned view_reference(')
@@ -282,6 +286,56 @@ class ActivateSourceTests(unittest.TestCase):
                       placed)
         self.assertIn('nearest=inner_hit;best=i;continue;', placed)
         self.assertIn('in it, the ray meets reference %u at %.1f', body('aw_inventory.c', 'void AW_PlacedAimReport(void){'))
+
+    def test_what_stands_in_a_plants_box_wins_over_the_plant(self):
+        # PLANT-BOX-AIM-69: every plant that opens as a container carries its measured box (FARGOTH-STASH-STUMP-69),
+        # the visible box of the whole plant, far coarser than its leaves: 3 items, 18 boards (two of them Balmora's
+        # signposts), 4 people, 37 plants to pick and 3,316 smaller plants stand inside one outdoors. Every branch of the
+        # placed rows' choice asks the one rule (aw_activate.h AW_AimTakes, host tested), never the nearer alone
+        placed = body('aw_inventory.c', 'static int placed_target(void){')
+        self.assertNotIn('hit>nearest', placed)
+        self.assertNotIn('rank>nearest', placed)
+        self.assertEqual(placed.count('aim_takes(i,'), 7)
+        for t in ('view_hit', 'inner_hit', 'rank'):
+            self.assertIn('aim_takes(i,%s,best,nearest,reach,shift,eye,f)' % t, placed)
+        self.assertEqual(placed.count('aim_takes(i,hit,best,nearest,reach,shift,eye,f)'), 4)
+        # the eye inside a container's box (standing in the bush): the box says nothing of where the plant is along the
+        # ray and would take every aim; the container is aimed at its point instead, as before the boxes
+        box = placed[placed.index("if(row->kind=='C' && row->box>=0 && row->box<focus_boards){"):]
+        box = box[:box.index('VectorAdd(row->at,shift,at);along=DotProduct(delta,f);')]
+        self.assertIn('(hit=focus_board_ray(focus_board_axis[row->box],at,eye,f))<0)continue;', box)
+        self.assertIn('if(hit>0){', box)
+        self.assertIn('placed_best=best;VectorCopy(eye,placed_eye);VectorCopy(f,placed_dir);VectorCopy(shift,placed_shift);',
+                      placed)
+        takes = body('aw_inventory.c', 'static int aim_takes(')
+        self.assertIn('return AW_AimTakes(t,nearest,reach,best>=0,t>nearest && holds,t<=nearest && holds);', takes)
+        holds = body('aw_inventory.c', 'static int focus_box_holds(')
+        self.assertIn("row->kind!='C' || row->box<0 || row->box>=focus_boards", holds)
+        self.assertIn('AW_BoxHolds(at,(const float (*)[3])focus_board_axis[row->box],point)', holds)
+        # the box the use key's thing is aimed by gives way to a person or a door met inside it, and a plant to pick
+        # nearer than the container (or inside its box) takes the use, the title and the action line
+        self.assertIn('if(!aim_is_placed || placed_best<0 || placed_best>=focus_count || !(distance>=0))return 0;',
+                      body('aw_inventory.c', 'int AW_PlacedAimHolds(float distance){'))
+        self.assertIn('aim_is_placed=placed>=0 && (drop<0 || placed<=drop);',
+                      body('aw_inventory.c', 'float AW_InventoryAimDistance(void){'))
+        choice = body('aw_scene.c', 'static int focus_kind(void) {')
+        for part in ('aim.actor_far>=0 && AW_PlacedAimHolds(aim.actor_near)', 'aim.door>=0 && AW_PlacedAimHolds(aim.door)',
+                     'aim.hinged>=0 && AW_PlacedAimHolds(aim.hinged)'):
+            self.assertIn(part, choice)
+        self.assertLess(choice.index('aim.hinged=aw_hinged_aim?aw_hinged_aim():-1;'),
+                        choice.index('AW_PlacedAimHolds(aim.hinged)'))
+        self.assertLess(choice.index('aim.thing=-1;'), choice.index('focus_held_kind=AW_FocusChoose(&aim,focus_held_kind);'))
+        use = body('aw_scene.c', 'int AW_SceneUse(void) {')
+        self.assertIn('(focus_plant_first?((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse()) || '
+                      'AW_InventoryUse():', use)
+        draw = body('aw_scene.c', 'void AW_SceneDraw(void) {')
+        # PLANT-PICK-DIRECT-DEFAULT-69: the AmiWind pick's plant line follows the same order (a mushroom nearer wins)
+        self.assertEqual(draw.count('!focus_plant_first &&'), 3)
+        self.assertIn('!focus_plant_first &&\n            (name=AW_PlacedPlantHint(&steal))!=NULL', draw)
+        self.assertLess(draw.index('!focus_plant_first &&\n           (AW_InventoryFocus('), draw.index('AW_PlacedFocus(&focus_name,'))
+        self.assertIn('!focus_plant_first &&\n            AW_ItemPrompt(take,sizeof(take),&steal)', draw)
+        self.assertIn('WEAK int AW_PlacedAimHolds(float distance)', (ROOT / 'tests' / 'aga_hook_stubs.c').read_text(
+            encoding='utf-8'))
 
     def test_the_rules_file_is_built(self):
         self.assertIn('aw_activate_rules.c', (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8'))

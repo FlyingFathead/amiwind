@@ -19,6 +19,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev5 (9cde408f) | 2026-11-27 | gate 13441 of the planning item SOL-SEA-INVISIBLE-BLOCKER-68 | A creature collides only up to its drawn body, so the horker swimming under the surface off Solstheim no longer stops a player walking on the water, and a step never lands on a body; the whole open world is checked for walls and blockers (tools/world_seams.py); the in-play proof follows |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-24: reported in v0.0.68
+- 2026-11-27: fixed in source: a gated commit, v0.0.69-dev5 (9cde408f); gate 13441 of the planning item SOL-SEA-INVISIBLE-BLOCKER-68: A creature collides only up to its drawn body, so the horker swimming under the surface off Solstheim no longer stops a player walking on the water, and a step never lands on a body; the whole open world is checked for walls and blockers ...
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

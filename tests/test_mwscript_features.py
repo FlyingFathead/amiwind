@@ -61,22 +61,91 @@ class Tracker(unittest.TestCase):
         inert = [r for r in rows if r['state'] == 'inert']
         used = len(rows) - len(inert)
         self.assertIn('Of the {:,} scripts the original game uses'.format(used), text)
-        self.assertIn('The {:,} scripts that nothing in the original game ever names'.format(len(inert)), text)
-        head, _, tail = text.partition('## Not used in the original game')
+        self.assertIn('The {:,} scripts not used in the original game (they never run there either'.format(len(inert)),
+                      text)
+        self.assertIn('are not counted toward completion', text)
+        self.assertIn('| Not used in the original game (never runs there either; not counted toward completion) | '
+                      '{:,} |'.format(len(inert)), text)
+        head, _, tail = text.partition('\n## Not used in the original game')
         self.assertTrue(tail)
         for r in inert:
             self.assertIn('| %s |' % r['id'], tail)
             self.assertNotIn('| %s | %s | %s |' % (r['id'], r['area'], 'Named by nothing'), head)
         self.assertEqual(len(rows), self.doc['measured'].get('scripts', len(rows)))
 
-    def test_main_script_is_carried(self):
-        # the game always starts the global script Main (OpenMW GlobalScripts::addStartup), named by nothing or not
+    def test_main_script_is_own_code_never_unused(self):
+        # the game always starts the global script Main (OpenMW GlobalScripts::addStartup), named by nothing or not:
+        # it is never "not used". AmiWind's own code does it; it is an adaptation only with every step carried out
+        # (tests/test_mwscript_counterparts.py), and today its roll of Random100 is open
         r = {'id': 'Main', 'error': False, 'handwritten': False, 'inert': True, 'notyet': [], 'bound': 0,
              'start': False, 'started_by': [], 'refs': {'records': {}, 'placed': {}, 'levelled': 0,
                                                          'dialogue_starts': 0, 'dialogue_speaker': 0}}
-        self.assertEqual(F.state_of(r)[0], 'carried')
+        want = 'carried' if F.is_adaptation(F.counterparts().get('main')) else 'adaptation-gap'
+        self.assertEqual(F.state_of(r)[0], want)
         r['id'] = 'main'
-        self.assertEqual(F.state_of(r)[0], 'carried')
+        self.assertEqual(F.state_of(r)[0], want)
+
+    def test_not_used_means_nothing_can_bring_it_into_the_game(self):
+        """MWSCRIPT-EFFECT-PARITY-69: the "not used in the original game" list holds only scripts nothing can bring
+        into the game: no start record, no StartScript, no placed record, no levelled list, no script or dialogue
+        result that makes its record, no item a script could hand out. A row that can run is refused there."""
+        inert = [r for r in self.doc['scripts'] if r['state'] == 'inert']
+        self.assertGreater(len(inert), 100)
+        for r in inert:
+            self.assertEqual(F.reachable(r), [], r['id'])
+            self.assertFalse(set(r['refs']['records']) & set(F.CARRIED), r['id'])
+        # none of them is counted toward completion, on the page's counts or in the summary the Toolkit draws
+        s = F.script_summary(copy.deepcopy(self.doc))
+        self.assertEqual(s['all']['unused'], len(inert))
+        self.assertEqual(s['all']['used'], len(self.doc['scripts']) - len(inert))
+        self.assertEqual(sum(m['used'] for m in s['masters']), s['all']['used'])
+        self.assertEqual(sum(m['unused'] for m in s['masters']), len(inert))
+        for m in s['masters'] + [s['all']]:
+            self.assertEqual(m['run'] + m['adaptation'] + m['not_yet'], m['used'])
+            self.assertEqual(m['done'], m['run'] + m['adaptation'])
+        # each way in moves a row out of the list, and the check refuses a row left there
+        for change, word in ((lambda r: r['refs'].update(levelled=1), 'a levelled list'),
+                             (lambda r: r['refs'].update(made_by=['dialogue']), 'makes its record'),
+                             (lambda r: r['refs'].update(placed={'Tribunal.esm': {'ACTI': 1}}), 'a placed record'),
+                             (lambda r: r.update(started_by=['x']), 'StartScript'),
+                             (lambda r: r.update(start=True), 'a start record')):
+            doc = copy.deepcopy(self.doc)
+            row = next(r for r in doc['scripts'] if r['state'] == 'inert' and r['refs']['records'])
+            change(row)
+            self.assertIn(word, ', '.join(F.reachable(row)))
+            self.assertNotEqual(F.state_of(row)[0], 'inert', word)
+            self.assertTrue(any('listed as not used in the original game, but it can run there' in p
+                                for p in F.problems(doc)), word)
+
+    def test_a_script_with_nothing_to_run_counts_where_its_cell_is_in_the_image(self):
+        """MWSCRIPT-EFFECT-PARITY-69: two scripts with no function at all, on an add-on merchant and on the soldiers of
+        an add-on fort, read "only in an add-on world" although their cells are in the image: the build leaves such a
+        script out of the file, so it has no binding, and only bindings told the tracker what the image carries. The
+        measurement now counts the placements in cells the image carries (placed_in_image), bound or not."""
+        base = {'error': False, 'handwritten': False, 'inert': True, 'notyet': [], 'bound': 0, 'start': False,
+                'started_by': [], 'functions': {},
+                'refs': {'records': {'NPC_': ['x']}, 'placed': {'Tribunal.esm': {'NPC_': 1}}, 'levelled': 0,
+                         'dialogue_starts': 0, 'dialogue_speaker': 11, 'placed_by_scripts': 0, 'made_by': []}}
+        old = copy.deepcopy(base)            # measured before the count: as before
+        self.assertEqual(F.state_of(old)[0], 'not-in-image')
+        r = copy.deepcopy(base)
+        r['refs']['placed_in_image'] = {'Tribunal.esm': 1}
+        self.assertEqual(F.state_of(r), ('runs', 'nothing to run but its own locals, which the dialogue keeps on the '
+                                                 'speaker'))
+        r['refs']['placed_in_image'] = {}    # its cell is not in the image
+        self.assertEqual(F.state_of(r)[0], 'not-in-image')
+        # a script with something to run, placed in cells the image carries and bound nowhere, is a fault of the
+        # build, never "only in an add-on world"
+        r['inert'], r['functions'] = False, {'getdistance': 1}
+        r['refs']['placed_in_image'] = {'Tribunal.esm': 1}
+        self.assertEqual(F.state_of(r), ('not-attached', 'placed in cells the image carries, but the build does not '
+                                                         'attach it there'))
+        # the data: both scripts run, and no script of the game waits for a cell the image has
+        by_id = {x['id']: x for x in self.doc['scripts']}
+        for sid in ('rerlas', 'fortloreboozeScript'):
+            self.assertEqual(by_id[sid]['state'], 'runs', sid)
+            self.assertTrue(sum(by_id[sid]['refs']['placed_in_image'].values()), sid)
+        self.assertIn("'placed_in_image'", (ROOT / 'tools' / 'mwscript_features.py').read_text(encoding='utf-8'))
 
     def test_state_rules(self):
         base = {'error': False, 'handwritten': False, 'inert': False, 'notyet': [], 'bound': 0, 'start': False,
@@ -193,7 +262,8 @@ class Tracker(unittest.TestCase):
         allowed = {'id', 'master', 'defined_in', 'area', 'areas', 'refs', 'start', 'started_by', 'bound', 'held',
                    'handwritten', 'inert', 'error', 'functions', 'tests', 'conditions', 'openmw', 'notyet', 'state',
                    'why'}
-        refs = {'records', 'placed', 'levelled', 'dialogue_starts', 'dialogue_speaker', 'placed_by_scripts', 'made_by'}
+        refs = {'records', 'placed', 'placed_in_image', 'levelled', 'dialogue_starts', 'dialogue_speaker',
+                'placed_by_scripts', 'made_by'}
         for r in self.doc['scripts']:
             self.assertLessEqual(set(r), allowed, r['id'])
             self.assertLessEqual(set(r['refs']), refs, r['id'])
@@ -240,10 +310,119 @@ class Tracker(unittest.TestCase):
         the basis only, and a line names no source place (a file with a line number)."""
         eff = F.effects(F.EFFECTS)
         for n, e in eff['functions'].items():
-            self.assertLessEqual(set(e), {'effect', 'missing', 'register', 'basis'}, n)
-            low = e['missing'].casefold()
-            for word in ('.c:', '.py:', '.cpp:', '.h:'):
+            self.assertLessEqual(set(e), {'effect', 'missing', 'register', 'basis', 'in_play', 'checked'}, n)
+            low = (e['missing'] + ' ' + ' '.join(s['what'] for s in e.get('in_play', ()))).casefold()
+            for word in ('.c:', '.py:', '.cpp:', '.h:', ':/', ':\\', '.json', '.txt'):
                 self.assertNotIn(word, low, n)
+
+    def test_a_row_is_checked_again_when_its_register_entry_is_fixed(self):
+        """MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69: the PlayBink row went on saying every video can be skipped after the
+        fix had shipped, because nothing tied a register entry's fix to the row. Now a row names every register entry
+        about its function and records, under "checked", the newest fix step of each one it was read against; a new
+        step (fixed in source, shipped, confirmed in play, the fixed state) makes the row stale until it is checked."""
+        eff = F.effects(F.EFFECTS)
+        rows = eff['functions']
+        register = F.register_entries()
+        self.assertGreater(len(register), 1000)
+        self.assertEqual(F.stale_effect_rows(rows, register), [])
+        # the origin: PlayBink names its entry, was checked against its fix and is no longer "in part"
+        play = rows['playbink']
+        self.assertIn('MWSCRIPT-PLAYBINK-SKIP-FLAG-68', play['register'])
+        self.assertEqual(play['checked']['MWSCRIPT-PLAYBINK-SKIP-FLAG-68'],
+                         F.fix_mark(register['MWSCRIPT-PLAYBINK-SKIP-FLAG-68']))
+        self.assertTrue(play['checked']['MWSCRIPT-PLAYBINK-SKIP-FLAG-68'].startswith('fixed in source: v0.0.69-dev3'))
+        self.assertEqual((play['effect'], play['missing']), ('full', ''))
+        # the old behaviour: the row as it was (no entry named) is refused, by the entry's own id
+        old = copy.deepcopy(rows)
+        old['playbink'].update(register=[], checked={})
+        self.assertTrue(any('playbink: the register entry MWSCRIPT-PLAYBINK-SKIP-FLAG-68 is about this function'
+                            in p for p in F.stale_effect_rows(old, register)))
+        # an open entry about a function, with no fix step yet, may be filed without touching the rows
+        opened = dict(register, **{'MWSCRIPT-PLAYBINK-NEW-FAULT-69': {'id': 'MWSCRIPT-PLAYBINK-NEW-FAULT-69',
+                                                                      'state': 'open', 'closure': []}})
+        self.assertEqual(F.stale_effect_rows(rows, opened), [])
+        opened['MWSCRIPT-PLAYBINK-NEW-FAULT-69']['closure'] = [{'stage': 'fixed in source', 'where': 'v9.9.9 (x)'}]
+        self.assertTrue(any('MWSCRIPT-PLAYBINK-NEW-FAULT-69 is about this function and has the fix step' in p
+                            for p in F.stale_effect_rows(rows, opened)))
+        # a fix step that comes later makes the row stale: a new closure step, and the fixed state with no steps
+        name = next(n for n, e in sorted(rows.items()) if e['register'] and not e['checked'])
+        rid = rows[name]['register'][0]
+        later = copy.deepcopy(register)
+        later[rid]['closure'] = [{'stage': 'fixed in source', 'where': 'v9.9.9 (abcdef12)'}]
+        self.assertTrue(any('%s names %s, which has the fix step "fixed in source: v9.9.9 (abcdef12)"' % (name, rid)
+                            in p for p in F.stale_effect_rows(rows, later)))
+        later[rid]['closure'].append({'stage': 'confirmed in play', 'where': 'v9.9.9 (a session)'})
+        seen = copy.deepcopy(rows)
+        seen[name]['checked'] = {rid: 'fixed in source: v9.9.9 (abcdef12)'}
+        self.assertTrue(any('confirmed in play' in p for p in F.stale_effect_rows(seen, later)))
+        seen[name]['checked'] = {rid: F.fix_mark(later[rid])}
+        self.assertEqual(F.stale_effect_rows(seen, later), [])
+        later = copy.deepcopy(register)
+        later[rid].update(state='fixed', fixed_in='v9.9.9', closure=[])
+        self.assertEqual(F.fix_mark(later[rid]), 'fixed: v9.9.9')
+        self.assertTrue(any('fixed: v9.9.9' in p for p in F.stale_effect_rows(rows, later)))
+        # a named entry the register does not have, and a checked note for an entry the row does not name
+        bad = copy.deepcopy(rows)
+        bad[name]['register'] = rows[name]['register'] + ['NO-SUCH-ENTRY-69']
+        self.assertTrue(any('NO-SUCH-ENTRY-69, which is not in the register' in p
+                            for p in F.stale_effect_rows(bad, register)))
+        bad = copy.deepcopy(rows)
+        bad[name]['checked'] = {'NO-SUCH-ENTRY-69': 'x'}
+        self.assertTrue(any('checked names NO-SUCH-ENTRY-69' in p for p in F.stale_effect_rows(bad, register)))
+        # which entries are about a function: MWSCRIPT ids by any word, other ids by their first word, never an
+        # everyday word (a JOURNAL entry is about the journal window, not the function Journal)
+        some = {'MWSCRIPT-PLAYBINK-SKIP-FLAG-68': {}, 'GETPOS-X-1': {}, 'JOURNAL-PAGE-1': {}, 'UI-GETPOS-1': {},
+                'MWSCRIPT-JOURNAL-INDEX-1': {}}
+        self.assertEqual(F.entries_about('playbink', some), ['MWSCRIPT-PLAYBINK-SKIP-FLAG-68'])
+        self.assertEqual(F.entries_about('getpos', some), ['GETPOS-X-1'])
+        self.assertEqual(F.entries_about('journal', some), ['MWSCRIPT-JOURNAL-INDEX-1'])
+        # the check command refuses it too (the pregate and this suite run it)
+        self.assertTrue(any('MWSCRIPT-PLAYBINK-SKIP-FLAG-68' in p
+                            for p in F.effect_problems(self.doc, dict(eff, functions=old), register)))
+
+    def test_the_in_play_column(self):
+        """MWSCRIPT-EFFECT-PARITY-69: what a play session has shown of a function's effect is kept per row (what,
+        version, date) and drawn in its own column; a class known from play needs such a note, and a note says only
+        what was seen."""
+        eff = F.effects(F.EFFECTS)
+        rows = eff['functions']
+        for n, e in rows.items():
+            self.assertIsInstance(e['in_play'], list, n)
+        seen = {n: e for n, e in rows.items() if e['in_play']}
+        self.assertIn('becomewerewolf', seen)
+        self.assertIn('undowerewolf', seen)
+        for n, e in seen.items():
+            for s in e['in_play']:
+                self.assertEqual(set(s), {'what', 'version', 'date'}, n)
+        self.assertTrue(all(e['in_play'] for e in rows.values() if e['basis'] == 'play'))
+        page = F.OUT.read_text(encoding='utf-8')
+        section = page.split('### Effect in play', 1)[1].split('\n## ', 1)[0]
+        self.assertIn('| Function | Effect | Scripts | Dialogue | What is missing | Known from | Seen in play | '
+                      'Register |', section)
+        for n, e in seen.items():
+            self.assertIn(F._cell(F._seen(e)), section, n)
+        self.assertIn('| not yet |', section)
+        table = F.function_table(self.doc)
+        c = F.effect_counts(table)
+        self.assertEqual(c['seen_in_play'], sum(1 for n in table if rows[n]['in_play']))
+        self.assertEqual(c['full'] + c['part'] + c['none'], c['called'])
+        self.assertIn('%d functions have such a note' % c['seen_in_play'], section)
+        # the refusals: a class known from play with no note, a note without its date
+        name = next(n for n in sorted(table) if not rows[n]['in_play'])
+        bad = copy.deepcopy(eff)
+        bad['functions'][name]['basis'] = 'play'
+        self.assertTrue(any('a class known from play needs its in_play note' in p
+                            for p in F.effect_problems(self.doc, bad)))
+        bad = copy.deepcopy(eff)
+        bad['functions'][name]['in_play'] = [{'what': 'x', 'version': '0.0.69-dev5'}]
+        self.assertTrue(any('in_play is a list of notes' in p for p in F.effect_problems(self.doc, bad)))
+        # the werewolf rows say what was seen and keep what is not handled in their line
+        wolf = rows['becomewerewolf']
+        self.assertEqual(wolf['effect'], 'part')
+        for word in ('doubled health', 'witnesses', 'refusal to take', 'camera height', 'silver weapons', 'sounds'):
+            self.assertIn(word, wolf['missing'], word)
+        self.assertNotIn('to be seen in play', wolf['missing'])
+        self.assertIn('werewolf body', F._seen(wolf))
 
 
 if __name__ == '__main__':

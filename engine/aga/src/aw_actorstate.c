@@ -626,6 +626,46 @@ int AW_ActorWeaponEnchant(int row,int *item){
     if(item)*item=(int)U16(e);
     return it.enchant;
 }
+/* ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69: the models the actor of ROW is drawn holding: its record's equipped weapon
+ * (the row's weapon entry) into WEAPON and its equipped shield (the worn entry whose item is armour of the shield
+ * type) into SHIELD, each the path the item's row names (AITM bytes 30-31, v0.0.69: the item model of its mesh), ""
+ * for none. Returns bit 0 a weapon path, bit 1 a shield path; -1 when the table cannot say (no table or row, rows of
+ * the size before v0.0.61, or a field that names no item model: a table written before the field, where the two
+ * bytes are 0), so the caller keeps what it had. Read once when an actor spawns: the row, its inventory entries and
+ * the item row and path string of each held one. The original shows what the inventory's two slots hold (rule from
+ * OpenMW apps/openmw/mwrender/npcanimation.cpp showWeapons and showCarriedLeft; read, not copied). */
+#define AITM_KIND_WEAPON 1
+#define AITM_KIND_ARMOR 2
+#define AITM_ARMOR_SHIELD 8
+static int held_path(int item,int kind,int type,char out[AW_ACTOR_HELD_PATH]){
+    unsigned char r[AITM_BYTES];int index,n;
+    out[0]=0;
+    if(item<0 || (uint32_t)item>=st->aitm.rows || !fetch(st->aitm.offset+(uint32_t)item*AITM_BYTES,r,AITM_BYTES))return -1;
+    if(r[2]!=kind || (type>=0 && r[3]!=type))return 0;
+    index=(int)U16(r+30);
+    if(index==AW_ACTOR_NONE)return 0;                       /* an item without a mesh */
+    if(!string_at(index,out,AW_ACTOR_HELD_PATH,0))return -1;
+    n=(int)strlen(out);
+    if(n<18 || strncmp(out,"progs/items/m",13) || strcmp(out+n-4,".mdl")){out[0]=0;return -1;}
+    return 1;
+}
+int AW_ActorHeldModels(int row,char weapon[AW_ACTOR_HELD_PATH],char shield[AW_ACTOR_HELD_PATH]){
+    aw_actor_base_t b;unsigned char e[AINV_BYTES];int i,k,got=0;
+    weapon[0]=shield[0]=0;
+    if(!st || aitm_size()<AITM_BYTES || !AW_ActorBase(row,&b))return -1;
+    for(i=0;i<b.inv_count;i++){
+        if(!fetch(st->ainv.offset+(uint32_t)(b.inv_first+i)*AINV_BYTES,e,AINV_BYTES))return -1;
+        if(!(e[4]&AWI_INV_EQUIPPED))continue;
+        if(i==b.weapon){
+            if((k=held_path((int)U16(e),AITM_KIND_WEAPON,-1,weapon))<0)return -1;
+            if(k)got|=1;
+        }else if(!(got&2)){
+            if((k=held_path((int)U16(e),AITM_KIND_ARMOR,AITM_ARMOR_SHIELD,shield))<0)return -1;
+            if(k)got|=2;
+        }
+    }
+    return got;
+}
 
 /* --- spells --- */
 static int base_spell(const aw_actor_t *a,int spell){

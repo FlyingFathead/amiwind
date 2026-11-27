@@ -429,6 +429,19 @@ def read_anim_build(run):
     # every area stage's resident table (towns, room batches, the city and opening interiors): {'models': {id: {
     # 'appearance', 'model', ...}}}
     residents = sorted(set(glob.glob(str(run / '*/*.json')) + glob.glob(str(run / '*/scene/*.json'))))
+    # ACTOR-CHECKS-MISS-PLACED-MODELS-69: the models each record is really placed with (the image's placed actor
+    # census, tools/actor_placed_census.py). A stage report's model that no map places is not judged for a placed
+    # record (Fargoth was judged on a prototype model of an early stage, his placed model never read); without the
+    # table (an older run) every report counts, as before.
+    placed = {}
+    census = run / 'image/actor-placed-census.json'
+    if census.is_file():
+        from actor_placed_census import placed_models
+        placed = placed_models(json.loads(census.read_text(encoding='utf-8')))
+
+    def stands_in(ident, model):
+        return ident not in placed or model in placed[ident]
+
     for path in residents:
         if '/actor-library/' in path.replace('\\', '/'):
             continue
@@ -442,8 +455,15 @@ def read_anim_build(run):
             continue
         method = 'town resident' if 'chim-town-' in path else 'room resident'
         for ident, rec in models.items():
-            if isinstance(rec, dict) and rec.get('model') and ident.casefold() not in out:
+            if isinstance(rec, dict) and rec.get('model') and ident.casefold() not in out and \
+                    stands_in(ident.casefold(), rec['model']):
                 skeletal_npc(ident.casefold(), rec.get('appearance') or {}, rec['model'], method)
+    # the opening's people stand in their own models (np_*.mdl, whose layout links the full kit worn in a fight):
+    # judged on the model the census found them in, before the library, whose model is only their fight model
+    for ident, models in sorted(placed.items()):
+        own = [m for m in models if m.startswith('progs/np_')]
+        if own and ident not in out:
+            skeletal_npc(ident, {}, own[0], 'opening standing model + full kit')
     lib = run / 'actor-library'
     if (lib / 'npc-library.json').is_file():
         npcs = json.loads((lib / 'npc-library.json').read_text(encoding='utf-8'))

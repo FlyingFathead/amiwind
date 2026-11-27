@@ -73,6 +73,30 @@ int AW_ActorUseBox(int frames,int dead,int person,float scale,const float mins[3
     }
     return AW_USEBOX_BODY;
 }
+/* PLANT-BOX-AIM-69 (aw_activate.h): what stands inside a container's measured box wins over that container */
+int AW_BoxHolds(const float centre[3],const float axis[3][3],const float point[3]){
+    float d[3],len,e;int j,k;
+    if(!centre || !axis || !point)return 0;
+    for(j=0;j<3;j++)d[j]=point[j]-centre[j];
+    for(k=0;k<3;k++){
+        len=axis[k][0]*axis[k][0]+axis[k][1]*axis[k][1]+axis[k][2]*axis[k][2];
+        if(!(len>1e-6f))return 0;
+        e=(d[0]*axis[k][0]+d[1]*axis[k][1]+d[2]*axis[k][2])/len;   /* the box's own coordinate along k, -1..1 inside */
+        if(e<-1 || e>1)return 0;
+    }
+    return 1;
+}
+int AW_AimTakes(float t,float nearest,float reach,int have_best,int best_box_holds_t,int own_box_holds_nearest){
+    if(!(t>=0) || t>reach)return 0;
+    if(!have_best)return t<=nearest;
+    if(t<=nearest)return !own_box_holds_nearest;
+    return best_box_holds_t;
+}
+int AW_PlantFirst(float item,float plant,int item_box_holds_plant){
+    if(plant<0)return 0;
+    if(item<0)return 1;
+    return plant<item || item_box_holds_plant;
+}
 float AW_FocusDistance(const aw_focus_aim_t *aim,int kind){
     if(!aim)return -1;
     switch(kind){

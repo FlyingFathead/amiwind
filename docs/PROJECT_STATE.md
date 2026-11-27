@@ -1,6 +1,6 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -53,7 +53,8 @@ game: 1,134 of 1,134 interiors of Morrowind, 96 of 96 of Tribunal and 98 of 98 o
 reached from Ebonheart and walked from the palace to the Plaza. Bloodmoon's Solstheim is in: all 153 of its cells (land
 and sea) and all of its rooms are built, one open sea joins it to Vvardenfell, so you can take the boat from Khuul or
 swim across, its quest and underwater entrances can be used, and its werewolves, weathers and ice are in. The game's
-scripts run: of the 1,074 the original uses, 1,063 run and 9 more are carried by AmiWind's own code. Character creation
+scripts run: of the 1,074 the original uses, 1,065 run and 8 more are AmiWind adaptations (AmiWind's own
+code does every step of the script). Character creation
 through the opening, the inventory, the journal and the map, saving and loading with what the player changes staying
 changed, combat and casting, talking and the services, crime with witnesses, guards and jail, alchemy, and containers
 are in. The tracker of the base game's systems ([game features](GAME_FEATURES.md)) counts what is done, partial and

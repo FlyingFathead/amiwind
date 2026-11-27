@@ -41,10 +41,15 @@ class ContainerCensusTests(unittest.TestCase):
         self.assertEqual(got['most_boxes_in_a_window'], 2)
 
     def test_engine_holds_the_most_boxes_counted(self):
-        # the census of the original data (13 November 2026): at most 154 boards and boxed containers in a 3 x 3 window
+        # the census of the original data (13 November 2026): at most 154 boards and boxed containers in a 3 x 3 window;
+        # PLANT-BOX-AIM-69 (27 November 2026): with the boxes of the plants that open, 1,183, past the 256 of before: as
+        # many boxes as rows, so the box table never runs out before the rows (every box belongs to a row)
+        import prepare_focus as pf
         inventory = (ROOT / 'engine/aga/src/aw_inventory.c').read_text(encoding='utf-8')
-        self.assertIn('#define FOCUS_BOARDS 256', inventory)
+        self.assertIn('#define FOCUS_BOARDS 1536', inventory)
         self.assertIn('#define FOCUS_ROWS 1536', inventory)
+        self.assertEqual(pf.WINDOW_BOXES, 1536)
+        self.assertEqual(pf.WINDOW_BOXES, pf.WINDOW_ROWS)
 
     def test_the_rules_judged_by_are_the_engines(self):
         # the count judges by this tree's engine: each rule the census names is the one the engine source has
@@ -62,7 +67,7 @@ class ContainerCensusTests(unittest.TestCase):
         self.assertTrue(cc.ROOM_STABLE_IDS)
         # ChimRoom_Has, ChimRoom_RayRef, ChimRoom_Hide and ChimRoom_PoseModel (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68)
         self.assertEqual(room.count('RoomRefIs (i, reference)'), 4)
-        self.assertEqual((cc.FOCUS_ROWS, cc.FOCUS_BOARDS), (1536, 256))
+        self.assertEqual((cc.FOCUS_ROWS, cc.FOCUS_BOARDS), (1536, 1536))
 
     def test_merged_room_numbers_read_as_stable_ids(self):
         # REF-IDENTITY-MERGED-MASTER-66: a room record's merged number (2^22 x master + number) is the stable id
@@ -129,6 +134,30 @@ class ContainerCensusTests(unittest.TestCase):
                     {'references': [{'number': number, 'type': 'CONT'}, {'number': 5, 'type': 'STAT'}]}))
             self.assertEqual(cc.exterior_scenery(tmp), {cc.stable_ref(cc.pf.MASTER, 172851),
                                                        cc.stable_ref(cc.pf.MASTER, 297457)})
+
+    def test_a_room_record_is_read_from_the_interiors_stage_when_the_image_holds_none(self):
+        # CONTAINER-COUNT-LOOSE-ROOM-PATH-68: an image whose room store sits on the world partition has no chimi/ in its
+        # boot id1; the count read only id1 and stopped at the first room map (the v0.0.68 release build's report was
+        # not made). The record is found in the run's CHIM interiors stage, and a missing one is still refused.
+        import tempfile
+        import container_census as cc
+        from chim import format as F
+        from chim.room_records import ROOM_BLOCK, ROOM_KIND, FORMAT_VERSION
+        maps_entities = '{\n"classname" "worldspawn"\n"_aw_cell_int" "12"\n"_chim_world" "chimi"\n"_chim_room" "r"\n}\n'
+        body = maps_entities.encode('latin-1') + b'\0'
+        bsp = struct.pack('<i', 29) + struct.pack('<ii', 4 + 15 * 8, len(body)) + bytes(14 * 8) + body
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp)
+            (run / cc.MAPS).mkdir(parents=True)
+            (run / cc.MAPS / 'r.chim').write_bytes(bsp)
+            with self.assertRaises(ValueError):
+                cc.room_record_of(run, run / cc.MAPS / 'r.chim')
+            at = F.HEADER.size + ROOM_BLOCK.size
+            record = F.header(ROOM_KIND, 0, at, at, at, version=FORMAT_VERSION) + ROOM_BLOCK.pack(0, 0, 0, 1, 1, 1, 0, 0)
+            (run / cc.STAGE_ROOMS / 'chimi/rooms').mkdir(parents=True)
+            (run / cc.STAGE_ROOMS / 'chimi/rooms/r.crm').write_bytes(record)
+            got = cc.room_record_of(run, run / cc.MAPS / 'r.chim')
+            self.assertEqual(got['placements'], [])
 
     def test_open_container_ids_leave_out_plants_and_unnamed(self):
         import open_containers as oc

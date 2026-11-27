@@ -809,6 +809,13 @@ int AW_ObjectLock(unsigned reference,int lock,int level){
     object_op(reference,lock?AWM_LOCK:AWM_UNLOCK,lock?level:0);
     return 1;
 }
+/* OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69 (aw_opening.c aw_opening_disable): a script's Disable of REFERENCE, done by
+ * the opening for what the clerk's script disables on a map that is not loaded when it runs; 1 done */
+static int opening_disable(unsigned reference){
+    if(!reference || reference>0xFFFFFFu)return 0;
+    object_op(reference,AWM_DISABLE,0);
+    return 1;
+}
 static int32_t object_op(uint32_t ref,int op,int32_t value){
     object_t *o;
     if(aw_ledger_on && op!=AWM_ACTIVATE && op!=AWM_GETLOCKED)return ledger_object(ref,op,value);
@@ -1784,6 +1791,14 @@ int AW_MwscriptWeaponType(struct edict_s *e){
     if(!e || e==sv_player || !AW_MwscriptActors() || (row=row_of_edict(e))==AW_ACTOR_NONE)return -1;
     return AW_ActorWeaponType(row);
 }
+/* ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69: the held models of the weapon and the shield E's record has equipped, for
+ * aw_items.c (its hook aw_items_held, set in AW_MwhostInit's place below): AW_ActorHeldModels of its row; -1 when the
+ * record cannot say (the player, no actor table, no row, a table without the held models). Asked once at a spawn. */
+static int items_held(struct edict_s *e,char weapon[AW_ACTOR_HELD_PATH],char shield[AW_ACTOR_HELD_PATH]){
+    int row;
+    if(!e || e==sv_player || !AW_MwscriptActors() || (row=row_of_edict(e))==AW_ACTOR_NONE)return -1;
+    return AW_ActorHeldModels(row,weapon,shield);
+}
 /* Once a frame while anyone fights: the fighters' health and deaths reach their records (the dead count, OnDeath),
  * and the scripts that read actors wake (AW_MwvmStateChanged). */
 static int compare_edicts(const void *a,const void *b){
@@ -2138,7 +2153,8 @@ static char *home_text(const char *map,uint32_t ref,unsigned long *length){
  * (64 rows, 512 bytes: one name read per script that is attached, from the string cache; never a scan of the file's
  * names). */
 static const char *const census_scripts[]={"chargendoorentercaptain","chargendoorexit","chargendoorexitcaptain",
-    "chargenfatiguebarrel","chargendoorguardtalker","chargenclassnpc","chargenstatssheet","chargen_ring_keley",NULL};
+    "chargenfatiguebarrel","chargendoorguardtalker","chargenclassnpc","chargenstatssheet","chargen_ring_keley",
+    "chargendialoguemessage",NULL};   /* the captain's hint and his locals (CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69) */
 #define CENSUS_SEEN 64
 static int census_seen[CENSUS_SEEN],census_is[CENSUS_SEEN],ncensus_seen;static const unsigned char *census_for;
 static int census_script(int script){
@@ -3121,6 +3137,8 @@ int AW_MwscriptWerewolfNpc(struct edict_s *e){
     return were_npc_find(r)>=0;
 }
 extern int (*aw_items_werewolf)(struct edict_s *actor);   /* aw_items.c: a turned NPC holds nothing (set below) */
+/* aw_items.c: what an actor's own record has equipped, as held model paths (set below; items_held above) */
+extern int (*aw_items_held)(struct edict_s *actor,char weapon[AW_ACTOR_HELD_PATH],char shield[AW_ACTOR_HELD_PATH]);
 /* NPC-WEREWOLF-FIGHTS-ARMED-68 (v0.0.68): the hooks of the combat layer (aw_combat.c: a turned NPC fights with its claws,
  * the claws' multiplier now) and of the view (aw_view.c: a turned NPC drawn at its race's size, WEREWOLF-RACE-SCALE-68),
  * declared here, not in aw_combat.h (the CHIM world stage keys it); set in the init below */
@@ -6736,6 +6754,7 @@ void AW_MwscriptInit(void){
     aw_item_added=item_added;   /* OnPCAdd (CENSUS-INTRO-SCRIPTS-62) */
     aw_worldui_werewolf=were_form;   /* the inventory and magic windows refused while a werewolf (WEREWOLF-BODY-63) */
     aw_items_werewolf=AW_MwscriptWerewolfNpc;   /* a turned NPC holds nothing (NPC-WEREWOLF-NO-MODEL-66) */
+    aw_items_held=items_held;   /* an actor holds what its own record has equipped (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69) */
     aw_combat_werewolf=AW_MwscriptWerewolfNpc;  /* and fights with its claws only (NPC-WEREWOLF-FIGHTS-ARMED-68) */
     aw_talk_werewolf=AW_MwscriptWerewolfNpc;    /* and is not talked to by the use key (NPC-WEREWOLF-TALK-OFFERED-68) */
     aw_talk_player_werewolf=player_is_werewolf; /* nor does a werewolf player use any actor */
@@ -6745,6 +6764,7 @@ void AW_MwscriptInit(void){
     aw_actors_levelled_spawned=levelled_spawned;   /* a levelled pick runs its record's script (the same item) */
     aw_rest_spawn=rest_creature;   /* a wilderness rest cut short brings its creature (REST-CUT-NO-CREATURE-67) */
     aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
+    aw_opening_disable=opening_disable;        /* the ship's guards and props go by Disable (OPENING-SHIP-DOCK-SCRIPTS-HAND-ACTED-69) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
     aw_inventory_takes_use=object_takes_use;   /* a named activator whose script reads OnActivate is used (ROOM-SCRIPTED-ACTIVATOR-NO-USE-68) */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */

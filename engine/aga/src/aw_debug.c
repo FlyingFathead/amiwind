@@ -7,6 +7,7 @@
 #include "aw_placed.h"
 #include "aw_links.h"
 #include "aw_bounds.h"
+#include "aw_actor_clip.h"
 #include "aw_save.h"
 #include "aw_region.h"
 #include "aw_world.h"
@@ -423,7 +424,7 @@ void AW_DebugInit(void) {
     aw_inventory_allowed=AW_StoryInventoryAllowed;   /* no take, no container until EnableInventoryMenu (PRISON-SHIP-ITEMS-TAKEABLE-65) */
     aw_object_labels=AW_StoryObjectLabels;           /* no name or action line on placed objects before the papers */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_TpPlacesInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_ActorClipInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_TpPlacesInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     /* a bad sprite (r_sprite.c) names the CHIM streamed static it belongs to (SPRITE-BAD-TYPE-THREADED-56) */
     {extern const char *(*aw_sprite_describe)(const entity_t *,char *,int);

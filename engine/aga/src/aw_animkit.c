@@ -344,10 +344,18 @@ typedef struct {
     unsigned char sneak,has_chances,idle,roll,chances[8];
     int over_from,over_to;float over_t;     /* equip, unequip, cast: a one-shot over the source (-1 none) */
     int over_loops;                         /* a script's PlayGroup/LoopGroup: further plays of the same span */
+    /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the over's event (AW_PE_EQUIP, AW_PE_UNEQUIP; 0 a cast or a script's group),
+     * the frame of its "equip attach" / "unequip detach" key (-1 none: at its start, as the original), and whether the
+     * fight was told the weapon is in the hand or put away (over_items) */
+    int over_event,over_key;unsigned char over_told;
+    /* ACTOR-DRAW-STOPS-LEGS-69: a draw or put-away played over the walk: its frame on the torso (root bone, -1 none),
+     * the legs on the movement's pick; valid for the send it was set in (torso_send == pick_sends), entity torso_num */
+    int torso_root,torso_frame,torso_num;unsigned long torso_send;
     aw_pick_state_t last;int picked,gi,from,to,lfrom,lto,loop,inner;float t;
     char group[AW_PICK_NAME];const char *rule;
     float saved;int applied;
     const aw_skel_table_t *table;           /* the table the picks are on (the werewolf's for a turned NPC) */
+    unsigned char hit_rolled;               /* ACTOR-ATTACK-ONE-CLOCK-69: roll is the hit the fight timed (AW_AnimKitHitTiming) */
 } picker_t;
 /* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): an NPC a script turned into a werewolf is drawn with the player's werewolf set
  * (aw_view.c: one body model and one table for all of them and the player), so its frames are picked on the
@@ -363,6 +371,11 @@ int AW_MwscriptWerewolfNpc(struct edict_s *e);                          /* aw_mw
 static picker_t pickers[PICKERS];
 static model_t *pick_world;
 static unsigned long pick_driven,pick_changes;
+/* ACTOR-DRAW-STOPS-LEGS-69: the sends (AW_AnimPickPreSend), the torso layers set in this one, all of them */
+static unsigned long pick_sends,torso_layered;static int torso_now;
+int AW_ItemsTorsoRoot(const model_t *m,const void *skel_table);   /* aw_items.c, declared there */
+extern int (*R_AliasTorsoLayer)(const entity_t *e,float *layer_frame,int *root);   /* r_alias.c */
+extern int (*aw_items_torso_layer)(edict_t *actor,float *layer_frame,int *root);    /* aw_items.c */
 
 static picker_t *picker_of(edict_t *e,int create) {
     int i,old=-1;
@@ -373,7 +386,7 @@ static picker_t *picker_of(edict_t *e,int create) {
         if(old<0 || pickers[i].seen<pickers[old].seen)old=i;
     }
     memset(&pickers[old],0,sizeof(pickers[old]));
-    pickers[old].e=e;pickers[old].over_from=-1;pickers[old].gi=-1;
+    pickers[old].e=e;pickers[old].over_from=-1;pickers[old].gi=-1;pickers[old].torso_root=-1;
     VectorCopy(e->v.origin,pickers[old].last_origin);pickers[old].last_yaw=e->v.angles[1];
     return &pickers[old];
 }
@@ -405,6 +418,19 @@ static int engine_group_of(const aw_anim_t *a,int frame) {
     return -1;
 }
 static int forced_now(edict_t *e) {int i;for(i=0;i<forced_count;i++)if(forced[i].e==e)return 1;return 0;}
+/* ACTOR-ATTACK-ONE-CLOCK-69: E's swing clock (aw_combat.c; declared here, not in aw_combat.h: the CHIM world stage
+ * keys that header): 0 no fight slot or no swing yet, 1 its layout's attack group, 2 its table's keys; the swing's
+ * seconds (the weapon's speed in), the share of it at which the blow lands, the share played now (-1 after it) */
+int AW_CombatSwingClock(edict_t *e,float *seconds,float *hit,float *progress);
+/* the same for E's hit recovery (aw_combat.c): 0 none yet, 1 its layout's hit group, 2 its table's hitN; its seconds
+ * and the share played now (-1 after it) */
+int AW_CombatHitClock(edict_t *e,float *seconds,float *progress);
+/* the state of a weapon attack of type ATTACK (AW_PA_*) over the stance's weapon in S: the one place drive and the
+ * fight's clock (AW_AnimKitAttackTiming) set it, so the group, the keys and the time cannot disagree. The follow is
+ * always the large one (by the swing's strength in the original: ACTOR-SWING-STRENGTH-NOT-SHOWN-69). */
+static void attack_state(aw_pick_state_t *s,int attack) {
+    s->event=AW_PE_ATTACK;s->attack=(unsigned char)(attack>=0 && attack<3?attack:0);s->follow=AW_PF_LARGE;
+}
 /* the drawn weapon: the actor record's (OpenMW getActiveWeapon), a carried weapon of unknown type plays the long
  * blade's groups (getWeaponAnimation's fallback), nothing in the hand hand-to-hand */
 static int weapon_of(edict_t *e) {
@@ -412,12 +438,33 @@ static int weapon_of(edict_t *e) {
     if(w>=0 && w<=AW_PW_LAST)return w;
     return AW_ItemsKinds(e)&1?1:AW_PW_HANDTOHAND;
 }
+static void over_items(picker_t *p,int frame,int ending);
 static void over(picker_t *p,const aw_skel_table_t *t,aw_pick_state_t s) {
     aw_pick_t o;int g;
     if(!AW_AnimPick(&s,table_has,(void *)t,&o) || (g=AW_SkelGroup(t,o.group))<0)return;
+    if(p->over_from>=0)over_items(p,0,1);        /* a draw or put-away played over by this one ends here */
     p->over_from=key_frame(t,g,o.start);p->over_to=key_frame(t,g,o.stop);p->over_t=0;p->over_loops=0;
     if(p->over_from<0 || p->over_to<p->over_from)p->over_from=-1;
     else{memcpy(p->group,o.group,sizeof(p->group));p->rule=o.rule;}   /* both AW_PICK_NAME, NUL-terminated */
+    /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the moment the weapon goes into the hand or leaves it (OpenMW 0.53
+     * character.cpp handleTextKey 1069-1082, updateWeaponState 1409-1411 and 1466-1470: shown at "equip attach",
+     * hidden at "unequip detach", at the group's start when it has no such key; read, not copied) */
+    p->over_event=s.event==AW_PE_EQUIP || s.event==AW_PE_UNEQUIP?s.event:0;p->over_told=0;p->over_key=-1;
+    if(p->over_from>=0 && p->over_event){
+        p->over_key=key_frame(t,g,p->over_event==AW_PE_EQUIP?"equip attach":"unequip detach");
+        if(p->over_key<p->over_from || p->over_key>p->over_to)p->over_key=-1;
+    }
+}
+/* the fight's side of the draw and the put-away (aw_combat.c; declared here, not in aw_combat.h: the CHIM world stage
+ * keys that header): E's drawn weapon and shield held out of the hand (0) or in it (1); E's put-away set gone */
+void AW_CombatItemsInHand(edict_t *e,int in_hand);
+void AW_CombatSheathed(edict_t *e);
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the over at FRAME (ENDING: it ends or is cut off now) tells the fight, once, when
+ * its key has passed: a draw puts the weapon in the hand, a put-away takes it out */
+static void over_items(picker_t *p,int frame,int ending) {
+    if(!p->over_event || p->over_told || !p->e || (!ending && p->over_key>=0 && frame<p->over_key))return;
+    p->over_told=1;
+    if(p->over_event==AW_PE_EQUIP)AW_CombatItemsInHand(p->e,1);else AW_CombatSheathed(p->e);
 }
 /* WERE: a turned NPC on the werewolf's table (NPC-WEREWOLF-NO-MODEL-66): its weapon is its claws (hand to hand), a
  * sidestep walks sideways, and a state its table has no group for stands on its idle: never the own frame on the
@@ -437,8 +484,15 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     VectorCopy(e->v.origin,p->last_origin);p->last_yaw=e->v.angles[1];p->last_time=realtime;p->seen=realtime;
     memset(&s,0,sizeof(s));s.weapon=AW_PW_NONE;
     /* drawing and putting away (updateWeaponState: equip start .. equip stop, unequip ...) */
-    if(fighting && !p->fighting){p->weapon=were?AW_PW_HANDTOHAND:weapon_of(e);s.weapon=(signed char)p->weapon;s.event=AW_PE_EQUIP;over(p,t,s);}
-    else if(!fighting && p->fighting && !(f && f->dead)){s.weapon=(signed char)p->weapon;s.event=AW_PE_UNEQUIP;over(p,t,s);}
+    if(fighting && !p->fighting){
+        p->weapon=were?AW_PW_HANDTOHAND:weapon_of(e);s.weapon=(signed char)p->weapon;s.event=AW_PE_EQUIP;over(p,t,s);
+        /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the weapon out of the hand until the draw's attach key (over_items) */
+        if(p->over_from>=0 && p->over_event==AW_PE_EQUIP)AW_CombatItemsInHand(e,0);
+    }else if(!fighting && p->fighting && !(f && f->dead)){
+        s.weapon=(signed char)p->weapon;s.event=AW_PE_UNEQUIP;over(p,t,s);
+        /* the set the fight left in the hand goes at the put-away's detach key; with no put-away to play, now */
+        if(p->over_from<0 || p->over_event!=AW_PE_UNEQUIP)AW_CombatSheathed(e);
+    }
     p->fighting=fighting;
     memset(&s,0,sizeof(s));s.weapon=(signed char)(fighting?p->weapon:AW_PW_NONE);
     s.swim=g==AW_ANIM_SWIM || g==AW_ANIM_SWIMIDLE;s.sneak=p->sneak;s.storm=(unsigned char)storm;
@@ -469,7 +523,7 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     case AW_ANIM_HIT:s.event=AW_PE_HIT;break;
     case AW_ANIM_KNOCK:s.event=f && f->knocked==2?AW_PE_KNOCKOUT:AW_PE_KNOCKDOWN;p->knocked=s.event==AW_PE_KNOCKOUT?2:1;break;
     case AW_ANIM_DEATH:s.event=AW_PE_DEATH;s.knocked=(unsigned char)p->knocked;break;
-    case AW_ANIM_ATTACK:{int k=AW_CombatAttackType(e);s.event=AW_PE_ATTACK;s.attack=(unsigned char)(k>=0 && k<3?k:0);s.follow=AW_PF_LARGE;break;}
+    case AW_ANIM_ATTACK:attack_state(&s,AW_CombatAttackType(e));break;
     case AW_ANIM_BLOCK:s.event=AW_PE_BLOCK;break;
     case AW_ANIM_DODGEL:case AW_ANIM_DODGER:
         if(!were)return;  /* the dodge: the AmiWind sidestep plays as it is (a werewolf walks sideways on its table) */
@@ -477,16 +531,33 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     default:return;
     }
     if(g!=AW_ANIM_KNOCK && g!=AW_ANIM_DEATH)p->knocked=0;
-    if(s.event!=p->last.event || !p->picked)p->roll=(unsigned char)AW_Roll(256);
+    /* ACTOR-ATTACK-ONE-CLOCK-69: a hit the fight timed (AW_AnimKitHitTiming) keeps the roll its time was read for */
+    if((s.event!=p->last.event || !p->picked) && !(s.event==AW_PE_HIT && p->hit_rolled))p->roll=(unsigned char)AW_Roll(256);
+    if(s.event==AW_PE_HIT)p->hit_rolled=0;
     s.roll=p->roll;
     /* a hit, a fall or a death ends a draw or a cast at once */
-    if(s.event==AW_PE_HIT || s.event==AW_PE_KNOCKDOWN || s.event==AW_PE_KNOCKOUT || s.event==AW_PE_DEATH)p->over_from=-1;
+    if(s.event==AW_PE_HIT || s.event==AW_PE_KNOCKDOWN || s.event==AW_PE_KNOCKOUT || s.event==AW_PE_DEATH){
+        if(p->over_from>=0)over_items(p,0,1);     /* a draw cut off: the weapon in the hand (OpenMW refreshHitRecoilAnims) */
+        p->over_from=-1;
+    }
+    p->torso_root=-1;
     if(p->over_from>=0){
-        int done=0;
+        int done=0,root=-1;
         out=AW_AnimKitSpanFrame((unsigned)p->over_from,(unsigned)p->over_to,t->rate,&p->over_t,dt*aw_anim_kit_speed,0,&done);
+        over_items(p,out,done && p->over_loops<=0);
         if(done){if(p->over_loops>0){p->over_loops--;p->over_t=0;}else p->over_from=-1;}
-        p->saved=e->v.frame;e->v.frame=(float)out;p->applied=1;pick_driven++;
-        return;
+        /* ACTOR-DRAW-STOPS-LEGS-69: a draw or put-away while the actor moves (or turns) plays on its torso and arms; its
+         * legs keep the movement's pick below, as the original's weapon groups sit under the movement on the lower body
+         * of a two-legged actor (OpenMW 0.53 character.cpp: Priority_WeaponLowerBody, refreshMovementAnims; the upper
+         * body's blend mask from Bip01 Spine1; read, not copied). Standing, the draw poses the whole body as before. */
+        if(p->over_event && !were && s.event==AW_PE_NONE && s.move!=AW_PM_NONE &&
+           (root=AW_ItemsTorsoRoot(sv.models[(int)e->v.modelindex],t))>=0){
+            p->torso_root=root;p->torso_frame=out;p->torso_num=NUM_FOR_EDICT(e);p->torso_send=pick_sends;
+            torso_now++;torso_layered++;
+        }else{
+            p->saved=e->v.frame;e->v.frame=(float)out;p->applied=1;pick_driven++;
+            return;
+        }
     }
     if(!p->picked || memcmp(&s,&p->last,sizeof(s))){
         int gi=-1;
@@ -504,6 +575,11 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     }
     if(p->gi<0){
         int gi;aw_skel_group_t gg;
+        if(p->torso_root>=0){          /* no movement group for the legs: the draw on the whole body, as before */
+            out=p->torso_frame;p->torso_root=-1;torso_now--;
+            p->saved=e->v.frame;e->v.frame=(float)out;p->applied=1;pick_driven++;
+            return;
+        }
         if(!were)return;               /* nothing fits: the driver's frame stays (OpenMW keeps what plays) */
         gi=AW_SkelGroup(t,"idle");     /* the werewolf: its idle's first frame, never the own frame on its body */
         if(gi>=0){AW_SkelGroupAt(t,gi,&gg);out=(int)gg.first;}else out=0;
@@ -513,6 +589,10 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     progress=src->count>1?(float)(frame-src->base)/(float)(src->count-1):0;
     if(progress<0)progress=0;
     if(progress>1)progress=1;
+    /* ACTOR-ATTACK-ONE-CLOCK-69: a swing timed by this span's own keys (AW_AnimKitAttackTiming) is shown by the fight's
+     * own clock, never stepped by the engine group's frames: the hit key's frame is on screen when the blow lands */
+    if(g==AW_ANIM_ATTACK){float q;if(AW_CombatSwingClock(e,NULL,NULL,&q)==2 && q>=0)progress=q;}
+    if(g==AW_ANIM_HIT){float q;if(AW_CombatHitClock(e,NULL,&q)==2 && q>=0)progress=q;}   /* the hitN's own time */
     if(g==AW_ANIM_IDLE || g==AW_ANIM_SWIMIDLE ||
        (s.event==AW_PE_KNOCKOUT && p->lfrom>=0 && progress>=.5f)){
         /* standing (and a knockout held down): the group's own clock; an inner loop (idlestorm, knockout) once in */
@@ -530,7 +610,11 @@ void AW_AnimPickPreSend(void) {
     /* the storm pose is the arm layer of aw_items.c (ACTOR-STORM-POSE-51: idlestorm on the arm facing the storm, as
      * OpenMW plays it over the upper body), so the whole-body pick leaves it out here */
     int i,storm=0,weres=0,picking;const aw_skel_table_t *wt=NULL;
-    if(pick_world!=sv.worldmodel){memset(pickers,0,sizeof(pickers));pick_world=sv.worldmodel;}
+    pick_sends++;torso_now=0;   /* ACTOR-DRAW-STOPS-LEGS-69: this send's torso layers start empty */
+    if(pick_world!=sv.worldmodel){
+        memset(pickers,0,sizeof(pickers));pick_world=sv.worldmodel;
+        for(i=0;i<PICKERS;i++)pickers[i].torso_root=-1;
+    }
     /* NPC-WEREWOLF-NO-MODEL-66: the send's turned NPCs named for the renderer (0 begins, 1 on the map, 2 drawn as the
      * werewolf, 3 ends: the werewolf set let go when none is on the map and the player does not draw it); their frames
      * on the werewolf's table whatever dbg animkit pick says (the werewolf's body is drawn at them) */
@@ -562,12 +646,34 @@ void AW_AnimPickPreSend(void) {
         if(g<0){if(!were)continue;g=AW_ANIM_IDLE;}   /* a scripted or own group plays; the werewolf stands */
         if(!(p=picker_of(e,1)))continue;
         if(p->table!=t){   /* into or out of the werewolf: the picks start again on the other table */
+            if(p->over_from>=0)over_items(p,0,1);   /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a draw or put-away ends */
             p->table=t;p->picked=0;p->gi=-1;p->over_from=-1;p->over_loops=0;p->t=0;p->inner=0;p->fighting=0;
         }
         drive(p,e,t,a,g,storm,were);
         if(were && p->applied)AW_ViewWereNpcSend(2,i);
     }
     AW_ViewWereNpcSend(3,0);
+}
+/* ACTOR-DRAW-STOPS-LEGS-69: the torso layer of entity N at this send (the draw's frame, the root bone): asked by the
+ * renderer for every skeletal entity it draws (r_alias.c R_AliasTorsoLayer) and by the held items (aw_items.c); nothing
+ * is looked up while no actor of the send has one, else a pass over the pickers. */
+static int torso_of_number(int n,float *layer_frame,int *root) {
+    int i;
+    if(!torso_now)return 0;
+    for(i=0;i<PICKERS;i++){
+        const picker_t *p=&pickers[i];
+        if(p->torso_root>=0 && p->torso_send==pick_sends && p->torso_num==n && p->e && !p->e->free){
+            *layer_frame=(float)p->torso_frame;*root=p->torso_root;return 1;
+        }
+    }
+    return 0;
+}
+static int torso_render(const entity_t *ce,float *layer_frame,int *root) {
+    if(!ce || ce<cl_entities || ce>=cl_entities+MAX_EDICTS)return 0;
+    return torso_of_number((int)(ce-cl_entities),layer_frame,root);
+}
+static int torso_items(edict_t *actor,float *layer_frame,int *root) {
+    return torso_now && actor && !actor->free && torso_of_number(NUM_FOR_EDICT(actor),layer_frame,root);
 }
 void AW_AnimPickPostSend(void) {
     int i;
@@ -585,6 +691,79 @@ static const aw_skel_table_t *pick_table(edict_t *e) {
     if(p && p->table && AW_MwscriptWerewolfNpc(e))return p->table;
     return table_of(e);
 }
+/* ACTOR-ATTACK-ONE-CLOCK-69 (aw_animkit.h): the clock of E's swing or shot, asked by the fight when it starts. Every
+ * swing ran on one engine attack group of the layout (the hand-to-hand chop, about 1 s with the blow at 0.714 of it)
+ * while the pick above showed the weapon's own group stretched onto it: the blow landed off the shown hit key (a
+ * one-handed thrust two table frames after it) and every class and type took the same time. Here the span the pick
+ * will show (the same state as drive sets: the stance's weapon, the attack type, the large follow; the same rules,
+ * AW_AnimPick, and the same key lookup, key_frame) gives its own time at the table's rate and the share of it where
+ * its hit key lies; drive then shows that span by the fight's own clock. The rule from OpenMW 0.53
+ * mwmechanics/character.cpp (read, not copied): the weapon group's own sections at its key times scaled by the
+ * weapon's speed (1716-1717, 1785-1786, 1805-1806), the damage at the group's "<type> hit" key (1083-1109), a shot at
+ * "shoot release" (1150-1157). 0 (the fight keeps its layout's clock) whenever the send would not pick that span: no
+ * table (a baked actor), the pick or the kit off, a forced actor, a layout without its attack group, a model not in
+ * the cache (no load for a timing), a turned NPC before its picker has the werewolf's table, a group or key missing,
+ * or a creature's own attackN (rolled at the send: CREATURE-ATTACK-PICTURE-DAMAGE-APART-69). Cost: once per swing, a
+ * few lookups of the table's groups and keys by name; nothing read from disk, nothing kept. */
+/* the table E's next pick of engine group GROUP is made on, as the send makes it (NULL: the send would not pick it, so
+ * the fight keeps its layout's clock), and E's picker (NULL before its first send) and werewolf form */
+static const aw_skel_table_t *timing_table(edict_t *e,int group,picker_t **pp,int *were_out) {
+    const aw_skel_table_t *t;const aw_anim_t *a;picker_t *p;model_t *m;int mi,were;
+    if(!AW_ANIMKIT || !e || e->free || !sv.active || !pick_on || !aw_anim_kit_enabled || forced_now(e))return NULL;
+    if((mi=(int)e->v.modelindex)<=0 || mi>=MAX_MODELS || !(m=sv.models[mi]) || m->type!=mod_alias)return NULL;
+    p=picker_of(e,0);were=AW_MwscriptWerewolfNpc(e);
+    if(were)t=p?p->table:NULL;                        /* posed on the werewolf's table once its picker drove it */
+    else t=Cache_Check(&m->cache)?table_of(e):NULL;
+    a=AW_AnimOf(e);
+    if(!t || !(t->rate>0) || !a->from_layout || !a->g[group].present)return NULL;
+    *pp=p;*were_out=were;
+    return t;
+}
+int AW_AnimKitAttackTiming(edict_t *e,int attack,float *seconds,float *hit_fraction) {
+    aw_pick_state_t s;aw_pick_t o;const aw_skel_table_t *t;picker_t *p=NULL;int g,were=0;
+    if(!(t=timing_table(e,AW_ANIM_ATTACK,&p,&were)))return 0;
+    memset(&s,0,sizeof(s));
+    s.weapon=(signed char)(p && p->fighting?p->weapon:were?AW_PW_HANDTOHAND:weapon_of(e));   /* drive's draw */
+    attack_state(&s,attack);
+    if(!AW_AnimPick(&s,table_has,(void *)t,&o) || !o.hit[0] || (g=AW_SkelGroup(t,o.group))<0)return 0;
+    return AW_PickAttackClock(key_frame(t,g,o.start),key_frame(t,g,o.hit),key_frame(t,g,o.stop),t->rate,1,seconds,
+                              hit_fraction);
+}
+/* ACTOR-ATTACK-ONE-CLOCK-69 (aw_animkit.h): the time of E's hit recovery that starts now. Every hit played a random
+ * hit1..hitN stretched onto the layout's one hit group (hit1's length) and ended with it. Here the roll is made now and
+ * kept for the send (drive: hit_rolled), the pick names the same hitN, and its own span ("start" .. "stop") at the
+ * table's rate is the time the fight holds the recovery, shown by the fight's own clock. Rule from OpenMW 0.53
+ * mwmechanics/character.cpp refreshHitRecoilAnims (read, not copied): a random hitN, the hit state ends when that
+ * group stops playing (407-423, 455-462). 0 (the layout's hit group times it) under the same conditions as above. */
+int AW_AnimKitHitTiming(edict_t *e,float *seconds) {
+    aw_pick_state_t s;aw_pick_t o;const aw_skel_table_t *t;picker_t *p=NULL;int g,from,to,were=0;
+    if(!(t=timing_table(e,AW_ANIM_HIT,&p,&were)) || (!p && !(p=picker_of(e,1))))return 0;
+    memset(&s,0,sizeof(s));
+    s.weapon=(signed char)(p->fighting?p->weapon:were?AW_PW_HANDTOHAND:weapon_of(e));s.event=AW_PE_HIT;
+    p->roll=(unsigned char)AW_Roll(256);p->hit_rolled=1;s.roll=p->roll;   /* the send picks the same hitN */
+    if(!AW_AnimPick(&s,table_has,(void *)t,&o) || (g=AW_SkelGroup(t,o.group))<0)return 0;
+    from=key_frame(t,g,o.start);to=key_frame(t,g,o.stop);
+    if(from<0 || to<=from)return 0;
+    *seconds=(float)(to-from)/t->rate;
+    return 1;
+}
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69 (aw_animkit.h): 1 while E plays its draw; the fight starts no swing or shot under
+ * it (OpenMW 0.53 character.cpp updateWeaponState: an attack starts only once the weapon is equipped, read, not
+ * copied). A first swing used to start under the draw's pose, its blow landing while the draw was shown. */
+int AW_AnimKitDrawing(edict_t *e) {
+    picker_t *p=e?picker_of(e,0):NULL;
+    return p && p->over_from>=0 && p->over_event==AW_PE_EQUIP;
+}
+/* 1 when the send will play E's put-away once its fight slot is let go: a resident (driven without a slot) on a table
+ * the pick drives, its stance's group with an unequip span. The fight then leaves its weapon and shield in the hand
+ * until that put-away's detach key (AW_CombatSheathed), as the original hides them only there. */
+int AW_AnimKitSheathes(edict_t *e) {
+    aw_pick_state_t s;aw_pick_t o;const aw_skel_table_t *t;picker_t *p=NULL;int were=0;
+    if(!e || e->free || strcmp(pr_strings+e->v.classname,"aw_npc") || !(t=timing_table(e,AW_ANIM_IDLE,&p,&were)) || were ||
+       !p || !p->fighting)return 0;
+    memset(&s,0,sizeof(s));s.weapon=(signed char)p->weapon;s.event=AW_PE_UNEQUIP;
+    return AW_AnimPick(&s,table_has,(void *)t,&o) && AW_SkelGroup(t,o.group)>=0;
+}
 void AW_AnimPickCast(edict_t *e,int range) {
     picker_t *p;const aw_skel_table_t *t=pick_table(e);aw_pick_state_t s;
     if(!t || !(p=picker_of(e,1)))return;
@@ -599,6 +778,8 @@ int AW_AnimPickScripted(edict_t *e,const char *group,int count) {
     picker_t *p;const aw_skel_table_t *t=e?pick_table(e):NULL;int g;aw_skel_group_t gg;
     if(!t || !group || (g=AW_SkelGroup(t,group))<0 || !(p=picker_of(e,1)))return 0;
     AW_SkelGroupAt(t,g,&gg);
+    if(p->over_from>=0)over_items(p,0,1);        /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a draw or put-away ends */
+    p->over_event=0;
     p->over_from=(int)gg.first;p->over_to=(int)gg.last;p->over_t=0;p->over_loops=count>0?count:0;
     strncpy(p->group,gg.name,sizeof(p->group)-1);p->group[sizeof(p->group)-1]=0;p->rule="script PlayGroup";
     return 1;
@@ -628,6 +809,9 @@ static void pick_command(void) {
     }
     if(argc==1){
         Con_Printf("Animation groups by state %s: %lu frames placed, %lu group changes.\n",pick_on?"on":"off",pick_driven,pick_changes);
+        /* ACTOR-DRAW-STOPS-LEGS-69 */
+        Con_Printf("Draws and put-aways over the walk: %lu frames sent with the torso on the draw (%d this send).\n",
+                   torso_layered,torso_now);
         {   /* NPC-WEAPON-GRIP-WRONG-69: the held items posed again at the frame sent (aw_items.c AW_ItemsPreSend) */
             void AW_ItemsPreSendCount(unsigned long *sets,unsigned long *lights,float *far_units,int *shown_now);
             unsigned long sets,lights;float far_units;int shown_now;
@@ -636,17 +820,28 @@ static void pick_command(void) {
                        "move %ld.%ld units.\n",shown_now,sets,lights,(long)far_units,(long)(far_units*10)%10);
         }
         {   /* GUARD-WEAPON-INVISIBLE-65: the level's item tag tables, and the one of the NPC under the crosshair */
-            int AW_ItemsTables(edict_t *actor,int counts[4],const char **model,int info[3]);
-            int counts[4],info[3];const char *model="";
+            int AW_ItemsTables(edict_t *actor,int counts[11],const char **model,int info[3]);
+            int counts[11],info[3];const char *model="";
             int has=AW_ItemsTables(e,counts,&model,info);
-            Con_Printf("Item tag tables: %d of %d this level, %d read with the tag's own frame count, %d tagged "
-                       "spawns found them full.\n",counts[0],counts[1],counts[2],counts[3]);
+            Con_Printf("Item tag tables: %d of %d this level, %d read with the tag's own frame count, %d given on "
+                       "from a model nobody used (%d scans), %d tagged spawns found them all in use.\n",counts[0],
+                       counts[1],counts[2],counts[4],counts[5],counts[3]);
+            Con_Printf("Held items by the actors' own records: %d spawns, %d by their model's tag; %d of %d item model "
+                       "names in use, %d refused.\n",counts[6],counts[7],counts[8],counts[9],counts[10]);
             if(has)Con_Printf("%s: item tags of %s: %d frames, the model %d now (read against %d).\n",name_of(e),model,
                               info[0],info[1],info[2]);
         }
         if(e && (p=picker_of(e,0))!=NULL)
             Con_Printf("%s: %s (%s), stance %d, sneak %d, wander idle %d%s.\n",name_of(e),p->group[0]?p->group:"-",p->rule?p->rule:"-",
                        p->fighting?p->weapon:AW_PW_NONE,p->sneak,p->idle,p->has_chances?"":" (no chances given)");
+        {   /* ACTOR-ATTACK-ONE-CLOCK-69: the clock of its swing under way, else of its last one */
+            float swing_s=0,swing_h=0,swing_q=-1;int k=e?AW_CombatSwingClock(e,&swing_s,&swing_h,&swing_q):0;
+            if(k)Con_Printf("%s: swing clock %.3f s, the blow at %.3f of it, from %s (%s).\n",name_of(e),swing_s,swing_h,
+                            k==2?"its table's keys":"its layout's attack group",swing_q>=0?"swinging now":"its last swing");
+            if((k=e?AW_CombatHitClock(e,&swing_s,&swing_q):0)!=0)
+                Con_Printf("%s: hit recovery %.3f s, from %s (%s).\n",name_of(e),swing_s,
+                           k==2?"its table's hit group":"its layout's hit group",swing_q>=0?"recovering now":"its last hit");
+        }
         return;
     }
     if(!e || !table_of(e)){Con_Printf("dbg animkit pick: no skeletal NPC under the crosshair.\n");return;}
@@ -663,7 +858,7 @@ static void pick_command(void) {
     Con_Printf("dbg animkit pick [on/off / cast self/touch/target / sneak on/off / idle C2 .. C9]\n");
 }
 #undef ARG
-void AW_AnimPickInit(void) {pick_on=1;}
+void AW_AnimPickInit(void) {pick_on=1;R_AliasTorsoLayer=torso_render;aw_items_torso_layer=torso_items;}
 
 /* ---- the combat playground (aw_arena.c animation mode; aw_animkit.h) ---- */
 int AW_AnimKitSkeletal(int modelindex) {

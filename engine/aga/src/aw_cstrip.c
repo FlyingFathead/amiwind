@@ -37,11 +37,28 @@ extern int scr_copyeverything;
 int AW_CStripActive(void){return strip!=NULL;}
 const aw_cstrip_list_t *AW_CStripList(void){return strip?&strip->list:NULL;}
 static int strip_open(unsigned reference,const char *name,int owned);
-/* aw_placed.c AW_PlacedInit: E on containers opens the strip; the input, drawing and prompt reach it (hooks only, no
- * command, no variable, nothing allocated) */
+/* PLANT-PICK-DIRECT-DEFAULT-69: Options > Prefs "Plant and mushroom picking", one saved value (also dbg plantpick):
+ * 1 AmiWind (the default), a plant is picked with one press and no window (aw_inventory.c plant_pick); 0 Original,
+ * every organic container opens its window. The pick sound is the mushrooms' (aw_harvest_runtime.c PICKUP_SOUND, the
+ * original's Fx/item/item.wav), the room's placement of a picked plant goes out of the view (chim_room.c). */
+static cvar_t plant_pick={"aw_plant_pick","1",true};
+extern int (*aw_plant_pick_amiwind)(void);
+extern void (*aw_plant_pick_sound)(void);
+extern int (*aw_plant_hide)(unsigned reference,int hide);
+static int plant_pick_amiwind(void){return plant_pick.value!=0;}
+#define PLANT_PICK_SOUND "pool/a031af0520e9edfa2.wav"
+static void plant_pick_sound(void){
+    static int available;FILE *f=NULL;int bytes;
+    if(!available){bytes=COM_FOpenFile("sound/" PLANT_PICK_SOUND,&f);available=bytes>=44 && f?1:-1;if(f)fclose(f);}
+    if(available>0)S_LocalSound(PLANT_PICK_SOUND);
+}
+/* aw_placed.c AW_PlacedInit: E on containers opens the strip; the input, drawing and prompt reach it (hooks only,
+ * nothing allocated); and the plant pick's setting and hooks */
 void AW_CStripInit(void){
     aw_container_open=strip_open;aw_container_lock=AW_ObjectLockLevel;
     aw_cstrip_mouse=AW_CStripMouse;aw_cstrip_key=AW_CStripKey;aw_cstrip_draw=AW_CStripDraw;aw_cstrip_open_now=AW_CStripActive;
+    Cvar_RegisterVariable(&plant_pick);
+    aw_plant_pick_amiwind=plant_pick_amiwind;aw_plant_pick_sound=plant_pick_sound;aw_plant_hide=ChimRoom_Hide;
 }
 static void strip_close(void){
     if(strip){free(strip->list.row[0]);free(strip->list.row[1]);free(strip);strip=NULL;}

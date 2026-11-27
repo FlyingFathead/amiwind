@@ -124,7 +124,7 @@ function chimHead(m) {
     frame.contentWindow.postMessage({type: 'amiwind-chim-pick', bucket: chimPicked}, '*');
     chimHead(m);
   };
-  window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked, {expansions: m.expansions || null, readiness: m.readiness || null});
+  window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked, {expansions: m.expansions || null, readiness: m.readiness || null, scripts: m.scripts || null});
 }
 // The round "?" opens the help panel of the tab that is open (header.js: click, Enter or Space; Esc or a click outside closes it).
 document.getElementById('helpbtn').onclick = () => {

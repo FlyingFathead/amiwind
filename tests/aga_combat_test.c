@@ -68,6 +68,24 @@ float AW_ActorStat(const aw_actor_t *a,int stat){(void)a;
 void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value){(void)a;
     if(cast_paid && dynamic==AWA_MAGICKA){magicka+=value;if(magicka<0)magicka=0;magicka_last=value;magicka_changes++;}}
 float AW_AnimKitCast(edict_t *e,const char *variant){(void)e;(void)variant;return -1;}
+/* ACTOR-ATTACK-ONE-CLOCK-69: the swing clock of the group the actor is seen to play (aw_animkit.c): none here (the
+ * layout's attack group times every swing) unless table_seconds is set; every question is counted with its type */
+static float table_seconds,table_hit;static int table_asks,table_attack=-1;
+/* aw_combat.c (not in aw_combat.h); weak, so this file also builds on the engine before it and fails there by a check */
+int AW_CombatSwingClock(edict_t *e,float *seconds,float *hit,float *progress) __attribute__((weak));
+int AW_AnimKitAttackTiming(edict_t *e,int attack,float *seconds,float *hit_fraction){
+    (void)e;table_asks++;table_attack=attack;
+    if(!(table_seconds>0))return 0;
+    *seconds=table_seconds;*hit_fraction=table_hit;return 1;
+}
+/* the same for a hit recovery: none (the layout's hit group) unless hit_seconds is set; every question counted */
+static float hit_seconds;static int hit_asks;
+int AW_CombatHitClock(edict_t *e,float *seconds,float *progress) __attribute__((weak));
+int AW_AnimKitHitTiming(edict_t *e,float *seconds){
+    (void)e;hit_asks++;
+    if(!(hit_seconds>0))return 0;
+    *seconds=hit_seconds;return 1;
+}
 unsigned long AW_CastActorCasts(void){return 0;}
 int AW_CastActorRelease(edict_t *caster,edict_t *target,int row,float reach){(void)caster;(void)target;(void)row;(void)reach;return -1;}
 int AW_CastReady(void){return 0;}
@@ -77,9 +95,22 @@ void AW_MagicCastLookRelease(int handle,int ok){(void)handle;(void)ok;}
 int AW_CompanionPickAim(void){return 0;}      /* aw_companion.c: the right button in pick mode */
 /* aw_hand_models.c: the image's hand clip table (FIRST-PERSON-HANDS-IN-C-54): a 0.9 s punch, as the old stamp gave */
 float AW_HandDuration(int clip,float fallback){(void)fallback;return clip==3?.9f:fallback;}
-int AW_ItemsShow(edict_t *a,edict_t *o[AW_ITEMS_KINDS]){(void)a;o[0]=o[1]=NULL;items_shown++;return 0;}
-void AW_ItemsUpdate(edict_t *a,edict_t *i[AW_ITEMS_KINDS]){(void)a;(void)i;}
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: with items_fake set a shown set is two edicts of this fixture (a weapon and a
+ * shield, model indices 5 and 6); kit_drawing and kit_sheathes are the animation kit's answers (aw_animkit.c) */
+static int items_fake,kit_drawing,kit_sheathes,moved_sets,item_updates;static edict_t item_edicts[2];
+int AW_ItemsShow(edict_t *a,edict_t *o[AW_ITEMS_KINDS]){(void)a;o[0]=o[1]=NULL;items_shown++;
+    if(!items_fake)return 0;
+    memset(item_edicts,0,sizeof(item_edicts));item_edicts[0].v.modelindex=5;item_edicts[1].v.modelindex=6;
+    o[0]=&item_edicts[0];o[1]=&item_edicts[1];return 2;}
+void AW_ItemsUpdate(edict_t *a,edict_t *i[AW_ITEMS_KINDS]){(void)a;if(i[0] || i[1])item_updates++;}
 void AW_ItemsHide(edict_t *i[AW_ITEMS_KINDS]){i[0]=i[1]=NULL;items_hidden++;}
+void AW_ItemsMoveSet(edict_t *from[AW_ITEMS_KINDS],edict_t *to[AW_ITEMS_KINDS]){
+    to[0]=from[0];to[1]=from[1];from[0]=from[1]=NULL;moved_sets++;}
+int AW_AnimKitDrawing(edict_t *e){(void)e;return kit_drawing;}
+int AW_AnimKitSheathes(edict_t *e){(void)e;return kit_sheathes;}
+/* aw_combat.c (not in aw_combat.h); weak as above */
+void AW_CombatItemsInHand(edict_t *e,int in_hand) __attribute__((weak));
+void AW_CombatSheathed(edict_t *e) __attribute__((weak));
 /* aw_levelup.c (its own fixture aga_levelup_rules_test.c): the skill uses the fights report, counted by skill. */
 static int skill_uses[27];
 int AW_LevelupUse(int skill,int use,float scale){assert(skill>=0 && skill<27 && use==0 && scale==1);skill_uses[skill]++;return 0;}
@@ -614,6 +645,153 @@ int main(void){
      assert(AW_AnimParse(&a,"idle:30:8:0.1250 run:133:8:0.1289:75.75 attack:96:8:0.1250:0.400",400));
      assert(AW_CombatEngage(npc,&f,NULL) && AW_CombatGroupFrames(npc,"cast",&base,&count) && base==30 && count==8);
      AW_CombatClear();anim_layout=NULL;printf("skeletal fighter groups ok: run, attack and cast found\n");}
+    /* ACTOR-ATTACK-ONE-CLOCK-69: a swing's clock is asked once at its start. Without an answer (a baked actor) the
+     * layout's attack group times it as before (attack:10:8:0.1500:0.667, 1.2 s over the weapon's speed 1.25, the blow
+     * at 0.667 of it); with the table's answer (here 1 s, the blow at 0.5: a one-handed thrust's own keys) the swing
+     * lasts that time over the speed, its blow lands at that share and the chase comes back at its end. Fails on the
+     * code before: every swing ran on the layout's group whatever the table said. */
+    {int k,asks,swings,run_no;float q,sec,hit,started,struck,ended;
+     assert(AW_CombatSwingClock);
+     for(run_no=0;run_no<2;run_no++){
+         AW_CombatClear();aw_combat_scene();p->v.health=100000;p->v.button0=0;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+         npc->v.origin[0]=p->v.origin[0]-20;npc->v.origin[1]=p->v.origin[1];
+         assert(AW_CombatActorLoad("mevil molor",&f) && f.weapon);f.speed=1.25f;
+         table_seconds=run_no?1.f:0;table_hit=.5f;asks=table_asks;
+         assert(AW_CombatEngage(npc,&f,"idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 "
+                                       "knock:21:4:0.6667 death:25:6:0.3333"));
+         assert(!AW_CombatSwingClock(npc,&sec,&hit,&q));                 /* no swing yet */
+         for(k=0;k<400 && !AW_CombatSwingClock(npc,&sec,&hit,&q);k++)tick(1);
+         started=(float)sv.time;swings=AW_CombatStats()->npc_swings;
+         assert(q>=0 && q<.001f && table_asks==asks+1 && table_attack==AW_CombatAttackType(npc));
+         for(k=0;k<400 && AW_CombatStats()->npc_swings==swings;k++)tick(1);
+         struck=(float)sv.time;
+         for(k=0;k<400 && AW_CombatSwingClock(npc,&sec,&hit,&q) && q>=0;k++)tick(1);
+         ended=(float)sv.time;
+         assert(AW_CombatSwingClock(npc,&sec,&hit,&q)==(run_no?2:1) && q<0);   /* the last swing's clock is kept */
+         if(run_no)assert(fabsf(sec-.8f)<1e-4f && hit==.5f);
+         else assert(fabsf(sec-1.2f/1.25f)<1e-4f && fabsf(hit-.667f)<1e-4f);
+         assert(fabsf(struck-started-sec*hit)<=.021f && fabsf(ended-started-sec)<=.021f);
+         assert(table_asks==asks+1);                                       /* once a swing, nothing in between */
+         printf("swing clock ok (%s): %.3f s, the blow after %.3f s, the chase again after %.3f s\n",
+                run_no?"the table's keys":"the layout's group",(double)sec,(double)(struck-started),(double)(ended-started));
+     }
+     assert(!AW_CombatSwingClock(resident,&sec,&hit,&q));
+     AW_CombatClear();table_seconds=0;p->v.health=60;}
+    /* ACTOR-ATTACK-ONE-CLOCK-69: a hit recovery's time is asked once, at its start. Without an answer the layout's hit
+     * group times it (hit:18:3:0.3333, 1 s); with the table's answer (0.6 s, a shorter hitN) it lasts that and the
+     * chase comes back at its end (by the think, every 0.1 s). Fails on the code before: every hit lasted hit1's
+     * length. The fighter swings once (a cooldown of 100 s after it) and every blow in reach lands (dice off). */
+    {int k,run_no,asks=0;float sec,q,started,ended;
+     static const char *layout="idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 "
+                               "knock:21:4:0.6667 death:25:6:0.3333";
+     assert(AW_CombatHitClock);
+     Cvar_SetValue("aw_combat_dice",0);aw_combat_settings.fCombatDelayNPC=100;
+     for(run_no=0;run_no<2;run_no++){
+         AW_CombatClear();aw_combat_scene();p->v.health=100000;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+         npc->v.origin[0]=p->v.origin[0]-20;npc->v.origin[1]=p->v.origin[1];p->v.v_angle[1]=180;target=npc;
+         assert(AW_CombatActorLoad("mevil molor",&f));f.health=f.health_max=100000;
+         hit_seconds=run_no?.6f:0;
+         assert(AW_CombatEngage(npc,&f,layout));
+         assert(!AW_CombatHitClock(npc,&sec,&q));                       /* no hit yet */
+         for(k=0;k<20;k++){
+             asks=hit_asks;
+             p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;
+             for(i=0;i<50 && hit_asks==asks;i++)tick(1);
+             fields[1][0]._float=2;
+             if(hit_asks!=asks)break;
+             tick(1);
+         }
+         assert(hit_asks==asks+1);started=(float)sv.time;               /* the tick the blow landed in */
+         assert(AW_CombatHitClock(npc,&sec,&q)==(run_no?2:1) && q>=0 && q<.05f);
+         for(i=0;i<200 && AW_CombatHitClock(npc,&sec,&q) && q>=0;i++)tick(1);
+         ended=(float)sv.time;
+         assert(AW_CombatHitClock(npc,&sec,&q)==(run_no?2:1) && q<0);   /* the last hit's clock is kept */
+         if(run_no)assert(fabsf(sec-.6f)<1e-4f);else assert(fabsf(sec-3*.3333f)<1e-3f);
+         assert(ended-started>=sec-.021f && ended-started<=sec+.121f && hit_asks==asks+1);
+         printf("hit clock ok (%s): %.3f s, the chase again after %.3f s\n",run_no?"the table's hitN":"the layout's group",
+                (double)sec,(double)(ended-started));
+     }
+     assert(!AW_CombatHitClock(resident,&sec,&q));
+     AW_CombatClear();hit_seconds=0;Cvar_SetValue("aw_combat_dice",1);aw_combat_settings.fCombatDelayNPC=.1f;p->v.health=60;}
+    /* KEEP, the AmiWind miss style (aw_combat_miss; docs/COMBAT.md, ANIMATION.md "Block and dodge"): a failed attack
+     * roll shows the defender's block or sidestep. Its default is 1, and with it the player's miss at a fighter standing
+     * in its chase plays the block group (a one-handed weapon and a shield facing the blow) or a dodge group; with 0
+     * neither. Every change to the fight's rules and timings keeps this (the attack clock above included). */
+    {int k,run_no,misses,swings,frame,found=0,skill=aw_character.skills[AW_SK_H2H];aw_fighter_t *foe;
+     static const char *layout="idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 "
+                               "knock:21:4:0.6667 death:25:6:0.3333 block:31:4:0.3333 dodgel:35:3:0.2000 dodger:38:3:0.2000";
+     for(k=0;k<cvar_count;k++)if(!strcmp(cvars[k]->name,"aw_combat_miss")){
+         found=1;assert(!strcmp(cvars[k]->string,"1") && cvars[k]->value==1);}
+     assert(found);
+     model.numframes=48;aw_combat_settings.fCombatDelayNPC=100;
+     for(run_no=0;run_no<2;run_no++){
+         AW_CombatClear();aw_combat_scene();p->v.health=100000;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+         npc->v.origin[0]=p->v.origin[0]-20;npc->v.origin[1]=p->v.origin[1];p->v.v_angle[1]=180;target=npc;
+         assert(AW_CombatActorLoad("mevil molor",&f));
+         assert(AW_CombatEngage(npc,&f,layout));
+         swings=AW_CombatStats()->npc_swings;
+         for(k=0;k<400 && AW_CombatStats()->npc_swings==swings;k++)tick(1);   /* its one swing */
+         tick(100);                                                          /* then it stands in its chase */
+         /* the player's roll always fails: no skill against the fighter's best evasion (about 15 against 95) */
+         foe=(aw_fighter_t *)AW_CombatFighter(npc);assert(foe);
+         foe->attributes[AW_AGI]=foe->attributes[AW_LUC]=255;foe->aware=1;aw_character.skills[AW_SK_H2H]=0;
+         Cvar_SetValue("aw_combat_miss",run_no?0:1);misses=AW_CombatStats()->player_misses;
+         p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;
+         for(k=0;k<50 && AW_CombatStats()->player_misses==misses;k++)tick(1);
+         fields[1][0]._float=2;
+         assert(AW_CombatStats()->player_misses==misses+1 && !AW_CombatStats()->npc_blocks);
+         tick(2);frame=(int)npc->v.frame;
+         printf("miss style %d: the missed fighter shows frame %d (%s)\n",run_no?0:1,frame,
+                frame>=31 && frame<35?"its block":frame>=35 && frame<41?"its sidestep":"neither");
+         if(run_no)assert(frame<31);else assert(frame>=31 && frame<41);
+     }
+     Cvar_SetValue("aw_combat_miss",1);aw_combat_settings.fCombatDelayNPC=.1f;model.numframes=31;AW_CombatClear();
+     aw_character.skills[AW_SK_H2H]=(unsigned char)skill;p->v.health=60;}
+    /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the set is spawned at the engage and held out of the hand (its models off the
+     * send) while the kit plays the draw, until its attach key, at most 3 s; no swing starts under the draw; when the
+     * fight ends for a resident whose put-away the kit plays, its set stays on the hand and follows it until the detach
+     * key, at most 2 s, or until the actor is hidden; without that put-away it goes at once, as before. Fails on the
+     * code before: no hold, no put-away (the weak functions are missing). */
+    {int k,swings,hidden,moved,updates;
+     static const char *layout="idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 "
+                               "knock:21:4:0.6667 death:25:6:0.3333";
+     assert(AW_CombatItemsInHand && AW_CombatSheathed);
+     items_fake=1;
+     AW_CombatClear();aw_combat_scene();p->v.health=100000;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+     npc->v.origin[0]=p->v.origin[0]-20;npc->v.origin[1]=p->v.origin[1];
+     assert(AW_CombatActorLoad("mevil molor",&f));
+     assert(AW_CombatEngage(npc,&f,layout) && item_edicts[0].v.modelindex==5 && item_edicts[1].v.modelindex==6);
+     /* the draw starts (the kit, at its first send): out of the hand, and no swing under it, however long it plays */
+     AW_CombatItemsInHand(npc,0);assert(!item_edicts[0].v.modelindex && !item_edicts[1].v.modelindex);
+     kit_drawing=1;swings=AW_CombatStats()->npc_swings;tick(50);
+     assert(AW_CombatStats()->npc_swings==swings && !item_edicts[0].v.modelindex);
+     /* its attach key: in the hand; the draw over: the swing comes */
+     AW_CombatItemsInHand(npc,1);assert(item_edicts[0].v.modelindex==5 && item_edicts[1].v.modelindex==6);
+     kit_drawing=0;for(k=0;k<200 && AW_CombatStats()->npc_swings==swings;k++)tick(1);
+     assert(AW_CombatStats()->npc_swings==swings+1);
+     /* a draw the kit stops driving: in the hand after at most 3 s */
+     AW_CombatItemsInHand(npc,0);tick(140);assert(!item_edicts[0].v.modelindex);
+     tick(20);assert(item_edicts[0].v.modelindex==5 && item_edicts[1].v.modelindex==6);
+     /* the fight ends (StopCombat) for a resident whose put-away the kit plays: its set stays on its hand and follows
+      * it; the detach key takes it */
+     kit_sheathes=1;hidden=items_hidden;moved=moved_sets;
+     assert(AW_CombatActorEnd(npc) && items_hidden==hidden && moved_sets==moved+1);
+     updates=item_updates;tick(5);assert(item_updates>updates && items_hidden==hidden);
+     AW_CombatSheathed(npc);assert(items_hidden==hidden+1);
+     /* ... or the time limit */
+     assert(AW_CombatEngage(npc,&f,layout));hidden=items_hidden;
+     assert(AW_CombatActorEnd(npc) && items_hidden==hidden);
+     tick(90);assert(items_hidden==hidden);tick(20);assert(items_hidden==hidden+1);
+     /* ... or the actor hidden (a Disable after its StopCombat), at once */
+     assert(AW_CombatEngage(npc,&f,layout));hidden=items_hidden;assert(AW_CombatActorEnd(npc) && items_hidden==hidden);
+     npc->v.modelindex=0;tick(1);assert(items_hidden==hidden+1);npc->v.modelindex=1;
+     /* without the kit's put-away (a baked actor, the kit off) at once, as before; a set still out of the hand too */
+     kit_sheathes=0;assert(AW_CombatEngage(npc,&f,layout));hidden=items_hidden;
+     assert(AW_CombatActorEnd(npc) && items_hidden==hidden+1);
+     kit_sheathes=1;assert(AW_CombatEngage(npc,&f,layout));AW_CombatItemsInHand(npc,0);hidden=items_hidden;
+     assert(AW_CombatActorEnd(npc) && items_hidden==hidden+1);
+     printf("draw and put-away ok: held to the attach key, no swing under the draw, kept to the detach key\n");
+     items_fake=kit_sheathes=0;AW_CombatClear();p->v.health=60;}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));

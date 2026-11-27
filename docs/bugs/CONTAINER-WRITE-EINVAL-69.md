@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-26: reported in v0.0.69-dev5
+- 2026-11-27 12:57 +0200: seen again in v0.0.69-dev7: Seen again while copying the bug register into the next snapshot: page writes failed with an invalid-argument error and succeeded on later tries; the copy now retries and the register check runs after it.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

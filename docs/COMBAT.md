@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -601,6 +601,19 @@ for no slot.
 Every map keeps edicts free for the held weapon and shield of four fighters. A fifth armed fighter draws its weapon
 and shield only while the map has 76 or more edicts to spare; on a map that full it fights with the same rules and
 nothing drawn in its hands, and `dbg combat` counts it ("held items left out").
+
+**Held items and the swing's clock (v0.0.69-dev7).** Each actor holds the weapon and shield its own record has equipped,
+through the held model path in its row of the actor table; a ranged fighter with a tag holds its bow, crossbow or thrown
+weapon (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69, ACTOR-RANGED-WEAPON-NOT-HELD-69), and 47 of the 58 armed creature
+records get a tag of bones and scale of their own and hold their weapon and shield (CREATURE-COMBAT-WEAPON-54,
+CREATURE-OWN-TABLE-NO-ITEM-BONES-69). The item tag tables hold 64 armed models in all; when they are full, the next armed
+model takes the entry of a model no live actor uses, so every armed person draws its weapon (HELD-ITEM-TABLE-FULL-69).
+A skeletal fighter's swing or shot lasts its own weapon group's keys at the weapon's speed and lands on the shown hit or
+release key; the hit recovery lasts the shown hit group; the AmiWind dodge and block on a miss stay the default
+(ACTOR-ATTACK-ONE-CLOCK-69). The weapon and shield appear at the draw's attach key and go at the put-away's detach key, no
+swing starts under the draw, and a draw while moving plays on the torso so the legs keep walking
+(ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69, ACTOR-DRAW-STOPS-LEGS-69). A creature collides only up to its drawn height
+(ACTOR-CLIP-ABOVE-DRAWN-BODY-69). Open: the rest of the original's weapon use (NPC-WEAPON-USE-PARITY-69).
 
 Per fighter: one
 think every 0.1 s using the companion's navigation (at most two search traces

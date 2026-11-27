@@ -59,6 +59,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
+- [Possibly related](#possibly-related)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -111,6 +112,12 @@ A lights gate per map: every lit lamp must have its mesh in that map, or be
 reported.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Possibly related
+
+Entries that are probably the same fault seen another way, or that may share its cause; each keeps its own timeline. One listed here as fixed or closed may have come back: read its history and check its guard before calling this one new.
+
+- Possibly related: [SEYDA-FRAME-DEFERRED-REFS-69](SEYDA-FRAME-DEFERRED-REFS-69.md) (open): Seyda Neen's frame leaves out many of the original's objects of its own cells: lantern hooks, ropes, the inn sign, road signs and chimney smoke are drawn by nothing that names them. Why: Both are objects of the original that the Seyda Neen frame leaves out (the lantern hooks are among the deferred references); they are planned as one rebuild of the frame, which re-keys 19 build stages.
 
 ## Bugs in the same category
 
@@ -202,5 +209,6 @@ Related bugs in other categories:
 
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - [LIGHT-ENTITIES-UNWIRED-33](LIGHT-ENTITIES-UNWIRED-33.md): Morrowind lights are never turned into Quake light entities, so the light compiler bakes nothing
+- [SEYDA-FRAME-DEFERRED-REFS-69](SEYDA-FRAME-DEFERRED-REFS-69.md): Seyda Neen's frame leaves out many of the original's objects of its own cells: lantern hooks, ropes, the inn sign, road signs and chimney smoke are drawn by nothing that names them
 
 <!-- END GENERATED CATEGORY -->

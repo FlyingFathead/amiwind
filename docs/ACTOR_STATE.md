@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -69,7 +69,7 @@ after the script sections. Big-endian; the layout is in `tools/mwscript/actors.p
 | OACT | 2 | the actor each script object names (the scripts' targets) | in memory with the scripts |
 | ACTB | 96 | one actor: id, kind, flags, level, attributes, skills, behaviour ratings, disposition, reputation, rank, health, magicka, fatigue, race, class, faction, gold, its inventory and spell lists, its weapon, creature type, attacks, soul | on disk |
 | AINV | 6 | an inventory entry: item, count, flags (worn, from a levelled list, restocks) | on disk |
-| AITM | 32 | a shared item: id, kind, type, condition, armour rating, damage, flags, weight, speed, reach, its enchantment (v0.0.61; 28 bytes before, still read) | on disk |
+| AITM | 32 | a shared item: id, kind, type, condition, armour rating, damage, flags, weight, speed, reach, its enchantment (v0.0.61; 28 bytes before, still read), and the model an actor holding it is drawn with (v0.0.69: a weapon's and a shield's, the item model of its mesh, the one the player holds; none for every other item) | on disk |
 | ASPT | 4 | a shared spell: id, type, its flags (autocalculated, a starting spell, always succeeds; v0.0.61) | on disk |
 | ASPL | 2 | a spell entry | on disk |
 | ASPC | 4 | a spell's name and price cost (per ASPT row; the dialogue's Spells service) | on disk |

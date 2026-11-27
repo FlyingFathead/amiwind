@@ -1,6 +1,6 @@
 # Town containers and inventory plan
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 ## Status: 13 November 2026
 
@@ -26,6 +26,25 @@ measured once from the original data), as the named signposts do, and the view r
 exterior containers have a box; the most boxes in one 3 x 3 cell window is 154, in one room 99. Room containers carry
 the box too: in a CHIM room the room record's placement box is asked first, and the two room maps of the opening that
 are not CHIM rooms (the Imperial Prison Ship, 46 containers, and the Census and Excise Office, 12) use the box.
+
+Plants and the other organic containers (v0.0.69-dev7): the small mushrooms and the bracket fungi on the Bitter Coast
+trees are the harvest's, picked by the use key. Every other organic container is used by Options > Prefs > Plant and
+mushroom picking ([KEYMAPS.md](KEYMAPS.md), "Options"). Under AmiWind, the default, a plant, kwama egg sack, kollop,
+spore pod or ore or gem rock is picked with one press: its contents go into the inventory with the pick sound, no window
+opens, and it is not aimed at again until it refills; a picked plant in a room is taken out of the view (outdoors it
+stays drawn for now), a rock always stays drawn. Under Original each one opens its container window, as in the
+original, where an organic container opens like any other unless its mesh says it is picked. Stashes keep their window
+under both values: Fargoth's hollow treestump in Seyda Neen ([FARGOTH-STASH-STUMP-69](bugs/FARGOTH-STASH-STUMP-69.md)),
+Ahnassi's two barrels and the Fighters' and Mages' Guild supply chests. The respawn flag does not tell a plant from a
+stash (the egg sacks, rocks and kollops do not respawn, the supply chests do), so the builder takes the groups of
+`config/harvest-flora.json`. Counted on the three masters: 140 organic records, 12 of the harvest (2,945 placements),
+101 picked (22,502), 22 rocks picked and kept drawn (234), 5 with their window (14). Counted on the
+v0.0.69-dev5 data: 22,750 such placements are used now (19,880 outdoors, 2,870 in rooms); 2,945 stay picked. Indoors they are
+aimed at by their room placement's box. Outdoors their 111 models carry measured boxes too (v0.0.69-dev7); a plant's box holds its leaves and stems whole, so what the view ray meets
+inside it (an item, a sign, a person, a smaller plant, a mushroom to pick) is aimed and used first, a plant to pick
+nearer than a container takes the use, and from inside a plant's box the plant is aimed at its centre point as before.
+With them the most boxes in one 3 x 3 cell window is 1,183; the engine's box table holds as many boxes as rows (1,536),
+and the builder refuses a place past it.
 
 A trapped container or door casts its trap spell on the player when used and does not open; the trap is then used up
 (saved), and the key that opens its lock disarms it (since v0.0.64). Levelled entries are rolled once, on the first

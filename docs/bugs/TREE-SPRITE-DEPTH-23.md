@@ -113,5 +113,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [SPRITE-BAD-TYPE-THREADED-56](SPRITE-BAD-TYPE-THREADED-56.md): R_DrawSprite: Bad sprite type ends a load (dbg aw hors 0) on Amiberry with the threaded CPU: the game stays on Loading
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
 - [VISUAL-EVERYWHERE-ROOMS-67](VISUAL-EVERYWHERE-ROOMS-67.md): The per-model replacements of the everywhere visual recipe reach the outdoor frames only, so rooms draw the heavy original models
+- [WALK-FIX-TOWN-FRAME-SPIKES-69](WALK-FIX-TOWN-FRAME-SPIKES-69.md): Three towns show a much longer worst frame after the change that lets residents walk where the ground is not loaded
 
 <!-- END GENERATED CATEGORY -->

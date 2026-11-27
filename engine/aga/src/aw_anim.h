@@ -127,6 +127,8 @@ void AW_AnimInit(void);
  * no other edict wears it. Returns 1 when the edict changed model. */
 int AW_AnimMover(struct edict_s *e,int on);
 int AW_AnimMoving(struct edict_s *e);
+/* The model index the edict stands on under the mover it wears now; 0: it wears none. */
+int AW_AnimWornBase(struct edict_s *e);
 /* Saves write the standing model: begin swaps it in for every moving edict, end back. */
 void AW_AnimSaveSwap(int begin);
 /* A mover model the client must not load at sign-on (cl_parse.c). */

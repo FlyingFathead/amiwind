@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -359,7 +359,9 @@ of the master, and the teleport markers too, each resolved by one holder rule:
 - **Markers.** A `PrisonMarker` (where an arrest takes the player) is a row of kind `marker`: resolved like a door,
   never written into a bank (there is no door to touch). The jail system and the game's scripts look it up later.
 - **The build check.** A door or marker that does not resolve stops the image with the list. So do the named places of
-  `dbg tp` (`config/teleport-names.txt`, for example `dbg tp heartchamber`) whose room is not in the image.
+  `dbg tp` (`config/teleport-names.txt`, for example `dbg tp heartchamber`) whose room is not in the image, and a named
+  place that is a person or creature (map `being`, for example `dbg tp lordvivec`) whose record id is not on exactly one
+  being row of the image's teleport list.
 - **Travel services** (v0.0.54, `tools/prepare_travel.py`, [TRAVEL-SERVICES-CHIM-51](../BUGS.md)). The same step
   resolves the destinations of every caravaner, shipmaster, gondolier and guild guide of the masters (their travel
   records) by the same holder rule and writes them to `id1/travel.txt`, with the receipt in the image's `travel.json`.

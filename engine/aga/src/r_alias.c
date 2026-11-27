@@ -107,23 +107,38 @@ qboolean AW_AliasSphereVisible(vec3_t origin, float radius)
  * stands in, not by its rest frame's box, which holds every pose of the table (a body lying at full length): that
  * box let an actor off screen through the cull (SKEL-RUNTIME-COST-52; 3 alias models drawn against 2 baked at the
  * Balmora pose). */
-static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, byte box[6]);
+static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, int torso, byte box[6]);
 /* A skeletal entity's pose: its table frame, and while it holds a torch its left arm on the table's torch group
  * (aw_items.c AW_ItemsTorchLayer; SKEL-ITEM-TAGS-52). Returns the pose's key in the pose cache: the frame, or -1 less
  * the frame for the torch pose (a frame poses one way or the other); facing into an ash or blight storm its right
  * arm on the table's idlestorm group (aw_items.c AW_ItemsStormLayer; ACTOR-STORM-POSE-51), AW_STORM_KEY more.
- * LAYERS and ROOTS (AW_SKEL_LAYERS each: the torch's, the storm's; root -1 none) may be NULL. */
+ * LAYERS and ROOTS (AW_SKEL_LAYERS each: the torch's, the storm's, the torso's; root -1 none) may be NULL.
+ * ACTOR-DRAW-STOPS-LEGS-69: an entity E (NULL: none) drawing or putting away its weapon while it moves has its torso on
+ * the draw's frame and its legs on the walk's (aw_animkit.c, this send's pick: R_AliasTorsoLayer); *TORSO (may be
+ * NULL) is then 1 + that frame, else 0, a second part of the pose cache's key. */
 #define AW_STORM_KEY 0x100000
 int (*R_AliasTorchLayer)(const struct model_s *m, const void *skel_table, int frame, float *layer_frame, int *root);
 int (*R_AliasStormLayer)(const struct model_s *m, const void *skel_table, int frame, float yaw, float *layer_frame,
                          int *root);
-static int AW_SkelEntityKey (const model_t *model, const aliashdr_t *hdr, int frame, float yaw, float *layers,
-                             int *roots)
+int (*R_AliasTorsoLayer)(const entity_t *e, float *layer_frame, int *root);
+static int AW_SkelEntityKey (const entity_t *e, const model_t *model, const aliashdr_t *hdr, int frame, float yaw,
+                             float *layers, int *roots, int *torso)
 {
     float l;
     int r, key = frame;
     if (roots)
-        roots[0] = roots[1] = -1;
+        roots[0] = roots[1] = roots[2] = -1;
+    if (torso)
+        *torso = 0;
+    if (e && R_AliasTorsoLayer && R_AliasTorsoLayer (e, &l, &r))
+    {
+        if (layers)
+            layers[2] = l;
+        if (roots)
+            roots[2] = r;
+        if (torso)
+            *torso = 1 + (int)l;
+    }
     if (R_AliasStormLayer && R_AliasStormLayer (model, hdr->aw_skel_table, frame, yaw, &l, &r))
     {
         key += AW_STORM_KEY;
@@ -181,8 +196,9 @@ qboolean R_AliasCheckBBox (void)
     {
         byte box[6];
         const byte *bmin = pframedesc->bboxmin.v, *bmax = pframedesc->bboxmax.v;
-        if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame,
-                                                                             currententity->angles[YAW], NULL, NULL), box))
+        int torso = 0, key = pahdr->aw_skel ? AW_SkelEntityKey (currententity, pmodel, pahdr, currententity->frame,
+                                                             currententity->angles[YAW], NULL, NULL, &torso) : 0;
+        if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, key, torso, box))
             bmin = box, bmax = box + 3;
 
 // x worldspace coordinates
@@ -754,6 +770,7 @@ typedef struct {
     const model_t		*model;
     const aliashdr_t	*hdr;
     int					frame;
+    int					torso;		/* 1 + the torso layer's frame, 0 none (ACTOR-DRAW-STOPS-LEGS-69) */
     unsigned			used;		/* aw_pose_clock when last drawn; 0 empty */
     byte				box[6];		/* the posed vertices' box (min x y z, max x y z), in the model's bytes */
     trivertx_t			verts[MAXALIASVERTS];
@@ -788,11 +805,12 @@ static int R_AliasSkelFrame (void)
     const aw_skel_table_t	*table = (const aw_skel_table_t *)paliashdr->aw_skel_table;
     trivertx_t			*rest;
     aw_posed_t			*slot;
-    int					i, frame = currententity->frame, key, bones_key, talk, roots[AW_SKEL_LAYERS] = {-1, -1};
-    float				layers[AW_SKEL_LAYERS] = {0, 0};
+    int					i, frame = currententity->frame, key, bones_key, talk, torso, roots[AW_SKEL_LAYERS] = {-1, -1, -1};
+    float				layers[AW_SKEL_LAYERS] = {0, 0, 0};
     if (!table || pmdl->numverts > MAXALIASVERTS || paliashdr->frames[0].type != ALIAS_SINGLE)
         return 0;
-    key = bones_key = AW_SkelEntityKey (currententity->model, paliashdr, frame, currententity->angles[YAW], layers, roots);
+    key = bones_key = AW_SkelEntityKey (currententity, currententity->model, paliashdr, frame, currententity->angles[YAW],
+                                        layers, roots, &torso);
     talk = R_AliasTalkLevel ? R_AliasTalkLevel (currententity) : 0;
     if (talk)
         key = key >= 0 ? key + talk * AW_TALK_KEY : key - talk * AW_TALK_KEY;
@@ -811,7 +829,7 @@ static int R_AliasSkelFrame (void)
     for (i=0 ; i<aw_pose_slots ; i++)
     {
         aw_posed_t *p = &aw_posed[i];
-        if (p->used && p->model == currententity->model && p->hdr == paliashdr && p->frame == key)
+        if (p->used && p->model == currententity->model && p->hdr == paliashdr && p->frame == key && p->torso == torso)
         {
             p->used = ++aw_pose_clock ? aw_pose_clock : ++aw_pose_clock;
             aw_pose_hits++;
@@ -850,6 +868,7 @@ static int R_AliasSkelFrame (void)
     slot->model = currententity->model;
     slot->hdr = paliashdr;
     slot->frame = key;
+    slot->torso = torso;
     {
         /* the pose's own box, for the cull of its next draws (AW_PoseBox) */
         int k, v;
@@ -887,11 +906,12 @@ unsigned long R_AliasPoseCacheRelease (void)
     return given;
 }
 
-static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, byte box[6])
+static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, int torso, byte box[6])
 {
     int i;
     for (i=0 ; i<aw_pose_slots ; i++)
-        if (aw_posed[i].used && aw_posed[i].model == model && aw_posed[i].hdr == hdr && aw_posed[i].frame == frame)
+        if (aw_posed[i].used && aw_posed[i].model == model && aw_posed[i].hdr == hdr && aw_posed[i].frame == frame &&
+            aw_posed[i].torso == torso)
         {
             memcpy (box, aw_posed[i].box, 6);
             return 1;
@@ -921,9 +941,12 @@ int R_AliasEntityBox (const entity_t *e, float lo[3], float hi[3])
         f = 0;
     bmin = hdr->frames[f].bboxmin.v;
     bmax = hdr->frames[f].bboxmax.v;
-    if (hdr->aw_skel && AW_PoseBox (e->model, hdr, AW_SkelEntityKey (e->model, hdr, e->frame, e->angles[YAW], NULL, NULL),
-                                    pose))
-        bmin = pose, bmax = pose + 3;
+    if (hdr->aw_skel)
+    {
+        int torso = 0, key = AW_SkelEntityKey (e, e->model, hdr, e->frame, e->angles[YAW], NULL, NULL, &torso);
+        if (AW_PoseBox (e->model, hdr, key, torso, pose))
+            bmin = pose, bmax = pose + 3;
+    }
     for (k=0 ; k<3 ; k++)
     {
         s = R_AliasAxisScale (e, k);

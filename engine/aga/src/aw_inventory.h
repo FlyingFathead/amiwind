@@ -301,6 +301,11 @@ float AW_ActivateDistance(void);
 /* FOCUS-NPC-OVERRIDES-ITEM-62: how far along the view ray (map units from the eye) the item the use key would take or
  * open lies: a drop, a placed item or a container within the activation distance; -1 when none */
 float AW_InventoryAimDistance(void);
+/* PLANT-BOX-AIM-69: 1 when what the last AW_InventoryAimDistance aimed at is a container aimed by its measured box (a
+ * plant's box is far coarser than its leaves) and the view-ray point DISTANCE map units from the eye lies inside that
+ * box: what the ray meets there (a person, a door, a plant to pick) stands in it, and the box gives way to it
+ * (aw_scene.c focus_kind, aw_activate.h AW_PlantFirst) */
+int AW_PlacedAimHolds(float distance);
 /* The same for things placed in the loaded room (id1/focus.awf): items with weight and value, actors and doors with
  * their name only (empty lines). */
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);

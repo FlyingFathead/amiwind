@@ -229,9 +229,16 @@ int main(void)
             /* OPENING-CAPTAIN-HINT-SUBTITLE-63: within 75 map units (300 original) the hint is CharGenDialogueMessage's
              * message box with its Ok button, once */
             AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=0;box_buttons=-1;
+            /* CAPTAIN-SCRIPT-LOCALS-NOT-KEPT-69: with the scripts (census type original or amiwind) the captain's own
+             * script shows the box; the engine's hand-written one is for census type legacy only */
             AW_OpeningTick();
+            assert(aw_story.captain_hint==0 && box_buttons==-1);
+            aw_census_type.value=0;AW_OpeningTick();
+            assert(aw_story.captain_hint==0 && box_buttons==-1);
+            aw_census_type.value=1;AW_OpeningTick();
             assert(aw_story.captain_hint==1 && box_buttons==1 && strstr(box_text,"talk to the Captain"));
             box_buttons=-1;AW_OpeningTick();assert(box_buttons==-1);
+            aw_census_type.value=2;
             AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=1;
             assert(AW_ItemAdd(&aw_state,"chargen statssheet",1) && AW_Papers()==1);
             assert(!AW_CensusLegacy());

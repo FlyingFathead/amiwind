@@ -37,6 +37,14 @@ from pathlib import Path
 FORMAT = 'aw-land-readiness-2'
 COMPLETION_FORMAT = 'aw-master-completion-1'
 NOT_MEASURED = 'MOURNHOLD-STATE-TRACKING-PARITY-67'
+SCRIPTS_FORMAT = 'aw-script-summary-1'
+SCRIPTS_TEXT = ('Scripts, from the MWScript tracker: used = the scripts of the game file that the original game runs; '
+                'run = run by the interpreter; AmiWind adaptation = AmiWind\'s own code does the script\'s work, '
+                'feature complete (every step of the script); not yet = everything else. Scripts not used in the '
+                'original game never run there either and are never counted toward completion. Effect in play: of '
+                'the functions the scripts call, how many have the original\'s effect in full, in part or none, and '
+                'how many have something seen in play; a script that runs is not yet a script that plays as the '
+                'original.')
 LANDS = (
     {'id': 'vvardenfell', 'name': 'Vvardenfell', 'game': 'Morrowind (main game)', 'master': 'Morrowind.esm', 'island': 1,
      'set': 'vvardenfell'},
@@ -293,6 +301,15 @@ def scripts(script_doc):
             'states': [{'state': s, 'label': mf.LABELS[s], 'count': len(v), 'items': sorted(v, key=lambda i: i['id'].casefold())}
                        for s, v in states.items()],
             'start': sorted(start, key=lambda i: i['id'].casefold())}
+    # TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69: the counts each land's block of the headline draws (used in the original,
+    # run, AmiWind adaptation, not yet, and not used in the original, which never counts toward completion) and the
+    # functions' effect in play, from the same tracker (tools/mwscript_features.py script_summary)
+    summary = mf.script_summary(script_doc)
+    by_master = {x['master']: x for x in summary['masters']}
+    out['summary'] = {'format': SCRIPTS_FORMAT, 'source': summary['source'], 'version': summary['version'],
+                      'measured': summary['measured'], 'definition': SCRIPTS_TEXT,
+                      'lands': {land['id']: by_master[land['master']] for land in LANDS}, 'all': summary['all'],
+                      'dialogue_results': summary['dialogue_results'], 'functions': summary['functions']}
     return out
 
 
@@ -336,4 +353,5 @@ def completion(doc, census=None, script_rows=None):
                           gap='DOORS-DISTRICT-FRAMES-NOT-HOLDERS-67',
                           rooms_no_door=sorted(no_door, key=lambda i: i['name'])),
         })
-    return {'format': COMPLETION_FORMAT, 'todo': NOT_MEASURED, 'masters': masters}
+    return {'format': COMPLETION_FORMAT, 'todo': NOT_MEASURED, 'masters': masters,
+            'script_summary': (script_rows or {}).get('summary')}

@@ -151,11 +151,14 @@ int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t h,void *c,aw_pick_t *o) {
             keys(o,"start","stop");o->rule="creature attack, a random one: chooseRandomAttackAnimation";
             return 1;
         }
-        if(ranged(w)){keys(o,"shoot start","shoot follow stop");o->rule="attack, shoot: updateWeaponState";}
+        /* ACTOR-ATTACK-ONE-CLOCK-69: the key the blow lands on (a shot leaves on), for the fight's clock */
+        if(ranged(w)){keys(o,"shoot start","shoot follow stop");put(o->hit,AW_PICK_KEY,"shoot release",NULL);
+                      o->rule="attack, shoot: updateWeaponState";}
         else{
             put(a,sizeof(a),attacks[s->attack%3]," start");
             put(b,sizeof(b),attacks[s->attack%3]," ");put(b,sizeof(b),b,follows[s->follow%3]);put(b,sizeof(b),b," follow stop");
-            keys(o,a,b);o->rule="attack, chop/slash/thrust: updateWeaponState";
+            keys(o,a,b);put(o->hit,AW_PICK_KEY,attacks[s->attack%3]," hit");
+            o->rule="attack, chop/slash/thrust: updateWeaponState";
         }
         return has(h,c,o->group);
     case AW_PE_CAST:
@@ -194,6 +197,18 @@ int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t h,void *c,aw_pick_t *o) {
     }
     if(!o->start[0])keys(o,"start","stop");
     return has(h,c,o->group);
+}
+
+/* ACTOR-ATTACK-ONE-CLOCK-69 (aw_animpick.h): the span's own time at the table's rate over the weapon's speed, and the
+ * hit key's share of it. Rule from OpenMW 0.53 mwmechanics/character.cpp (read, not copied): the weapon group's
+ * sections play at their own key times scaled by the weapon's speed (playBlendedAnimation with weapSpeed, 1716-1717,
+ * 1785-1786, 1805-1806), the blow is dealt at the group's "<type> hit" key (1083-1109), a shot leaves at "shoot
+ * release" (1150-1157). */
+int AW_PickAttackClock(int from,int hit,int to,float rate,float speed,float *seconds,float *hit_fraction) {
+    if(from<0 || hit<from || to<hit || to<=from || !(rate>0) || !(speed>0))return 0;
+    *seconds=(float)(to-from)/rate/speed;
+    *hit_fraction=(float)(hit-from)/(float)(to-from);
+    return 1;
 }
 
 int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,int air,int swim,aw_pick_state_t *out) {

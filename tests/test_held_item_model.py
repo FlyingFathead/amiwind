@@ -41,14 +41,17 @@ class HeldItemModelTests(unittest.TestCase):
         items = code('aw_items.c')
         show = items[items.index('int AW_ItemsShow('):]
         show = show[:show.index('\n}\n')]
-        self.assertLess(show.index('if(!held_item_ok(actor,t,k,i))continue;'), show.index('ED_Alloc()'))
+        # (an actor's own item, named by its record, must be an item model too: ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69)
+        self.assertLess(show.index('!held_item_ok(actor,t,k,i))continue;'), show.index('ED_Alloc()'))
+        self.assertLess(show.index('own?!AW_ItemsIsItemPath(sv.model_precache[i])'), show.index('ED_Alloc()'))
         check = items[items.index('static int held_item_ok('):]
         check = check[:check.index('\n}\n')]
         self.assertIn('AW_ItemsPathHash(name)==table[t].item_hash[k]', check)
         self.assertIn('AW_ItemsIsItemPath(name)', check)
         self.assertIn('not drawn', check)
         # both tag forms record the hash of the path they precached
-        self.assertEqual(items.count('item_hash[k]=table[used].item[k]?AW_ItemsPathHash(items[k]):0;'), 2)
+        # (the table is built beside the level's tables since HELD-ITEM-TABLE-FULL-69, then put into its entry)
+        self.assertEqual(items.count('fresh.item_hash[k]=fresh.item[k]?AW_ItemsPathHash(items[k]):0;'), 2)
 
 
 if __name__ == '__main__':

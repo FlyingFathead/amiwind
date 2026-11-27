@@ -636,6 +636,17 @@ def read_table(data):
     return rows
 
 
+def being_ids(data):
+    """{record id casefold: rows} of a table's being rows, the common kinds' rows (F_NEAREST) left out: what a named
+    place of teleport-names.txt that is a being may point at (exactly one row; the engine's AW_TpPlacesBeingRow,
+    DBG-TP-LORDVIVEC-69)."""
+    out = {}
+    for r in read_table(data):
+        if r['flags'] & (F_BEING | F_NEAREST) == F_BEING and r['id']:
+            out[r['id'].casefold()] = out.get(r['id'].casefold(), 0) + 1
+    return out
+
+
 # ---------------------------------------------------------------- the image step
 
 def layer_inputs(data, chim_world=None, masters=None, layer_worlds=None):

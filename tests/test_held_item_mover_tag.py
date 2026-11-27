@@ -51,14 +51,16 @@ class MoverTagWiringTests(unittest.TestCase):
 
     def test_the_mover_branch_never_passes_the_movers_slot_count(self):
         prep = body(self.items, 'void AW_ItemsPrep(edict_t *actor) {')
-        self.assertIn('prep(sv.models[i],a->mover,0);', prep)
-        self.assertNotIn('sv.models[i]->numframes', prep)
+        # (the last argument: whether the tag's own item models are loaded, ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69)
+        self.assertIn('prep(mover,mover_name,0,!lazy);', prep)
+        self.assertNotIn('->numframes,!lazy);\n    t=', prep)
+        self.assertNotIn('mover->numframes', prep)
         # a model known by name only (another layout's mover) spawned as an actor's own model: its tag's count too
         self.assertIn('if(m->numframes<0 || m->numframes>AW_ITEMS_MAX_SKEL_FRAMES)return;', prep)
-        self.assertIn('prep(m,m->name,m->numframes);', prep)
+        self.assertIn('prep(m,m->name,m->numframes,!lazy);', prep)
 
     def test_both_tag_forms_take_the_count_rule_before_parsing(self):
-        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes) {')
+        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes,int load) {')
         rule = prep.index('numframes=AW_ItemsTagFrames((const char *)text,numframes);')
         self.assertLess(rule, prep.index('if(!strncmp((const char *)text,"AWTS1 ",6)){'))
         self.assertIn('AW_ItemsParseSkel((const char *)text,numframes,', prep[rule:])
@@ -71,7 +73,7 @@ class MoverTagWiringTests(unittest.TestCase):
         self.assertIn('int AW_ItemsTagFrames(const char *text,int numframes) {', host)
 
     def test_a_refusal_says_both_counts(self):
-        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes) {')
+        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes,int load) {')
         self.assertNotIn('invalid, items not drawn', prep)
         self.assertEqual(prep.count('refused(path,given,declared);'), 3)
         self.assertIn('"Item tags %s: invalid against %d model frames (the tag has %d), items not drawn\\n"',
@@ -91,14 +93,16 @@ class MoverTagWiringTests(unittest.TestCase):
         # New Game and every new server start with no table and no count (the reset rule); a new world too
         self.assertIn('by_own_count=full_spawns=0;', body(self.items, 'void AW_ItemsSceneReset(void) {'))
         self.assertIn('by_own_count=full_spawns=0;', body(self.items, 'static void level_check(void) {'))
-        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes) {')
-        self.assertLess(prep.index('declared=AW_ItemsTagFrames((const char *)text,0);'), prep.index('if(used>=TABLE){'))
+        prep = body(self.items, 'static void prep(model_t *m,const char *name,int numframes,int load) {')
+        # HELD-ITEM-TABLE-FULL-69: full means every entry in use by a live actor (table_slot), not the count alone
+        self.assertLess(prep.index('declared=AW_ItemsTagFrames((const char *)text,0);'),
+                        prep.index('if((at=table_slot())<0){'))
         self.assertIn('if(declared && !full_spawns++)', prep)
 
     def test_the_pick_status_shows_the_tables(self):
         kit = code('aw_animkit.c')
         self.assertIn('AW_ItemsTables(e,counts,&model,info);', kit)
-        self.assertIn('int AW_ItemsTables(edict_t *actor,int counts[4],const char **model,int info[3]) {', self.items)
+        self.assertIn('int AW_ItemsTables(edict_t *actor,int counts[11],const char **model,int info[3]) {', self.items)
 
 
 if __name__ == '__main__':

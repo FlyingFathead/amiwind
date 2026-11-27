@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev7 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.69: Fix The World After You Put It Together, in development, sixth snapshot 26 November 2026](#v0069-fix-the-world-after-you-put-it-together-in-development-sixth-snapshot-26-november-2026)
+- [v0.0.69: Fix The World After You Put It Together, in development, seventh snapshot 27 November 2026](#v0069-fix-the-world-after-you-put-it-together-in-development-seventh-snapshot-27-november-2026)
 - [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
@@ -120,7 +120,20 @@ _Last updated with AmiWind v0.0.69-dev6 (26 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.69: Fix The World After You Put It Together, in development, sixth snapshot 26 November 2026
+## v0.0.69: Fix The World After You Put It Together, in development, seventh snapshot 27 November 2026
+
+The seventh snapshot, [v0.0.69-dev7](releases/notes/RELEASE-v0.0.69-dev7.md), works on the world's items and on fighting.
+Plants, mushrooms, egg sacks, kollops, spore pods and ore rocks are picked with one press and the pick sound, with the
+original's container window as an option in the options (stashes keep their window); items without a name, such as the
+Temple Sewers' burned-out torches, can be taken; plants have measured aim boxes; outdoor items are drawn once; and the
+census office's table items are drawn whole. Each person holds the weapon and shield of its own record, 47 of the 58 armed
+creature records do too, every armed person draws its weapon, and swings and shots last as long as the weapon's own
+animation and land on the shown blow, with the weapon appearing at the draw while the legs keep walking. The open sea off
+Solstheim has no invisible wall, the world's seams are checked by a gate test, the actor checks judge every placed actor,
+and the script feature page is measured again. Next: plants shown picked outdoors and the small mushrooms under the
+original's window, the riekling and the lich king's weapons, ranged fighters with ammunition and shots at other actors,
+every weapon use as in the original (stance, attack types, reach, blocking), and then the open entries of v0.0.68's list,
+the game rules first.
 
 The sixth snapshot, [v0.0.69-dev6](releases/notes/RELEASE-v0.0.69-dev6.md), answers the faults of the latest play
 report: the walking residents of Seyda Neen walk smoothly without snapping back, every armed person holds its weapon in

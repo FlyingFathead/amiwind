@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1222,7 +1222,9 @@ In the original's order:
 - into the form: the player's own attributes and skills are kept and the werewolf's are set from the game settings
   (the compiled `WERE` rows, the `fWereWolf` settings; Acrobatics is set by `SetWerewolfAcrobatics`); back: his own
   are given back;
-- the inventory and magic windows do not open while the form holds.
+- the inventory and magic windows do not open while the form holds;
+- the werewolf kills start again at 0 at every change into the form, and the change back leaves the count, so
+  `GetWerewolfKills` reads the kills of this night's form (since v0.0.69).
 
 The werewolf robe in the robe slot is what draws the werewolf: the third-person body and the first-person arms are
 the werewolf's own model of the image (no head, hair or worn item of the player's race, nothing held), and the
@@ -1232,9 +1234,13 @@ a container's, a corpse's or a trade list; the player's own inventory lists it o
 are in the save (the `AWWF` block), the robe with the inventory; New Game clears all of it. An image without the
 werewolf's model keeps the player's own body and arms and says so once on the console.
 
-Not carried yet (WEREWOLF-TRANSFORM-RULES-PARTIAL-68): the werewolf's health (`fWereWolfHealth`), the witnesses of the
-change (`sWerewolfAlarmMessage`, `PCKnownWerewolf`, the bounty), the werewolf's refusals of items, doors, talk and rest,
-and the werewolf NPCs' own bodies (a script's `BecomeWerewolf` on an NPC keeps its list only).
+Not carried yet (WEREWOLF-TRANSFORM-RULES-PARTIAL-68, WEREWOLF-FIGHT-RULES-LEFT-68; the full list is the
+`becomewerewolf` row of [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md), Effect in play): the werewolf's doubled health
+(`fWereWolfHealth`), the witnesses of the change (`sWerewolfAlarmMessage`, `PCKnownWerewolf`, the bounty) and people
+attacking a werewolf on sight, the werewolf's refusals to take, open, loot, read and rest (the original refuses no
+door; talk is refused here as there), the first-person camera, view angle and screen border of the form, silver
+weapons' double damage and the werewolf's own sounds. An NPC a script turns is drawn as the werewolf and fights with
+its claws since v0.0.68.
 
 ## Sizes and costs
 

@@ -91,7 +91,7 @@ class EngineLimitsTests(unittest.TestCase):
         # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile, and one
         # per carried light of a skeletal guard (its torch, at most AW_ITEMS_CARRIERS: SKEL-ITEM-TAGS-52)
         items = (SRC / 'aw_items.c').read_text()
-        self.assertRegex(items, r'for\(k=0;k<AW_ITEMS_KINDS;k\+\+\)\{\s*int i=table\[t\]\.item\[k\];[^}]*ED_Alloc\(\)')
+        self.assertRegex(items, r'for\(k=0;k<AW_ITEMS_KINDS;k\+\+\)\{\s*int i=own\?own_item\[own\]\[k\]:table\[t\]\.item\[k\];[^}]*ED_Alloc\(\)')
         self.assertRegex(items, r'e=carriers\[i\]\.light=ED_Alloc\(\)')
         self.assertIn('static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];', items)
         self.assertIn('AW_ItemsShow(e,s->item);', (SRC / 'aw_combat.c').read_text())

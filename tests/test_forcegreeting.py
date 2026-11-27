@@ -233,13 +233,14 @@ class ForceGreetingContractTests(unittest.TestCase):
         import json
         effects = json.loads((ROOT / 'config' / 'mwscript-effects.json').read_text(encoding='utf-8'))
         row = effects['functions']['forcegreeting']
-        # still in part: a creature has no row in the dialogue table
-        self.assertEqual(row['effect'], 'part')
-        self.assertEqual(row['basis'], 'test')
-        self.assertIn('creature', row['missing'])
-        self.assertEqual(row['register'], ['DIALOGUE-CREATURE-SPEAKERS-66'])
-        self.assertNotIn('fight', row['missing'])
-        self.assertNotIn('werewolf', row['missing'])
+        # full since the creatures that have lines got their rows in the dialogue table (tools/greeting_lut.py, the
+        # creature's rule) and the greeting opens for any speaker with a row; read from the source, not yet seen in
+        # play (MWSCRIPT-EFFECT-PARITY-69: the row was "in part: a creature opens no conversation" until then)
+        self.assertEqual(row['effect'], 'full')
+        self.assertEqual(row['basis'], 'source')
+        self.assertEqual(row['missing'], '')
+        self.assertEqual(row['register'], ['DIALOGUE-CREATURE-SPEAKERS-66', 'MWSCRIPT-FORCEGREETING-TALK-RULES-68'])
+        self.assertIn('CreatureContext', (ROOT / 'tools' / 'greeting_lut.py').read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

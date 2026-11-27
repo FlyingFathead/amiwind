@@ -23,3 +23,9 @@ aldruhn|global|-12606 54169 2500|0|Ald'ruhn
 balmora|global|-20536 -13960 346|0|Balmora
 # Khuul (cell -9,17): the street outside Thongar's Tradehouse, where its door (reference 102149) puts the player.
 khuul|global|-66897 139876 400|0|Khuul
+# People and creatures: the map "being", the label the record id (x y z and the yaw are unused). dbg tp NAME takes the
+# teleport list's own row of that being, as choosing it under Beings does: beside it, facing it, where it stands now
+# when its scene is loaded, else where it is placed. The builder takes such a line only when exactly one row of the
+# image's teleport list is that being (no common kind); a disk without it says so and nothing moves.
+# Lord Vivec (vivec_god) in the Palace of Vivec; dbg tp vivec is the city.
+lordvivec|being|0 0 0|0|vivec_god

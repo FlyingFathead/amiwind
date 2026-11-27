@@ -122,7 +122,7 @@ class CombatSourceContractTests(unittest.TestCase):
         # configuration saved before it (defaults level below 2) takes the new default once.
         self.assertIn('static cvar_t best_cvar={"aw_combat_best_attack","1",true};', code('aw_combat.c'))
         menu = code('aw_menu.c')
-        self.assertIn('ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};', menu)
+        self.assertIn('ROW_LABELS,ROW_BEST,ROW_PLANTS,ROW_AUTOSAVE};', menu)   # PLANT-PICK-DIRECT-DEFAULT-69 beside it
         self.assertIn('Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1)', menu)
         self.assertIn('aw_defaults_migrate=AW_CombatDefaultsMigrate;', code('aw_combat.c'))
         self.assertIn('#define DEFAULTS_LEVEL 3',(SRC / 'aw_fog.c').read_text(encoding='utf-8'))

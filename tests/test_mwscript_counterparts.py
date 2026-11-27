@@ -29,16 +29,60 @@ class Counterparts(unittest.TestCase):
         bad['entries'][1]['verdict'] = 'fine'
         bad['entries'][2]['steps'][0]['verdict'] = ''
         problems = F.counterpart_problems(bad)
-        self.assertEqual(len(problems), 3, problems)
+        # the three refusals, and the entry with the emptied step is also no longer "the same as its script"
+        self.assertEqual(len(problems), 4, problems)
 
-    def test_every_carried_script_has_an_entry_and_no_entry_is_run(self):
+    def test_an_adaptation_has_no_open_step(self):
+        """MWSCRIPT-EFFECT-PARITY-69, decided for the project on 27 November 2026: a script AmiWind's own code does is
+        an "AmiWind adaptation" only when it is feature complete, every step of the original's script carried out.
+        With a step that is partial or different it is a gap: counted apart, never as an adaptation. Until then every
+        own-code script counted as carried, the game's Main script among them, although its Random100 roll is not
+        done."""
+        for e in self.doc['entries']:
+            self.assertEqual(F.is_adaptation(e), not F.open_steps(e), e['script'])
+            self.assertEqual(e['verdict'] == 'same', not F.open_steps(e), e['script'])
+        doc = F.load()
+        by_id = {r['id'].casefold(): r for r in doc['scripts']}
+        entries = F.counterparts()
+        for sid, e in entries.items():
+            state, why = F.state_of(by_id[sid])
+            self.assertEqual(state, 'carried' if F.is_adaptation(e) else 'adaptation-gap', sid)
+            if state == 'adaptation-gap':
+                for s in F.open_steps(e):
+                    self.assertIn(s['step'], why, sid)
+        # no row is an adaptation without an entry whose every step is the same
+        for r in doc['scripts']:
+            if r['state'] == 'carried':
+                self.assertTrue(F.is_adaptation(entries.get(r['id'].casefold())), r['id'])
+        # a step turned different makes the entry refused while it is still called the same, and the row a gap
+        bad = copy.deepcopy(self.doc)
+        first = next(e for e in bad['entries'] if e['verdict'] == 'same')
+        first['steps'][0]['verdict'] = 'different'
+        self.assertTrue(any('an AmiWind adaptation has no open step' in p for p in F.counterpart_problems(bad)))
+        self.assertFalse(F.is_adaptation(first))
+        # Main: its every-frame roll of Random100 is not done, so it is a gap, with that step named
+        main = entries['main']
+        self.assertEqual([s['step'] for s in F.open_steps(main)], ['every frame'])
+        self.assertNotIn('random100', (ROOT / 'engine/aga/src/aw_mwvm.c').read_text(encoding='utf-8').casefold())
+        self.assertEqual(F.state_of(by_id['main'])[0], 'adaptation-gap')
+        # the counts that count as done leave the gap out
+        self.assertEqual(F.DONE_STATES, ('runs', 'carried'))
+        summary = F.script_summary(doc)
+        st = [F.state_of(r)[0] for r in doc['scripts']]
+        self.assertEqual(summary['all']['adaptation'], st.count('carried'))
+        self.assertEqual(summary['all']['not_yet'], len(st) - st.count('inert') - st.count('runs') - st.count('carried'))
+        self.assertGreaterEqual(summary['all']['not_yet'], st.count('adaptation-gap'))
+
+    def test_every_own_code_script_has_an_entry_and_no_entry_is_run(self):
         # the compiler's hand-written list and the tracker name the same scripts: a pattern with an entry for each
-        # script it matches (chargenboat* = the deck guard and the woman), and no entry for a script that runs
+        # script it matches (chargenboat* = the deck guard and the woman), and no entry for a script that runs; the
+        # game's Main script, which the game always runs and no pattern names, has its entry too
         patterns = set(handwritten_patterns())
         names = {e['script'].casefold() for e in self.doc['entries']}
+        self.assertIn('main', names)
         for p in patterns:
             self.assertTrue(any(n == p or (p.endswith('*') and n.startswith(p[:-1])) for n in names), p)
-        for n in names:
+        for n in names - {'main'}:
             self.assertTrue(any(n == p or (p.endswith('*') and n.startswith(p[:-1])) for p in patterns), n)
 
     def test_the_ship_repeat_lines_count_only_while_near(self):
@@ -71,14 +115,19 @@ class Counterparts(unittest.TestCase):
         conv = (ROOT / 'tools/prepare_character.py').read_text(encoding='utf-8')
         self.assertIn("barriers(master, SHIP_CELL)", conv)
         self.assertIn('id1/intro/barriers-ship.awb', (ROOT / 'config/release-features.json').read_text(encoding='utf-8'))
-        self.assertTrue(all(e['verdict'] == 'same' for e in self.doc['entries']))   # every opening row the same
+        # every opening row the same (Main is not the opening's: its roll of Random100 is open)
+        self.assertTrue(all(e['verdict'] == 'same' for e in self.doc['entries'] if e['script'] != 'Main'))
 
     def test_the_page_shows_the_section_and_the_count(self):
         page = (ROOT / 'docs' / 'MWSCRIPT_FEATURES.md').read_text(encoding='utf-8')
-        self.assertIn('## Carried by AmiWind\'s own code', page)
-        self.assertIn('are carried by AmiWind\'s own code**', page)
+        self.assertIn('## AmiWind adaptations', page)
+        self.assertIn('are AmiWind adaptations**', page)
+        self.assertNotIn('arried by AmiWind\'s own code', page)      # the old name of the state and its section
         for e in self.doc['entries']:
             self.assertIn('### %s' % e['script'], page)
+            label = F.LABELS['carried'] if F.is_adaptation(e) else F.LABELS['adaptation-gap']
+            self.assertIn('| %s | %s |' % (e['script'], F._cell(e['what'])), page)
+            self.assertRegex(page, r'\| %s \|[^\n]*\| %s \| %d \|' % (e['script'], label, len(F.open_steps(e))))
 
 
 if __name__ == '__main__':

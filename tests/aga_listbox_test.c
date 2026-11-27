@@ -180,6 +180,44 @@ int main(void){
         assert(!(p.flags&AW_TP_BEING) && !p.id[0] && AW_TpPlacesCategory(p.flags)==AW_TP_CAT_INTERIOR);
         assert(AW_TpPlacesCategory(0)==AW_TP_CAT_EXTERIOR && AW_TpPlacesCategory(AW_TP_HAS_Z|AW_TP_DOOR)==AW_TP_CAT_EXTERIOR);
     }
+    /* DBG-TP-LORDVIVEC-69 (dbg tp lordvivec): the being row of a record id, read row by row from the file at its
+     * offset (a pak member), case ignored; a common kind's row never, a place or room row never; a missing id, an empty
+     * id, a longer id, an older table and a bad size: -1 */
+    {
+        unsigned char t[AW_TP_HEADER+4*AW_TP_ROW3],*r;FILE *f;long base;
+        memset(t,0,sizeof(t));memcpy(t,"AWTP",4);t[5]=3;t[7]=AW_TP_ROW3;put32(t+8,4);
+        /* 0: a place row carrying the id (never a being without its flag) */
+        r=t+AW_TP_HEADER;memcpy(r,"Vivec",5);r[76]=AW_TP_HAS_Z;memcpy(r+96,"vivec_god",9);
+        /* 1: a common kind's row (AW_TP_NEAREST) with the id in its field: never taken */
+        r+=AW_TP_ROW3;memcpy(r,"Vivec",5);r[76]=AW_TP_BEING|AW_TP_NEAREST|AW_TP_HAS_Z;memcpy(r+80,"k0000",5);
+        memcpy(r+96,"vivec_god",9);
+        /* 2: the being, in his palace (the v0.0.69-dev6 image's row: flags 25, vpi015, 0 4 -98) */
+        r+=AW_TP_ROW3;memcpy(r,"Vivec",5);put32(r+64,0);put32(r+68,4);put32(r+72,-98);
+        r[76]=AW_TP_BEING|AW_TP_ROOM|AW_TP_HAS_Z;memcpy(r+80,"vpi015",6);memcpy(r+96,"vivec_god",9);
+        /* 3: a 31-character id that fills its field */
+        r+=AW_TP_ROW3;memcpy(r,"Long",4);r[76]=AW_TP_BEING|AW_TP_HAS_Z;memset(r+96,'a',AW_TP_ID-1);
+        f=tmpfile();assert(f);fputs("PAK member before the table",f);base=ftell(f);
+        assert(fwrite(t,1,sizeof(t),f)==sizeof(t));fputs("and after",f);
+        memset(&p,0,sizeof(p));
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"vivec_god",&p)==2);
+        assert(!strcmp(p.name,"Vivec") && !strcmp(p.map,"vpi015") && !strcmp(p.id,"vivec_god"));
+        assert(p.flags==(AW_TP_BEING|AW_TP_ROOM|AW_TP_HAS_Z) && p.x==0 && p.y==4 && p.z==-98);
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"Vivec_GOD",&p)==2);                  /* case ignored */
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"vivec",&p)==-1);                      /* the whole id */
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"vivec_god_x",&p)==-1);
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"no_such_being",&p)==-1);
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t),"",&p)==-1 && AW_TpPlacesBeingRow(f,base,sizeof(t),NULL,&p)==-1);
+        {char id[AW_TP_ID+1];for(i=0;i<AW_TP_ID-1;i++)id[i]='A';id[AW_TP_ID-1]=0;
+         assert(AW_TpPlacesBeingRow(f,base,sizeof(t),id,&p)==3);
+         id[AW_TP_ID-1]='a';id[AW_TP_ID]=0;assert(AW_TpPlacesBeingRow(f,base,sizeof(t),id,&p)==-1);}  /* longer */
+        assert(AW_TpPlacesBeingRow(f,base,sizeof(t)-1,"vivec_god",&p)==-1);               /* the size exact */
+        assert(AW_TpPlacesBeingRow(NULL,base,sizeof(t),"vivec_god",&p)==-1);
+        fclose(f);
+        /* an older table (version 2) has no ids: -1 */
+        f=tmpfile();assert(f);assert(fwrite(table2,1,sizeof(table2),f)==sizeof(table2));
+        assert(AW_TpPlacesBeingRow(f,0,sizeof(table2),"vivec_god",&p)==-1);
+        fclose(f);
+    }
     /* a common kind's placements file */
     {
         unsigned char k[AW_TPK_HEADER+2*AW_TPK_ROW];

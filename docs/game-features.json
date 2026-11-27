@@ -11,8 +11,8 @@
     "used_and_carried_out": null,
     "scripts_total": 1207,
     "scripts_compile": 1207,
-    "scripts_run_whole": 1063,
-    "scripts_measured": "24 November 2026, v0.0.68; 9 more are carried by the game's own code",
+    "scripts_run_whole": 1065,
+    "scripts_measured": "27 November 2026, v0.0.69-dev6; 8 more are AmiWind adaptations",
     "note": "used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 462 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57). By master (24 November 2026, v0.0.68): Morrowind.esm 616 scripts = 519 run, 9 carried by the game's own code, 88 that nothing in the original names or starts; Tribunal.esm 255 = 236 used, 235 run, 1 only in an add-on world, 19 not used; Bloodmoon.esm 336 = 310 used, 309 run, 1 only in an add-on world, 26 not used. The counts are those of docs/MWSCRIPT_FEATURES.md."
   },
   "features": [
@@ -273,10 +273,10 @@
      "missing": "42 table functions are not carried out, each with its reason on the console commands page (the drawing switches, the path grid, the fog of war, the wind, the vision bonus, the levelled list edits, the skipped animation). How many of the 251 used ones are among them is pending a measurement run; since v0.0.68 no script of the game lacks a function (the last two, in Mournhold, raise and lower a room's water).",
      "bugs": ["MWSCRIPT-MISSING-FUNCTIONS-63", "MWSCRIPT-CONSOLE-LOCAL-NAMES-63"], "todo": ["MWSCRIPT-MORE-57", "ACTORS-ON-57", "MWSCRIPT-PLAYER-CONTROL-62", "MWSCRIPT-SMALL-FUNCTIONS-62", "MWSCRIPT-PLACE-OBJECTS-62", "CRIME-59", "MWSCRIPT-GAPS-63", "MW-CONSOLE-COMMANDS-62"]},
     {"id": "mwscript-scripts", "name": "Scripts that run whole", "area": "scripts", "state": "partial",
-     "what": "1,063 of the 1,074 scripts the original uses run as scripts and 9 more are carried by the game's own code (the character creation scripts, compared step by step with it, and Main). Every Vvardenfell script the original uses runs, and so do all of Tribunal's Mournhold and Bloodmoon's Solstheim but one each: of Morrowind.esm's 616 scripts, 519 run, 9 are carried and 88 are not used (nothing in the original names or starts them); of Tribunal.esm's 255, 236 are used and 235 run; of Bloodmoon.esm's 336, 310 are used and 309 run. All 7,411 dialogue result scripts run.",
+     "what": "1,065 of the 1,074 scripts the original uses run as scripts and 8 more are AmiWind adaptations: the game's own code does every step of the script (the character creation scripts, compared step by step with it). Of Morrowind.esm's 616 scripts, 519 run, 8 are adaptations, 1 (Main) is done by the game's own code with a step open and 88 are not used (nothing in the original names or starts them; they never run there either); of Tribunal.esm's 255, 236 are used and all 236 run; of Bloodmoon.esm's 336, 310 are used and all 310 run. All 7,411 dialogue result scripts run.",
      "reference": "the original scripts run under OpenMW 0.51",
-     "proof": "docs/MWSCRIPT_FEATURES.md and docs/mwscript-features.json (measured 24 November 2026, v0.0.68); tests/test_mwscript.py.",
-     "missing": "Two scripts, one of Tribunal and one of Bloodmoon, are placed only in add-on cells the image does not carry; the exact counts are on the MWScript tracker. The census tray smoke test is not run.",
+     "proof": "docs/MWSCRIPT_FEATURES.md and docs/mwscript-features.json (measured 27 November 2026, v0.0.69-dev6); tests/test_mwscript.py.",
+     "missing": "The game's Main script never rolls the global Random100, which it sets every frame in the original. A script that runs is not yet a script that plays as the original: of the 259 functions the scripts call, 161 have the original's effect in play in full, 92 in part and 6 none (the MWScript tracker, Effect in play). The census tray smoke test is not run.",
      "bugs": [], "todo": ["MWSCRIPT-MORE-57", "MWSCRIPT-TRAY-SMOKE-58", "ACTORS-ON-57", "SCRIPTS-BY-MASTER-63"]},
 
     {"id": "music", "name": "Music", "area": "sound-ui", "state": "done",

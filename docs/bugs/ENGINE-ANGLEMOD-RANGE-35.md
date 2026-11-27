@@ -187,6 +187,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-RING-DISPOSITION-CHECK-60](DIALOGUE-RING-DISPOSITION-CHECK-60.md): Disposition after handing Fargoth his ring needs checking against the original
 - [DIALOGUE-TEXT-DEFINES-PARTIAL-67](DIALOGUE-TEXT-DEFINES-PARTIAL-67.md): Incomplete: the text defines %PCCrimeLevel, %PCClothingModifier and the global-variable defines are not filled in an answer
 - [DIALOGUE-TOPIC-WHO-60](DIALOGUE-TOPIC-WHO-60.md): Shargam gro-Shagdub answers "Who?" about Ralen Hlaalo right after naming him in his rumors
+- [DIALOGUE-WEREWOLF-CONDITIONS-UNANSWERED-69](DIALOGUE-WEREWOLF-CONDITIONS-UNANSWERED-69.md): Dialogue lines whose conditions ask whether someone is a werewolf, or how many people the player killed as a werewolf, are not judged by those conditions
 - [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
 - [DOCK-GREETING-OUT-OF-REACH-67](DOCK-GREETING-OUT-OF-REACH-67.md): Since v0.0.67 the dock guard waits at the plank out of the greeting's reach of where the opening walk stops, and the race menu does not open
@@ -257,9 +258,13 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68](MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68.md): An actor whose fatigue a script takes below zero falls unconscious only while it fights, and a script's change of the player's fatigue is lost while he fights
 - [MWSCRIPT-FORCED-STANCE-ACTORS-68](MWSCRIPT-FORCED-STANCE-ACTORS-68.md): ForceSneak and ForceRun on a person or creature change only part of its behaviour: no sneaking stance or speed, and no run while following or escorting
 - [MWSCRIPT-FORCEGREETING-TALK-RULES-68](MWSCRIPT-FORCEGREETING-TALK-RULES-68.md): A script's ForceGreeting opens no conversation with a creature or with a person who is fighting, knocked down or has nothing to say
+- [MWSCRIPT-FORCERUN-ACTOR-NO-RUN-69](MWSCRIPT-FORCERUN-ACTOR-NO-RUN-69.md): ForceRun on a person or creature does not make it run: the flag is kept and read back, but it walks its packages at walking speed
+- [MWSCRIPT-GETPOS-OTHER-PLACE-ZERO-69](MWSCRIPT-GETPOS-OTHER-PLACE-ZERO-69.md): GetPos and GetAngle read 0 for an object that is in another place than the player's, where the original reads where it stands there
+- [MWSCRIPT-HURTCOLLIDING-TRAPS-NO-HARM-69](MWSCRIPT-HURTCOLLIDING-TRAPS-NO-HARM-69.md): The spikes, dicers and tenderizers of the Clockwork City do no harm: the script call that hurts whoever touches an object works only on objects with their own entity, and these are drawn as scenery
 - [MWSCRIPT-INERT-SEEN-62](MWSCRIPT-INERT-SEEN-62.md): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - [MWSCRIPT-INTERIOR-PLACEMENTS-48](MWSCRIPT-INTERIOR-PLACEMENTS-48.md): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - [MWSCRIPT-LATER-MASTER-SCRIPT-61](MWSCRIPT-LATER-MASTER-SCRIPT-61.md): An object placed in Vvardenfell whose record gets its script from a later master is not attached
+- [MWSCRIPT-MAIN-RANDOM100-NOT-ROLLED-69](MWSCRIPT-MAIN-RANDOM100-NOT-ROLLED-69.md): The global Random100 is never rolled: the game's main script sets it to a new number from 0 to 100 every frame, and a script that reads it always reads 0
 - [MWSCRIPT-MEMBER-LOOKUP-COST-66](MWSCRIPT-MEMBER-LOOKUP-COST-66.md): A script reading or writing another object's variable walks the instance table and the parking store for the object: with the tables sized for the whole game the walk grows to hundreds of instances and thousands of parked objects, in 307 every-frame operations
 - [MWSCRIPT-MEMBER-QUIET-READER-66](MWSCRIPT-MEMBER-QUIET-READER-66.md): A script that reads another object's variable can sleep through a change that object's own script makes to it: such a change does not wake quiet scripts
 - [MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66](MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66.md): A script's read or write of another object's local variable finds nothing: the engine takes the object row's id as its script, so the read gives 0 and the write is dropped (Dagoth Ur's shield never follows the Heart's count)
@@ -267,6 +272,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-NPC-STATS-SKIP-FIGHT-68](MWSCRIPT-NPC-STATS-SKIP-FIGHT-68.md): An attribute or skill a script sets or changes on an NPC or creature does not reach its fighting, which keeps the game data's values
 - [MWSCRIPT-OLD-CONFIG-OFF-57](MWSCRIPT-OLD-CONFIG-OFF-57.md): An install whose saved config holds aw_mwscript 0 keeps compiled scripts off after the default turned on
 - [MWSCRIPT-ONPCHITME-NEVER-SET-68](MWSCRIPT-ONPCHITME-NEVER-SET-68.md): The script variable OnPCHitMe is never set: a script that waits for the player to strike its actor never sees the blow
+- [MWSCRIPT-PACKAGE-END-NO-FALLBACK-69](MWSCRIPT-PACKAGE-END-NO-FALLBACK-69.md): After a scripted travel, follow or escort has ended, the actor stands where it is and still reports that package, where the original returns it to its own wander
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
 - [MWSCRIPT-PLACE-OTHER-KINDS-62](MWSCRIPT-PLACE-OTHER-KINDS-62.md): A script cannot place an activator, a container or a levelled creature list yet
 - [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md): A video started by a script can always be skipped, also the ones the original plays to the end without a skip
@@ -277,9 +283,11 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-POSITIONCELL-OUTDOOR-62](MWSCRIPT-POSITIONCELL-OUTDOOR-62.md): An NPC or a creature a script sends outdoors appears there only while its home area is loaded
 - MWSCRIPT-REFUSED-SCRIPT-COUNT-58 (no report page): The compiled game scripts are refused at load since the dialogue result scripts joined the file: no script runs
 - [MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68](MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68.md): ModReputation changes only the player's reputation, not a person's, and GetDisposition reads the base value without the race, faction, reputation and personality terms
+- [MWSCRIPT-RESURRECT-LIVING-AND-ROOM-69](MWSCRIPT-RESURRECT-LIVING-AND-ROOM-69.md): Resurrect also resets a living person or creature to its game data, and one brought back inside a room is gone until the room is entered again, then stands where the game data puts it
 - [MWSCRIPT-RESURRECT-LOADED-ONLY-68](MWSCRIPT-RESURRECT-LOADED-ONLY-68.md): Resurrect brings back only an NPC or creature loaded in the player's map, not one elsewhere and not the player
 - [MWSCRIPT-ROTATE-NO-ENTITY-59](MWSCRIPT-ROTATE-NO-ENTITY-59.md): A script's Rotate on a streamed outdoor object without an entity is not carried out: the object does not turn
 - [MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66](MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66.md): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
+- [MWSCRIPT-SETPCCRIMELEVEL-FIGHTS-GO-ON-69](MWSCRIPT-SETPCCRIMELEVEL-FIGHTS-GO-ON-69.md): A crime level a script sets to 0 clears the bounty, but the people who attacked the player for the crime go on fighting and stay alarmed
 - [MWSCRIPT-SMALL-DIFFERENCES-68](MWSCRIPT-SMALL-DIFFERENCES-68.md): Small differences of script functions: GetPCTraveling always 0, GetWeaponType for lockpicks and probes, GetInterior in the Mournhold districts, GetDetected by creatures, PlayBink always skippable, PCExpell without its message, PayFine keeps the weapon out, SetPCCrimeLevel 0 keeps witness marks
 - MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - [MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68](MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68.md): A script's StartCombat is refused once four fighters are in the fight, and an actor not loaded near the player starts no fight
@@ -310,6 +318,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59 (no report page): Outdoors no placed items are drawn after a teleport or load: the table is read before the player stands at the arrival
 - PLACED-ITEMS-ROOM-RESET-59 (no report page): Entering a room with placed items drawn resets the machine to the boot screen
 - [PLACED-PIT-AXE-NO-FOCUS-61](PLACED-PIT-AXE-NO-FOCUS-61.md): The iron shardaxe in the Seyda Neen pit is drawn but shows no item box and cannot be taken
+- [PLANT-BOX-AIM-69](PLANT-BOX-AIM-69.md): The plants that open as containers outdoors can only be aimed at their centre point; with a box of their own they would hide what stands inside them
 - [PLAYER-ANIM-GROUPS-NOT-PLAYED-66](PLAYER-ANIM-GROUPS-NOT-PLAYED-66.md): The player body does not play every animation group of the original player files
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 - [PLAYER-FORTIFY-END-AS-DAMAGE-61](PLAYER-FORTIFY-END-AS-DAMAGE-61.md): When a Fortify Attribute effect on the player ends, the character sheet keeps it as a raised modifier and records the drop as damage
@@ -400,6 +409,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WEAPON-STRIKE-ENCHANT-NOT-CAST-61](WEAPON-STRIKE-ENCHANT-NOT-CAST-61.md): A weapon's Cast When Strikes enchantment is not cast when the weapon hits
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn
+- [WEREWOLF-KILLS-NOT-RESET-69](WEREWOLF-KILLS-NOT-RESET-69.md): The werewolf's kill count does not start again at zero when the player changes into the werewolf, so a script that asks for this night's kills reads every kill since the first change
 - [WEREWOLF-RUN-SPEED-63](WEREWOLF-RUN-SPEED-63.md): A player in werewolf form runs at his normal run speed: the werewolf run multiplier is not applied
 - [WEREWOLF-SET-KEPT-WITH-TORCH-68](WEREWOLF-SET-KEPT-WITH-TORCH-68.md): With a torch carried, taking the werewolf robe off by hand kept the werewolf's body and arms in memory until the torch was put away
 - [WEREWOLF-TABLES-STAY-LOADED-68](WEREWOLF-TABLES-STAY-LOADED-68.md): After the change back from the werewolf form its two animation tables stay loaded until the game is closed

@@ -169,7 +169,7 @@ class ItemTagTests(unittest.TestCase):
         engine = (ROOT / 'engine/aga/src/aw_items.c').read_text(encoding='utf-8')
         # the mover's tag is read at spawn with its own count (the mover is registered by name only, so its slot holds
         # no count of its own: GUARD-WEAPON-INVISIBLE-65) and checked against the model's frames once it is worn
-        self.assertIn('prep(sv.models[i],a->mover,0);', engine)
+        self.assertIn('prep(mover,mover_name,0,!lazy);', engine)
         self.assertIn('static int frames_match(model_t *m,int t)', engine)
 
 

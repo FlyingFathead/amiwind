@@ -1756,6 +1756,10 @@ int AW_InventoryPropertiesLine(const char *id,int columns,char *out,int size){
 /* FOCUS-NPC-OVERRIDES-ITEM-62: the distance along the view of the last aimed drop (inv_target, ledger_target) and
  * placed row (placed_target), map units from the eye; -1 none */
 static float drop_aim=-1,placed_aim=-1;
+/* PLANT-BOX-AIM-69: the last placed_target's best row and its ray (eye, direction, a room's shift), and whether the last
+ * AW_InventoryAimDistance went to that row (no nearer drop), for AW_PlacedAimHolds */
+static int placed_best=-1,aim_is_placed;
+static vec3_t placed_eye,placed_dir,placed_shift;
 static int inv_target(void){
     int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p;vec3_t f,r,u,eye,delta;trace_t tr;
     drop_aim=-1;
@@ -1799,6 +1803,7 @@ static int drop_aimed(void){return aw_ledger_on?ledger_target():inv_target();}
 static int placed_target(void);
 float AW_InventoryAimDistance(void){
     float drop=drop_aimed()>=0?drop_aim:-1,placed=placed_target()>=0?placed_aim:-1;
+    aim_is_placed=placed>=0 && (drop<0 || placed<=drop);
     if(drop<0)return placed;
     return placed<0 || drop<placed?drop:placed;
 }
@@ -1862,7 +1867,9 @@ static int focus_stride=FOCUS_ROW;
 #define FOCUS_NAME_LONG (FOCUS_NAME_FIELD-1+FOCUS_ID-1)
 /* box: OUTDOOR-CONTAINER-AIM-66, an exterior container's box (tools/prepare_focus.py CONTAINER_BOXES, packed in its id
  * field as a board's): its index in focus_board_axis, -1 none (a room's container: the room ray; no measured model) */
-typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[FOCUS_NAME_LONG+1];short drawn,box;unsigned char lock;} focus_row_t;
+/* picked, hidden: PLANT-PICK-DIRECT-DEFAULT-69, a plant (FOCUS_ACT_PICK) whose contents are gone: not aimed at under the
+ * AmiWind pick; hidden 1 when this engine took its room placement out of the view (shown picked) */
+typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[FOCUS_NAME_LONG+1];short drawn,box;unsigned char lock,picked,hidden;} focus_row_t;
 static focus_row_t *focus_rows;
 static int focus_count;
 static model_t *focus_world;
@@ -1878,9 +1885,18 @@ static unsigned long focus_doors_over;     /* doors past the list at a load (non
  * that box. NAMED-ACTIVATOR-FOCUS-66: every named activator (beds, shrines, banners ...) the same way; the most in one
  * place of the original data: 18 in a room, 78 in a 3 x 3 exterior window (measured on the built table, 13 November 2026). */
 /* OUTDOOR-CONTAINER-AIM-66: the exterior containers' boxes share the table (the most in a 3 x 3 window of the original
- * data: tools/container_census.py window_boxes); 256 x 36 bytes */
-#define FOCUS_BOARDS 256
-static float focus_board_axis[FOCUS_BOARDS][3][3];
+ * data: tools/container_census.py window_boxes).
+ * PLANT-BOX-AIM-69: every plant that opens as a container (FARGOTH-STASH-STUMP-69) carries its box too, 19,879 more
+ * outdoors: with them the most in one 3 x 3 window of the three masters is 1,183, and at 256 the boxes past the table
+ * took 379 signpost boards out of focus in 182 places. As many boxes as rows (FOCUS_ROWS): every box belongs to a row,
+ * so the table can never run out before the rows do (tools/prepare_focus.py WINDOW_BOXES checks it at build time).
+ * 1536 x 36 bytes = 55,296 bytes, allocated with the rows at the first place read (focus_load), no longer in the BSS
+ * (9,216 bytes less there): the engine's static size is taken before the heap and the automatic CHIM cache bank is
+ * sized in whole MiB from what is left (chim_zone.c ChimZone_AutoStep), so a table there could cost the bank a MiB;
+ * allocated after the start it takes from the free Fast RAM as the rows' 153.6 KB do. Not allocated: no boxes (the
+ * boards and boxed containers are aimed as without them, a board not at all). */
+#define FOCUS_BOARDS 1536
+static float (*focus_board_axis)[3][3];
 static int focus_boards;
 static float focus_f32(const byte *p){
     uint32_t bits=(uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);float v;
@@ -1890,7 +1906,7 @@ static float focus_f32(const byte *p){
  * tools/prepare_focus.py reference_rotation) times half extent k. */
 static int focus_board_add(const byte *box){
     float h[3],q[4],m[3][3],n;int i,k;
-    if(focus_boards>=FOCUS_BOARDS)return -1;
+    if(!focus_board_axis || focus_boards>=FOCUS_BOARDS)return -1;
     for(i=0;i<3;i++){h[i]=focus_f32(box+4*i);if(!(h[i]>=0 && h[i]<100000))return -1;}
     for(i=0;i<4;i++){q[i]=focus_f32(box+12+4*i);if(!(q[i]>=-1.01f && q[i]<=1.01f))return -1;}
     n=q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3];
@@ -1947,7 +1963,7 @@ static void focus_add_row(const byte *row){
     /* 'C' a container (slice 3); 'N' a named board (SIGNPOST-NAMES-MISSING-65, its box in the id field) */
     if(row[0]!='I' && row[0]!='A' && row[0]!='D' && row[0]!='C' && row[0]!='N')return;
     r=&focus_rows[focus_count];
-    r->kind=(char)row[0];r->owned=row[1]?1:0;r->edict=0;r->reference=(unsigned)focus_u32(row+4);
+    r->kind=(char)row[0];r->owned=row[1]?1:0;r->edict=0;r->reference=(unsigned)focus_u32(row+4);r->picked=r->hidden=0;
     /* STEAL-PROMPT-58: the builder's action code (prepare_focus.py); an older file has 0: an item is taken */
     r->action=(char)(row[2]?row[2]:row[0]=='I'?FOCUS_ACT_TAKE|(row[1]?FOCUS_ACT_OWNED:0):0);
     /* CONTAINER-WINDOW-59: a container's action 1 opens it (0: organic, harvested; an older file: none) */
@@ -1961,7 +1977,9 @@ static void focus_add_row(const byte *row){
         memcpy(r->name+FOCUS_NAME_FIELD-1,row+FOCUS_ROW,FOCUS_ID-1);r->name[FOCUS_NAME_LONG]=0;
     }
     for(j=0;r->name[j];j++)if((unsigned char)r->name[j]<32)r->name[j]=' ';
-    if(!r->name[0] || !(r->weight>=0 && r->weight<1000000))return;
+    /* ITEM-NAMELESS-NOT-TAKEN-69: an item is kept without a name (tools/prepare_focus.py objects_of, OpenMW 0.51
+     * Light::hasToolTip is the carry flag): its title is empty and its action line "E: Take"; everything else needs one */
+    if((!r->name[0] && r->kind!='I') || !(r->weight>=0 && r->weight<1000000))return;
     if(r->kind=='N' && (r->value=focus_board_add(row+FOCUS_ROW))<0)return;   /* the board's box (game units) */
     /* OUTDOOR-CONTAINER-AIM-66: a container's id field holds its box when the builder measured one (a record id, which
      * a room's container keeps, is no unit quaternion: no box) */
@@ -2284,6 +2302,10 @@ static unsigned long area_name_hash(const char *s){
  * by the stable id. The base game's numbers are both forms. The stable id of REFERENCE, and its merged number. */
 static unsigned ref_stable(unsigned r){return r>=(1u<<22) && r<(3u<<22)?((r>>22)<<20)|(r&0x3FFFFFu):r;}
 static unsigned ref_merged(unsigned r){return r>=(1u<<20) && r<(3u<<20)?((r>>20)<<22)|(r&0xFFFFFu):r;}
+/* OUTDOOR-ITEM-CHIM-COPY-STAYS-69: a 'P' row whose aux bit 0 is set names a piece of an item the placed item list draws
+ * (tools/effect_links.py PLACE_LISTED): that piece is gone for good, so an Enable (HIDE 0) leaves it gone too; the item
+ * is drawn once, by its placed model */
+#define AREA_LINK_LISTED 1
 int AW_AreaEffectHide(unsigned reference,int hide){
     int i,k,n=0;unsigned stable=ref_stable(reference);
     for(i=0;reference && i<AREA_SLOTS;i++){
@@ -2291,7 +2313,10 @@ int AW_AreaEffectHide(unsigned reference,int hide){
         if(!a->blob || !a->links)continue;
         for(k=0;k<a->link_rows;k++){
             const byte *r=a->links+k*AREA_LINK;
-            if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable){ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;}
+            if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable){
+                if(!hide && (r[2]&AREA_LINK_LISTED))continue;
+                ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;
+            }
         }
     }
     return n;
@@ -2318,8 +2343,11 @@ void AW_AreaEffectsApply(void){
         if(!a->blob || !a->links)continue;
         for(k=0;k<a->link_rows;k++){
             const byte *r=a->links+k*AREA_LINK;unsigned key=(unsigned)focus_u32(r+4),ref=(unsigned)focus_u32(r+8);
-            /* the world change list holds a script's Disable under the merged number, a take under the stable id */
-            if(r[0]=='P'){if(AW_ObjectDisabled(ref) || (ref_merged(ref)!=ref && AW_ObjectDisabled(ref_merged(ref))))
+            /* the world change list holds a script's Disable under the merged number, a take under the stable id;
+             * OUTDOOR-ITEM-CHIM-COPY-STAYS-69: a piece of an item the placed list draws is gone whenever its area is
+             * applied (the placed model is the item's one copy) */
+            if(r[0]=='P'){if((r[2]&AREA_LINK_LISTED) || AW_ObjectDisabled(ref) ||
+                              (ref_merged(ref)!=ref && AW_ObjectDisabled(ref_merged(ref))))
                               ChimChunks_GonePid(key,1);}
             else if(r[0]=='F'){if(key==map)AW_StaticFlameLink(sv.worldmodel,r[2]|(r[3]<<8),ref);}
             else if(r[0]=='L')AW_LampLink(key,ref);
@@ -2985,8 +3013,73 @@ int AW_AreaContainerKey(unsigned reference,char *id,int size){
     k=c[10]|(c[11]<<8);
     return k>0 && area_item_id(a,k-1,id,size);
 }
+/* PLANT-PICK-DIRECT-DEFAULT-69 (the maintainer, 27 November 2026: the AmiWind pick is the default, the container window
+ * an option): the builder marks every organic container that is a plant, an egg sack, a kollop, a spore pod or an ore
+ * or gem rock (tools/prepare_focus.py ACT_PICK; stashes, supply barrels and chests are not marked and keep their
+ * window). Under the AmiWind value of Options > Prefs "Plant and mushroom picking" (aw_plant_pick 1, the default; dbg
+ * plantpick) one press takes all it holds into the inventory with the mushrooms' pick sound and their "Picked up"
+ * lines, no window opens, and an emptied plant is not aimed at again until it refills (a respawning record, at the
+ * place's refill); in a room its placement is taken out of the view (shown picked), an ore or gem rock stays drawn
+ * (ACT_PICK_KEEP). The Original value (0) opens the window as every container does. The hooks are aw_cstrip.c's (NULL,
+ * as in the tools' tests: the AmiWind value, no sound, nothing hidden). The mushrooms and bracket fungi are the harvest
+ * catalogue's (aw_harvest_runtime.c) and keep their own pick. */
+#define FOCUS_ACT_PICK 16
+#define FOCUS_ACT_PICK_KEEP 32
+int (*aw_plant_pick_amiwind)(void);
+void (*aw_plant_pick_sound)(void);
+int (*aw_plant_hide)(unsigned reference,int hide);
+static int plant_row(const focus_row_t *row){
+    return row->kind=='C' && (row->action&FOCUS_ACT_PICK) && (row->action&3)==FOCUS_ACT_TAKE &&
+           (!aw_plant_pick_amiwind || aw_plant_pick_amiwind());
+}
+/* a plant the change list holds (rolled, opened or picked) whose contents are gone; an untouched one is never asked,
+ * so no levelled list is rolled before the first pick */
+static int plant_emptied(unsigned reference){
+    aw_container_item_t items[AW_CONTAINER_ITEMS];int first;
+    if(!aw_ledger_on || !AW_LedgerContentOf(&aw_ledger,reference,&first))return 0;
+    return AW_ContainerContents(reference,items,AW_CONTAINER_ITEMS,NULL)==0;
+}
+/* shown picked: a room's placement out of the view (an exterior CHIM static cannot be hidden yet, nor an ore rock) */
+static void plant_hide(focus_row_t *row){
+    if(row->hidden || (row->action&FOCUS_ACT_PICK_KEEP) || focus_outdoor || !aw_plant_hide || !plant_row(row))return;
+    if(aw_plant_hide(row->reference,1))row->hidden=1;
+}
+/* the plants among rows FIRST .. LAST-1 just read (after focus_respawn: a refilled one holds its contents again) */
+static void focus_plants(int first,int last){
+    int i;
+    for(i=first;i<last;i++){
+        focus_row_t *row=&focus_rows[i];
+        if(row->kind!='C' || !(row->action&FOCUS_ACT_PICK) || !(row->picked=(unsigned char)plant_emptied(row->reference)))
+            continue;
+        plant_hide(row);
+    }
+}
+static int plant_pick(focus_row_t *row){
+    aw_container_item_t items[AW_CONTAINER_ITEMS];aw_inventory_item_t item;char message[512],line[160];const char *why;
+    int n=AW_ContainerContents(row->reference,items,AW_CONTAINER_ITEMS,NULL),i,moved,got=0,refused=-1;
+    message[0]=0;
+    for(i=0;i<n;i++){
+        why="";
+        if(!(moved=AW_ContainerTake(row->reference,items[i].id,items[i].count,row->owned,&why))){
+            if(strcmp(why,"none") && refused<0)refused=i;
+            continue;
+        }
+        got+=moved;
+        if(!AW_InventoryRead(items[i].id,&item) || !item.name[0])continue;
+        Q_snprintf(line,sizeof(line),"Picked up %ld %s.",(long)moved,item.name);
+        if(strlen(message)+strlen(line)+2>sizeof(message))continue;
+        if(message[0])strcat(message,"\n");
+        strcat(message,line);
+    }
+    if(got){
+        if(aw_plant_pick_sound)aw_plant_pick_sound();
+        if(message[0])AW_UIPickupNotice(message,3);
+    }else if(refused>=0)AW_InventoryRefused(row->name,items[refused].id,items[refused].count);
+    if(AW_ContainerContents(row->reference,items,AW_CONTAINER_ITEMS,NULL)<=0){row->picked=1;plant_hide(row);}
+    return 1;
+}
 /* a container that opens (not organic): its strip, or the locked line; 1 when E was used here */
-static int container_open(const focus_row_t *row){
+static int container_open(focus_row_t *row){
     static char line[64];char key[FOCUS_ID+1];
     if(row->kind!='C' || (row->action&3)!=FOCUS_ACT_TAKE)return 0;
     /* LOCKED-CONTAINERS-NEVER-OPEN-67: a locked one opens for its key (unlocked for good, its trap disarmed), in god
@@ -2997,6 +3090,7 @@ static int container_open(const focus_row_t *row){
         AW_UISubtitle(row->name,line,3);return 1;
     }
     if(aw_trap_spring && aw_trap_spring(row->reference))return 1;   /* the trap instead of the strip */
+    if(plant_row(row))return plant_pick(row);   /* PLANT-PICK-DIRECT-DEFAULT-69: one press, no window */
     return aw_container_open && aw_container_open(row->reference,row->name,row->owned!=0);
 }
 /* aw_placed container [open | aim [N] | take ID [N] | put ID [N] | all] (CELL-CHANGES-59 slice 3,
@@ -3381,6 +3475,9 @@ static void focus_load(void){
     if(!focus_outdoor)place_keys[place_n++]=(unsigned long)room;
     else for(dx=-1;dx<=1;dx++)for(dy=-1;dy<=1;dy++)place_keys[place_n++]=focus_exterior_key(focus_gx+dx,focus_gy+dy);
     if(!focus_rows && !(focus_rows=(focus_row_t *)AW_TryMalloc(FOCUS_ROWS*sizeof(focus_row_t))))return;
+    /* PLANT-BOX-AIM-69: the box table with the rows, once (55,296 bytes); without it no boxes, said once */
+    if(!focus_board_axis && !(focus_board_axis=(float (*)[3][3])AW_TryMalloc(FOCUS_BOARDS*sizeof(*focus_board_axis))))
+        {static int said;if(!said++)Con_Printf("Focus: no memory for the %d boxes table; boards are not aimed at\n",FOCUS_BOARDS);}
     if(area_ready()){
         /* AREA-TABLES-59: the place's area tables (the room, or the 3 x 3 exterior cells) loaded with it: one seek and
          * one read an area (already loaded ones kept), the rows taken from them; then every lookup in play reads them */
@@ -3394,6 +3491,7 @@ static void focus_load(void){
             if(!a)continue;
             for(j=0;j<a->rows;j++)focus_add_row(a->row+j*FOCUS_ROW2);
             focus_respawn(keys[k],was,focus_count);
+            focus_plants(was,focus_count);     /* PLANT-PICK-DIRECT-DEFAULT-69 */
         }
         /* the carried items' records into memory now (the inventory, the strip's other side, the HUD): read at the
          * load, never in play */
@@ -3433,11 +3531,12 @@ static void focus_load(void){
         if(!(f=focus_open(&base,&rooms)))return;
         /* CELL-CHANGES-59 slice 7: each place read is a place loaded: its respawning containers refill when due */
         if(!focus_outdoor){int was=focus_count;ok=focus_read_key(f,base,rooms,(unsigned long)room);
-            if(ok)focus_respawn((unsigned long)room,was,focus_count);}
+            if(ok){focus_respawn((unsigned long)room,was,focus_count);focus_plants(was,focus_count);}}
         else for(dx=-1;dx<=1 && ok;dx++)for(dy=-1;dy<=1 && ok;dy++){
             unsigned long key=focus_exterior_key(focus_gx+dx,focus_gy+dy);int was=focus_count;
             ok=focus_read_key(f,base,rooms,key);
             if(ok)focus_respawn(key,was,focus_count);
+            if(ok)focus_plants(was,focus_count);
         }
         fclose(f);
     }
@@ -3563,6 +3662,23 @@ int (*aw_inventory_takes_use)(unsigned reference);
 static int scripted_board(const focus_row_t *row){
     return row->kind=='N' && aw_inventory_takes_use && aw_inventory_takes_use(row->reference);
 }
+/* PLANT-BOX-AIM-69 (aw_activate.h AW_BoxHolds): 1 when the point the view ray EYE + T*F reaches lies inside ROW's
+ * measured box, ROW a container aimed by its box (a room's: SHIFT added, as placed_target aims it) */
+static int focus_box_holds(const focus_row_t *row,const float *shift,const vec3_t eye,const vec3_t f,float t){
+    vec3_t at,point;int k;
+    if(!row || row->kind!='C' || row->box<0 || row->box>=focus_boards || t<0)return 0;
+    for(k=0;k<3;k++){at[k]=row->at[k]+shift[k];point[k]=eye[k]+t*f[k];}
+    return AW_BoxHolds(at,(const float (*)[3])focus_board_axis[row->box],point);
+}
+/* PLANT-BOX-AIM-69 (aw_activate.h AW_AimTakes): whether row I, met at T, takes the aim from BEST (met at NEAREST, -1
+ * none): the nearer, and what the ray meets inside a container's measured box wins over that container */
+static int aim_takes(int i,float t,int best,float nearest,float reach,const float *shift,const vec3_t eye,const vec3_t f){
+    int holds=0;
+    if(!(t>=0) || t>reach)return 0;
+    if(best>=0)holds=t>nearest?focus_box_holds(&focus_rows[best],shift,eye,f,t):
+                               focus_box_holds(&focus_rows[i],shift,eye,f,nearest);
+    return AW_AimTakes(t,nearest,reach,best>=0,t>nearest && holds,t<=nearest && holds);
+}
 static int placed_target(void){
     int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit,rank,view_hit,inner_hit;
     edict_t *p;vec3_t f,r,u,eye,delta,at;unsigned view_ref,inner_ref;
@@ -3581,25 +3697,28 @@ static int placed_target(void){
         /* FOCUS-NPC-OVERRIDES-ITEM-62: an actor's row is never used here (AW_PlacedFocus and the use refuse it; the
          * actor himself is aimed at by aw_scene.c), so his feet near the crosshair line no longer hide an item */
         if(row->kind=='A')continue;
+        /* PLANT-PICK-DIRECT-DEFAULT-69: a plant picked empty is not aimed at under the AmiWind pick (until it refills);
+         * one taken out of the view never */
+        if(row->hidden || (row->picked && plant_row(row)))continue;
         VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);length=DotProduct(delta,delta);
         /* CENSUS-CRAB-PLATE-FOCUS-66: an item drawn as an edict of its own that the view ray meets first is aimed at
          * that point, wherever on it the ray lands (as a drawn row by its model); nothing lies in front of it.
          * CONTAINER-BRUSH-ROWS-67: a container drawn as a brush of its own the same way */
         if((row->kind=='I' || row->kind=='C') && row->live && view_ref && row->reference==view_ref){
-            if(view_hit>nearest)continue;
+            if(!aim_takes(i,view_hit,best,nearest,reach,shift,eye,f))continue;      /* PLANT-BOX-AIM-69 */
             nearest=view_hit;best=i;continue;
         }
         /* CENSUS-SHELF-PLATE-BAKED-67: an item drawn as an edict of its own standing in the furniture the view ray met
          * first (view_inner_reference: the Limeware Platter in the census office's bookshelf) is aimed at where the
          * ray meets it past that furniture; anything met before it still wins (the nearest) */
         if(row->kind=='I' && row->live && inner_ref && row->reference==inner_ref && inner_ref!=view_ref){
-            if(inner_hit>nearest)continue;
+            if(!aim_takes(i,inner_hit,best,nearest,reach,shift,eye,f))continue;
             nearest=inner_hit;best=i;continue;
         }
         /* the ray asked only of drawn rows whose origin is within the reach and 64 units (the longest item) */
         if(row->kind=='I' && row->drawn>0 && aw_placed_ray && length<=(reach+64)*(reach+64) &&
            (hit=aw_placed_ray(row->drawn,eye,f))>=0){
-            if(hit>nearest)continue;
+            if(!aim_takes(i,hit,best,nearest,reach,shift,eye,f))continue;
             VectorMA(eye,hit,f,at);
             tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* something in front of the item */
@@ -3610,7 +3729,8 @@ static int placed_target(void){
          * near-the-origin test */
         if(row->kind=='N'){
             if(row->value<0 || row->value>=focus_boards || length>(reach+256)*(reach+256) ||
-               (hit=focus_board_ray(focus_board_axis[row->value],at,eye,f))<0 || hit>nearest)continue;
+               (hit=focus_board_ray(focus_board_axis[row->value],at,eye,f))<0 ||
+               !aim_takes(i,hit,best,nearest,reach,shift,eye,f))continue;
             VectorMA(eye,hit,f,delta);
             tr=SV_Move(eye,vec3_origin,vec3_origin,delta,MOVE_NOMONSTERS,p);
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the board */
@@ -3620,7 +3740,7 @@ static int placed_target(void){
          * (the 6-unit test at its reference point missed most urns and sacks), with the same clear line to that point */
         if(row->kind=='C' && !focus_outdoor && aw_room_ray && length<=(reach+64)*(reach+64) &&
            (hit=aw_room_ray(row->reference,eye,f))>=0){
-            if(hit>nearest)continue;
+            if(!aim_takes(i,hit,best,nearest,reach,shift,eye,f))continue;
             VectorMA(eye,hit,f,at);
             tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the container */
@@ -3629,12 +3749,17 @@ static int placed_target(void){
         /* OUTDOOR-CONTAINER-AIM-66: an exterior container (no room record) is aimed at where the view ray meets its
          * measured box, as a named board is; the near-the-origin test missed nearly every sack, barrel and chest */
         if(row->kind=='C' && row->box>=0 && row->box<focus_boards){
-            if(length>(reach+256)*(reach+256) || (hit=focus_board_ray(focus_board_axis[row->box],at,eye,f))<0 ||
-               hit>nearest)continue;
-            VectorMA(eye,hit,f,delta);
-            tr=SV_Move(eye,vec3_origin,vec3_origin,delta,MOVE_NOMONSTERS,p);
-            if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the container */
-            nearest=hit;best=i;continue;
+            if(length>(reach+256)*(reach+256) || (hit=focus_board_ray(focus_board_axis[row->box],at,eye,f))<0)continue;
+            /* PLANT-BOX-AIM-69: the eye inside the box (a bush's box reaches past its leaves): where the ray enters
+             * says nothing of where the plant is along it, so the box would take every aim from inside; it is aimed at
+             * its point as before the boxes (below) */
+            if(hit>0){
+                if(!aim_takes(i,hit,best,nearest,reach,shift,eye,f))continue;
+                VectorMA(eye,hit,f,delta);
+                tr=SV_Move(eye,vec3_origin,vec3_origin,delta,MOVE_NOMONSTERS,p);
+                if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;    /* a wall in front of the container */
+                nearest=hit;best=i;continue;
+            }
         }
         VectorAdd(row->at,shift,at);along=DotProduct(delta,f);
         if(along<=0 || length>reach*reach)continue;
@@ -3645,7 +3770,7 @@ static int placed_target(void){
         rank=along;
         if(row->kind=='I' && !row->live && row->drawn<=0 && !focus_outdoor && aw_room_ray &&
            (hit=aw_room_ray(row->reference,eye,f))>=0 && hit<along)rank=hit;
-        if(rank>nearest)continue;
+        if(!aim_takes(i,rank,best,nearest,reach,shift,eye,f))continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
         if(tr.fraction<1 && (1-tr.fraction)*sqrt(length)>6)continue;      /* a wall between: not in view */
         nearest=rank;best=i;
@@ -3653,7 +3778,13 @@ static int placed_target(void){
     /* what the use key takes or opens (placed_use): an item or a container */
     if(best>=0 && (focus_rows[best].kind=='I' || focus_rows[best].kind=='C' || scripted_board(&focus_rows[best])))
         placed_aim=nearest;
+    placed_best=best;VectorCopy(eye,placed_eye);VectorCopy(f,placed_dir);VectorCopy(shift,placed_shift);
     return best;
+}
+/* PLANT-BOX-AIM-69 (aw_inventory.h) */
+int AW_PlacedAimHolds(float distance){
+    if(!aim_is_placed || placed_best<0 || placed_best>=focus_count || !(distance>=0))return 0;
+    return focus_box_holds(&focus_rows[placed_best],placed_shift,placed_eye,placed_dir,distance);
 }
 /* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61, a check command): every focus row within twice the reach of the eye and
  * what placed_target makes of it: the distance along the view, off the crosshair line, and the line of sight. */
@@ -3779,6 +3910,9 @@ static int container_prompt(const focus_row_t *row,char *line,int size,int *stea
         Q_snprintf(open,sizeof(open),"E: %s",word);
         if(!hud_setting("sLocked",locked,sizeof(locked)))strcpy(locked,"Locked");
     }
+    /* PLANT-PICK-DIRECT-DEFAULT-69: a plant under the AmiWind pick has no "Open": the scene draws the mushrooms' action
+     * line for it (AW_PlacedPlantHint below, aw_scene.c AW_SceneDraw) */
+    if(plant_row(row) && container_lock(row)<=0)return 0;
     *steal=row->owned!=0;
     Q_strcpy_bounded(line,container_lock(row)>0?locked:open,(size_t)size);
     return 1;
@@ -3810,6 +3944,18 @@ int AW_ItemPrompt(char *line,int size,int *steal){
     *steal=(code&FOCUS_ACT_OWNED)!=0;
     Q_strcpy_bounded(line,prompts[code],(size_t)size);
     return 1;
+}
+/* PLANT-PICK-DIRECT-DEFAULT-69: the name of the aimed plant the AmiWind pick takes with the use key (aw_scene.c draws it
+ * as an object's title with the mushrooms' action line), NULL for none; *OWNED 1 when picking it is theft (drawn red).
+ * The same conditions as the prompt: no drop aimed, the labels and the Inventory window allowed. */
+const char *AW_PlacedPlantHint(int *owned);
+const char *AW_PlacedPlantHint(int *owned){
+    int best;
+    if(owned)*owned=0;
+    if(drop_aimed()>=0 || !labels_allowed() || !inventory_allowed() || (best=placed_target())<0 ||
+       !plant_row(&focus_rows[best]) || container_lock(&focus_rows[best])>0)return NULL;
+    if(owned)*owned=focus_rows[best].owned!=0;
+    return focus_rows[best].name;
 }
 /* PICKUP-PLACED-58: the activate key on a placed item in reach takes it, as the original and OpenMW 0.51 do: its
  * record id from focus.awf (AWF2), one into the inventory, the placement disabled and hidden through the object state
@@ -3935,7 +4081,9 @@ static int take_row(focus_row_t *row){
         char owner[AW_LEDGER_STOLEN_ID+1];int faction,stolen=row->owned && container_owner(row->reference,owner,&faction);
         if(stolen && aw_ledger_on)AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1);
         aw_state.inventory.initialized=1;
-        AW_UIPickupTaken(row->name,1,3);AW_CombatEquipmentChanged();   /* PICKUP-NAME-ONLY-BOX-67 */
+        /* PICKUP-NAME-ONLY-BOX-67; ITEM-NAMELESS-NOT-TAKEN-69: an item without a name is taken without a notice */
+        if(row->name[0])AW_UIPickupTaken(row->name,1,3);
+        AW_CombatEquipmentChanged();
         if(stolen)theft(owner,faction,item.id,1,item.value);
     }
     return 1;

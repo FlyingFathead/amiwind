@@ -154,6 +154,23 @@ int AW_ItemsStanceGroup(const char *name) {
     return 0;
 }
 
+/* HELD-ITEM-TABLE-FULL-69: the entry a new model's tag table takes. USED of SIZE entries hold a table; FLAGS, one per
+ * entry in use: AW_ITEMS_SLOT_SKEL its table is the skeletal form (no rows on the level's memory, so the entry can be
+ * given to another model), AW_ITEMS_SLOT_BUSY a live actor stands on, wears or may wear its model, or carries its
+ * light. A free entry first; in a full table the first skeletal entry nobody uses; -1: every entry is in use. Before,
+ * a full table took no new model at all: a CHIM session is one level (the island and every room it joins), so every
+ * armed actor met after the level's 64th distinct armed model drew no weapon, shield or torch until the next load. */
+#define AW_ITEMS_SLOT_SKEL 1
+#define AW_ITEMS_SLOT_BUSY 2
+int AW_ItemsTableSlot(int used,int size,const unsigned char *flags);
+int AW_ItemsTableSlot(int used,int size,const unsigned char *flags) {
+    int k;
+    if(used<0 || size<1 || used>size)return -1;
+    if(used<size)return used;
+    for(k=0;k<used;k++)if((flags[k]&AW_ITEMS_SLOT_SKEL) && !(flags[k]&AW_ITEMS_SLOT_BUSY))return k;
+    return -1;
+}
+
 unsigned AW_ItemsPathHash(const char *s) {
     unsigned h=2166136261u;
     if(!s)return 0;
@@ -173,16 +190,39 @@ int AW_ItemsIsItemPath(const char *s) {
  * rows live on the hunk, which the level owns. */
 #define TABLE 64
 /* rows: a baked model's tag rows; or skel: a skeletal model's item bones and actor scale (rows NULL). */
-static struct {model_t *model;int frames;float *rows;int item[AW_ITEMS_KINDS];
+typedef struct {model_t *model;int frames;float *rows;int item[AW_ITEMS_KINDS];
                int skel,bone[AW_ITEMS_KINDS];float scale[3];
                float emitter[3];int has_emitter,light_item;   /* a carried light (guard torch) */
                unsigned item_hash[AW_ITEMS_KINDS];   /* the tag's own item paths (HELD-WEAPON-WRONG-MODEL-62) */
-               int given,told;} table[TABLE];   /* the model's count prep had (0: not known), a mismatch said */
+               int given,told;                       /* the model's count prep had (0: not known), a mismatch said */
+               int unloaded;} aw_items_entry_t;      /* the tag names items that were not loaded (prep LOAD 0) */
+static aw_items_entry_t table[TABLE];
 static int used;
 static int by_own_count,full_spawns;   /* tables read with the tag's own count; spawns that found the table full */
+static int reclaims;                   /* entries of models nobody used, given to another model (HELD-ITEM-TABLE-FULL-69) */
+static unsigned char slot_flags[TABLE];   /* per entry: skeletal, in use (AW_ItemsTableSlot), as of the last scan */
+static double slot_scan_time=-1;          /* the server time of that scan (-1: none this level) */
+static int slot_scans;
 static model_t *level_world;
-static char names[TABLE*AW_ITEMS_KINDS][AW_ITEMS_PATH];   /* precache names live through the level */
-static int named;
+/* precache names live through the level. 256: the game data has 235 weapon and shield meshes, and an actor's own
+ * items (below) can name any of them in one session; 128 held the tags' item models only */
+#define NAMES 256
+static char names[NAMES][AW_ITEMS_PATH];
+static int named,names_full;
+/* ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69: what each actor holds comes from its own record, not from its model. The
+ * tag beside a model named ONE weapon and shield for every actor drawn with that model, chosen when the game was
+ * built: actors sharing a model could not hold different weapons, a ranged fighter held its melee weapon, and a
+ * creature (one model per mesh, many records) held nothing. Now the actor's record says which weapon and shield it
+ * has equipped (aw_items_held: the actor table's row, aw_actorstate.c AW_ActorHeldModels) and the tag gives the bones
+ * and the scale; the original draws what the inventory's two slots hold (rule from OpenMW
+ * apps/openmw/mwrender/npcanimation.cpp showWeapons, showCarriedLeft and creatureanimation.cpp updateParts; read, not
+ * copied). own_item: per edict, the precache index of its weapon and its shield (0 none), valid while own_known; an
+ * actor whose record cannot say (no actor table, a table without the held models, no row) keeps its tag's items.
+ * 5 bytes an edict (3,000 bytes for 600), set at the actor's spawn, cleared with the level. */
+int (*aw_items_held)(edict_t *actor,char weapon[AW_ITEMS_PATH],char shield[AW_ITEMS_PATH]);
+static short own_item[MAX_EDICTS][AW_ITEMS_KINDS];
+static unsigned char own_known[MAX_EDICTS];
+static int own_actors,own_tag_actors;   /* spawns whose items came from their record; from their model's tag */
 #define CARRIERS AW_ITEMS_CARRIERS
 static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];
 static struct {int frame;float at[4];} carrier_posed[CARRIERS];   /* what each light was posed at (AW_ItemsPreSend) */
@@ -206,8 +246,9 @@ static void shown_drop(edict_t **items) {
     int i=shown_of(items);
     if(i>=0)shown[i]=shown[--shown_count];
 }
+static int pose_key(edict_t *actor);
 static void posed_at(edict_t *actor,int *frame,float at[4]) {
-    *frame=(int)actor->v.frame;
+    *frame=pose_key(actor);   /* the frame, and a torso layer's frame in it (ACTOR-DRAW-STOPS-LEGS-69) */
     at[0]=actor->v.origin[0];at[1]=actor->v.origin[1];at[2]=actor->v.origin[2];at[3]=actor->v.angles[1];
 }
 /* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): an NPC a script turned into a werewolf holds nothing, its weapon, shield and
@@ -223,6 +264,8 @@ static int turned(edict_t *actor) {return aw_items_werewolf && aw_items_werewolf
  * server clears them (SV_SpawnServer, beside AW_AnimSceneReset). */
 void AW_ItemsSceneReset(void) {
     used=0;named=0;memset(table,0,sizeof(table));level_world=NULL;by_own_count=full_spawns=0;
+    reclaims=slot_scans=0;slot_scan_time=-1;
+    memset(own_known,0,sizeof(own_known));own_actors=own_tag_actors=names_full=0;
     carrier_count=0;memset(carriers,0,sizeof(carriers));carrier_world=NULL;
     shown_count=0;memset(shown,0,sizeof(shown));presend_sets=presend_lights=0;presend_far=0;
 }
@@ -232,6 +275,8 @@ static void level_check(void) {
     R_AliasStormLayer=AW_ItemsStormLayer;   /* and an actor's eye-shielding arm in an ash or blight storm */
     if(level_world!=sv.worldmodel){
         level_world=sv.worldmodel;used=0;named=0;memset(table,0,sizeof(table));by_own_count=full_spawns=0;
+        reclaims=slot_scans=0;slot_scan_time=-1;
+        memset(own_known,0,sizeof(own_known));own_actors=own_tag_actors=names_full=0;
         shown_count=0;      /* the last world's sets went with its edicts */
     }
 }
@@ -256,7 +301,11 @@ static int carries_light(int t) {return t>=0 && table[t].skel && table[t].has_em
 static int precache(const char *path) {
     int i;model_t *m;
     for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)if(!strcmp(sv.model_precache[i],path))return i;
-    if(i>=MAX_MODELS || sv.state!=ss_loading || named>=TABLE*AW_ITEMS_KINDS)return 0;
+    if(i>=MAX_MODELS || sv.state!=ss_loading)return 0;
+    if(named>=NAMES){       /* said once a level, counted for dbg animkit pick: never a silent empty hand */
+        if(!names_full++)Con_Printf("Held item %s: the level's %d item model names are in use, not drawn\n",path,NAMES);
+        return 0;
+    }
     if(!(m=Mod_ForName((char *)path,false)))return 0;
     strcpy(names[named],path);sv.model_precache[i]=names[named++];sv.models[i]=m;
     return i;
@@ -272,10 +321,58 @@ static void refused(const char *path,int model_frames,int tag_frames) {
  * name only): the tag's own frame count is kept and checked against the model when it is worn
  * (frames_match), for both tag forms (AW_ItemsTagFrames); the builder writes one row per frame of each model
  * (ANIMKIT-ITEM-TAG-FRAMES-35). */
-static void prep(model_t *m,const char *name,int numframes) {
-    char path[MAX_QPATH+4],items[AW_ITEMS_KINDS][AW_ITEMS_PATH];byte *text;
-    int mark,n,k,frames,any=0,given=numframes,declared;float *rows;
-    if(!m || entry_of(m)>=0)return;
+/* HELD-ITEM-TABLE-FULL-69: the entry for a new model's table (AW_ItemsTableSlot): a free one, else, in a full table,
+ * a skeletal entry whose model no live actor stands on, wears as its mover, stands on under a worn mover or may wear
+ * (its layout names it), and whose light no live actor carries. The scan runs only at a spawn that finds the table
+ * full: one pass over the edicts, per alias-model edict one compare an entry, and a name compare an entry for an
+ * actor whose layout names a mover. No memory: the entry is used again in place (the indices the carriers hold stay
+ * good); a row table is never given back (its rows are on the level's memory). */
+static int table_slot(void) {
+    unsigned char *flags=slot_flags;int i,k,base;model_t *m;const aw_anim_t *a;
+    if(used<TABLE)return used;
+    /* one scan serves every spawn of the same server time (an area's actors join in one frame): within it actors are
+     * only added, and a model that takes an entry is marked in use at once (table_taken) */
+    if(slot_scan_time==sv.time)return AW_ItemsTableSlot(used,TABLE,flags);
+    slot_scan_time=sv.time;slot_scans++;
+    for(k=0;k<TABLE;k++)flags[k]=(unsigned char)(table[k].skel && !table[k].rows?AW_ITEMS_SLOT_SKEL:0);
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *e=EDICT_NUM(i);
+        if(e->free || !(m=model_of(e)) || m==sv.worldmodel)continue;
+        for(k=0;k<TABLE;k++)if(table[k].model==m)flags[k]|=AW_ITEMS_SLOT_BUSY;
+        if((base=AW_AnimWornBase(e))>0 && base<MAX_MODELS && sv.models[base])
+            for(k=0;k<TABLE;k++)if(table[k].model==sv.models[base])flags[k]|=AW_ITEMS_SLOT_BUSY;
+        a=AW_AnimOf(e);
+        if(a->mover[0])
+            for(k=0;k<TABLE;k++)if(!strcmp(table[k].model->name,a->mover))flags[k]|=AW_ITEMS_SLOT_BUSY;
+    }
+    for(i=0;i<carrier_count;i++)
+        if(carriers[i].actor && !carriers[i].actor->free && carriers[i].light && !carriers[i].light->free &&
+           carriers[i].table>=0 && carriers[i].table<TABLE)flags[carriers[i].table]|=AW_ITEMS_SLOT_BUSY;
+    return AW_ItemsTableSlot(used,TABLE,flags);
+}
+/* A new model's table put into entry AT: a new entry, or one given up by a model nobody used: then a carrier slot that
+ * still names the entry (its actor is gone) is free again. The entry counts as in use for the rest of this scan. */
+static void table_taken(int at,const aw_items_entry_t *fresh) {
+    int i;
+    if(at==used)used++;
+    else{
+        reclaims++;
+        for(i=0;i<carrier_count;i++)if(carriers[i].table==at){
+            if(carriers[i].light && !carriers[i].light->free)ED_Free(carriers[i].light);
+            carriers[i].actor=NULL;carriers[i].light=NULL;
+        }
+    }
+    table[at]=*fresh;if(!fresh->given)by_own_count++;
+    slot_flags[at]=(unsigned char)((fresh->skel && !fresh->rows?AW_ITEMS_SLOT_SKEL:0)|AW_ITEMS_SLOT_BUSY);
+}
+/* LOAD 0 (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69): the tag's own item models are not loaded now: the actor's record
+ * names what it holds, and the entry is kept for its bones and scale (also a tag that names no item at all, a
+ * creature's); tag_items loads them later for an actor whose record cannot say. */
+static void prep(model_t *m,const char *name,int numframes,int load) {
+    char path[MAX_QPATH+4],items[AW_ITEMS_KINDS][AW_ITEMS_PATH];byte *text;aw_items_entry_t fresh;
+    int mark,n,k,frames,any=0,given=numframes,declared,at;float *rows;
+    if(!m)return;
+    if((k=entry_of(m))>=0){slot_flags[k]|=AW_ITEMS_SLOT_BUSY;return;}   /* in use, also for a scan made just before */
     n=(int)strlen(name);
     if(n<5 || n>=(int)sizeof(path) || strcmp(name+n-4,".mdl") || numframes<0 || numframes>AW_ITEMS_MAX_SKEL_FRAMES)
         return;
@@ -285,33 +382,38 @@ static void prep(model_t *m,const char *name,int numframes) {
     text=COM_LoadTempFile(path);
     if(!text){Hunk_FreeToLowMark(mark);return;}
     declared=AW_ItemsTagFrames((const char *)text,0);
-    if(used>=TABLE){
-        /* a CHIM session is one level (the island and every room it joins): a model with a tag met after the
-         * table is full draws no items; said once a level, counted for dbg animkit pick */
+    /* a CHIM session is one level (the island and every room it joins), so a full table gives the entry of a model
+     * nobody uses any more to the new one (HELD-ITEM-TABLE-FULL-69: table_slot); only when every entry is in use by a
+     * live actor does a model with a tag draw no items: said once a level, counted for dbg animkit pick */
+    if((at=table_slot())<0){
         if(declared && !full_spawns++)
-            Con_Printf("Item tags %s: the level's %d tag tables are in use, items not drawn\n",path,TABLE);
+            Con_Printf("Item tags %s: the level's %d tag tables are in use by live actors, items not drawn\n",path,
+                       TABLE);
         Hunk_FreeToLowMark(mark);return;
     }
     numframes=AW_ItemsTagFrames((const char *)text,numframes);   /* not known: the tag's own */
+    /* built beside the table and put in only when it holds an item: an entry in use is never written over by a tag
+     * that is refused or names nothing */
+    memset(&fresh,0,sizeof(fresh));fresh.model=m;fresh.given=given;
     if(!strncmp((const char *)text,"AWTS1 ",6)){
         /* a skeletal model: its items follow the table's bones, posed when drawn (SKEL-ITEM-TAGS-52) */
         int bones[AW_ITEMS_KINDS];float scale[3];char light[AW_ITEMS_PATH];
-        frames=numframes?AW_ItemsParseSkel((const char *)text,numframes,items,bones,scale,light,table[used].emitter,
-                                           &table[used].has_emitter):0;
+        frames=numframes?AW_ItemsParseSkel((const char *)text,numframes,items,bones,scale,light,fresh.emitter,
+                                           &fresh.has_emitter):0;
         Hunk_FreeToLowMark(mark);
         if(!frames){refused(path,given,declared);return;}
-        table[used].model=m;table[used].frames=frames;table[used].rows=NULL;table[used].skel=1;
-        table[used].given=given;table[used].told=0;
-        for(k=0;k<3;k++)table[used].scale[k]=scale[k];
+        fresh.frames=frames;fresh.skel=1;
+        for(k=0;k<3;k++)fresh.scale[k]=scale[k];
         for(k=0;k<AW_ITEMS_KINDS;k++){
-            table[used].bone[k]=bones[k];
-            table[used].item[k]=items[k][0] && bones[k]>=0?precache(items[k]):0;
-            table[used].item_hash[k]=table[used].item[k]?AW_ItemsPathHash(items[k]):0;
-            if(table[used].item[k])any=1;
+            fresh.bone[k]=bones[k];
+            fresh.item[k]=load && items[k][0] && bones[k]>=0?precache(items[k]):0;
+            fresh.item_hash[k]=fresh.item[k]?AW_ItemsPathHash(items[k]):0;
+            if(fresh.item[k])any=1;
+            if(!load && bones[k]>=0){any=1;if(items[k][0])fresh.unloaded=1;}
         }
-        table[used].light_item=table[used].has_emitter && light[0]?precache(light):0;
-        if(table[used].light_item)any=1;
-        if(any){if(!given)by_own_count++;used++;}
+        fresh.light_item=fresh.has_emitter && light[0]?precache(light):0;
+        if(fresh.light_item)any=1;
+        if(any)table_taken(at,&fresh);
         return;
     }
     if(numframes>AW_ITEMS_MAX_FRAMES){Hunk_FreeToLowMark(mark);return;}
@@ -322,46 +424,94 @@ static void prep(model_t *m,const char *name,int numframes) {
         refused(path,given,declared);
         Hunk_FreeToLowMark(mark);return;
     }
-    table[used].model=m;table[used].frames=frames;table[used].rows=rows;table[used].skel=0;
-    table[used].given=given;table[used].told=0;
+    fresh.frames=frames;fresh.rows=rows;
     for(k=0;k<AW_ITEMS_KINDS;k++){
-        table[used].item[k]=items[k][0]?precache(items[k]):0;
-        table[used].item_hash[k]=table[used].item[k]?AW_ItemsPathHash(items[k]):0;
-        if(table[used].item[k])any=1;
+        fresh.item[k]=load && items[k][0]?precache(items[k]):0;
+        fresh.item_hash[k]=fresh.item[k]?AW_ItemsPathHash(items[k]):0;
+        if(fresh.item[k])any=1;
+        if(!load){any=1;if(items[k][0])fresh.unloaded=1;}
     }
-    if(any){if(!given)by_own_count++;used++;}else Hunk_FreeToLowMark(mark);
+    if(any)table_taken(at,&fresh);else Hunk_FreeToLowMark(mark);
+}
+/* The item models a table's own tag names, loaded after all (prep with LOAD 0 left them): for an actor whose record
+ * cannot say what it holds. The tag is read once more; its frames and bones were checked when the entry was made. */
+static void tag_items(int t) {
+    char path[MAX_QPATH+4],items[AW_ITEMS_KINDS][AW_ITEMS_PATH];const char *p;byte *text;int mark,n,k;
+    if(t<0 || !table[t].unloaded)return;
+    table[t].unloaded=0;
+    n=(int)strlen(table[t].model->name);
+    if(n<5 || n>=(int)sizeof(path))return;
+    memcpy(path,table[t].model->name,(size_t)(n-4));strcpy(path+n-4,".tag");
+    mark=Hunk_LowMark();
+    if((text=COM_LoadTempFile(path))!=NULL){
+        p=line_end((const char *)text);if(*p)p++;
+        if(item_paths(&p,items))for(k=0;k<AW_ITEMS_KINDS;k++){
+            table[t].item[k]=items[k][0] && (!table[t].skel || table[t].bone[k]>=0)?precache(items[k]):0;
+            table[t].item_hash[k]=table[t].item[k]?AW_ItemsPathHash(items[k]):0;
+        }
+    }
+    Hunk_FreeToLowMark(mark);
+}
+/* The full-kit model ACTOR's layout names as its mover (aw_anim.c AW_AnimMover; AW_AnimPrep has registered it by
+ * name), NULL none or M itself; *NAME its name as the layout writes it. */
+static model_t *mover_model(edict_t *actor,model_t *m,const char **name) {
+    const aw_anim_t *a=AW_AnimOf(actor);int i;
+    *name=a->mover;
+    if(!a->mover[0])return NULL;
+    for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)
+        if(!strcmp(sv.model_precache[i],a->mover))return sv.models[i] && sv.models[i]!=m?sv.models[i]:NULL;
+    return NULL;
 }
 
 void AW_ItemsPrep(edict_t *actor) {
-    model_t *m;const aw_anim_t *a;int i;
+    model_t *m,*mover;const char *mover_name;int i,n,k,t,tm,held=-1,lazy=aw_items_held!=NULL;
+    char own[AW_ITEMS_KINDS][AW_ITEMS_PATH];
     level_check();
-    if(!actor || !(m=model_of(actor)) || sv.state!=ss_loading)return;
+    if(!actor)return;
+    n=NUM_FOR_EDICT(actor);
+    if(n>0 && n<MAX_EDICTS)own_known[n]=0;      /* this edict's last actor's items are not this one's */
+    if(!(m=model_of(actor)) || sv.state!=ss_loading)return;
     /* 0: a model known by name only (another layout's mover, registered before this actor spawned, so its precache
      * loaded nothing): read with its tag's own count, as a mover is */
     if(m->numframes<0 || m->numframes>AW_ITEMS_MAX_SKEL_FRAMES)return;
-    prep(m,m->name,m->numframes);
-    if(carries_light(entry_of(m))){          /* a guard's torch: carried all the time (AW_ItemsCarriedUpdate) */
-        carriers_check();
-        for(i=0;i<carrier_count && carriers[i].actor!=actor;i++);
-        if(i==carrier_count && carrier_count<CARRIERS){
-            carriers[carrier_count].actor=actor;carriers[carrier_count].light=NULL;
-            carriers[carrier_count++].table=entry_of(m);
-        }
-    }
+    prep(m,m->name,m->numframes,!lazy);
     /* The full-kit model the actor wears while it moves or fights (aw_anim.c AW_AnimMover) has its own
      * tag table beside it; AW_AnimPrep has registered it by name. GUARD-WEAPON-INVISIBLE-65: never its numframes
      * here (as AW_AnimPrep reads the mover's layout): it is not loaded (0), or its reused slot still holds the count
      * of the model it held before; the tag is read with its own count and checked against the model once it is
      * loaded and worn (frames_match). Passed before, the skeletal tag of every such mover was refused. */
-    a=AW_AnimOf(actor);
-    if(!a->mover[0])return;
-    for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)
-        if(!strcmp(sv.model_precache[i],a->mover)){
-            if(sv.models[i] && sv.models[i]!=m)prep(sv.models[i],a->mover,0);
-            break;
+    if((mover=mover_model(actor,m,&mover_name))!=NULL)prep(mover,mover_name,0,!lazy);
+    t=entry_of(m);tm=mover?entry_of(mover):-1;
+    /* ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69: an actor that has a table (bones to hold with) is asked what its own
+     * record has equipped; those models are loaded, the tag's own are not. An actor whose record cannot say keeps
+     * the tag's items, loaded now. Asked only for a model with a table: an unarmed model costs no read. */
+    if(lazy && (t>=0 || tm>=0)){
+        if(n>0 && n<MAX_EDICTS && (held=aw_items_held(actor,own[0],own[1]))>=0){
+            for(k=0;k<AW_ITEMS_KINDS;k++)
+                own_item[n][k]=(short)((held&(1<<k)) && AW_ItemsIsItemPath(own[k])?precache(own[k]):0);
+            own_known[n]=1;own_actors++;
+        }else{tag_items(t);tag_items(tm);own_tag_actors++;}
+    }
+    if(carries_light(t)){          /* a guard's torch: carried all the time (AW_ItemsCarriedUpdate) */
+        carriers_check();
+        for(i=0;i<carrier_count && carriers[i].actor!=actor;i++);
+        /* HELD-ITEM-TABLE-FULL-69: a slot whose actor is gone is used again (a session is one level: the slots
+         * were never given back either, so the 33rd torch carrier met carried none) */
+        if(i==carrier_count)for(i=0;i<carrier_count && carriers[i].actor && !carriers[i].actor->free;i++);
+        if(i<carrier_count || carrier_count<CARRIERS){
+            if(i==carrier_count)carrier_count++;
+            else if(carriers[i].actor!=actor && carriers[i].light && !carriers[i].light->free)ED_Free(carriers[i].light);
+            if(carriers[i].actor!=actor)carriers[i].light=NULL;
+            carriers[i].actor=actor;carriers[i].table=t;
         }
+    }
 }
 
+/* ACTOR's edict number when its items are its own record's (AW_ItemsPrep), else 0. */
+static int own_of(edict_t *actor) {
+    int n=NUM_FOR_EDICT(actor);
+    return n>0 && n<MAX_EDICTS && own_known[n]?n:0;
+}
 /* A table is used only when its rows match the model's frames (a mover's are checked once it is loaded). */
 static int frames_match(model_t *m,int t) {return t>=0 && m && m->numframes==table[t].frames;}
 
@@ -388,18 +538,21 @@ static void mismatch_told(int t) {
                table[t].model->numframes);
 }
 int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
-    int t=-1,k,n=0;edict_t *e;
+    int t=-1,k,n=0,own;edict_t *e;
     level_check();
     for(k=0;k<AW_ITEMS_KINDS;k++)out[k]=NULL;
     if(!actor || actor->free || turned(actor) || !frames_match(model_of(actor),t=entry_of(model_of(actor)))){
         mismatch_told(t);return 0;}
+    own=own_of(actor);      /* the actor's own weapon and shield (its record's), else its model's tag's */
     for(k=0;k<AW_ITEMS_KINDS;k++){
-        int i=table[t].item[k];
+        int i=own?own_item[own][k]:table[t].item[k];
         /* while torches are carried the torch has the shield hand (AW_ItemsCarriedUpdate) */
-        if(!i || !sv.model_precache[i] || (k==1 && carries_light(t) && AW_GuardTorchWanted()))continue;
+        if(i<=0 || i>=MAX_MODELS || !sv.model_precache[i] || (k==1 && carries_light(t) && AW_GuardTorchWanted()))continue;
         /* HELD-WEAPON-WRONG-MODEL-62: the slot must still name the tag's own item model, and an item model at that;
-         * anything else is drawn as nothing and said once per level */
-        if(!held_item_ok(actor,t,k,i))continue;
+         * anything else is drawn as nothing and said once per level. An actor's own item: an item model, on a bone
+         * the table has */
+        if(own?!AW_ItemsIsItemPath(sv.model_precache[i]) || (table[t].skel && table[t].bone[k]<0):
+               !held_item_ok(actor,t,k,i))continue;
         e=ED_Alloc();
         e->v.classname=ED_NewString("aw_item")-pr_strings;
         e->v.model=sv.model_precache[i]-pr_strings;e->v.modelindex=i;
@@ -479,17 +632,45 @@ int AW_ItemsStormLayer(const model_t *m,const void *skel_table,int frame,float y
     return 1;
 }
 
-static int skel_rows(int t,int f,float rows[AW_ITEMS_ROW]) {
-    static const aw_skel_table_t *last_table;static int last_frame=-1,last_layered;
+/* ACTOR-DRAW-STOPS-LEGS-69: the torso layer of ACTOR at this send (aw_animkit.c: a draw or put-away played over the
+ * walk), NULL in the fixtures: 1 with the draw's table frame and the torso's root bone */
+int (*aw_items_torso_layer)(edict_t *actor,float *layer_frame,int *root);
+/* The torso's root bone of a skeletal model of an item table (Bip01 Spine2 of the stick figure, tools/skeletal_actor.py
+ * STICK_BONES): the parent of the bone both arms' roots hang on (the neck), -1 when the table is not shaped so or the
+ * model has no item table. Declared where it is called (aw_animkit.c). */
+int AW_ItemsTorsoRoot(const model_t *m,const void *skel_table);
+int AW_ItemsTorsoRoot(const model_t *m,const void *skel_table) {
+    const aw_skel_table_t *tab=(const aw_skel_table_t *)skel_table;int t,l,r,neck;
+    if(!m || !tab)return -1;
+    for(t=0;t<used && table[t].model!=m;t++);
+    if(t==used || !table[t].skel)return -1;
+    l=AW_SkelLeftArmRoot(tab,table[t].bone[1],table[t].bone[0]);r=AW_SkelRightArmRoot(tab,table[t].bone[1],table[t].bone[0]);
+    if(l<0 || r<0 || (neck=tab->parent[l])<0 || neck!=tab->parent[r] || tab->parent[neck]<=0)return -1;
+    return tab->parent[neck];
+}
+/* the frame an actor's set is posed at, the torso layer's frame in it (AW_ItemsStale compares it whole) */
+static int pose_key(edict_t *actor) {
+    float lf;int root;
+    if(actor && aw_items_torso_layer && aw_items_torso_layer(actor,&lf,&root))   /* unsigned: wraps, never overflows */
+        return (int)((unsigned)(int)actor->v.frame+(unsigned)(1+(int)lf)*(unsigned)(AW_ITEMS_MAX_SKEL_FRAMES+1));
+    return (int)actor->v.frame;
+}
+static int skel_rows(int t,int f,edict_t *actor,float rows[AW_ITEMS_ROW]) {
+    static const aw_skel_table_t *last_table;static int last_frame=-1,last_layered,last_roots[2];static float last_layers[2];
     static float world[AW_SKEL_MAX_BONES][3][4];
     const aliashdr_t *hdr=(const aliashdr_t *)Mod_Extradata(table[t].model);
     const aw_skel_table_t *tab=hdr && hdr->aw_skel?(const aw_skel_table_t *)hdr->aw_skel_table:NULL;
-    int k,root=-1,layered;float layer=0;
+    int k,root=-1,layered,roots[2];float layer=0,layers[2];
     if(!tab)return 0;
-    /* a guard holding his torch has his left arm on the torch group, as he is drawn (AW_ItemsTorchLayer) */
+    /* a guard holding his torch has his left arm on the torch group, as he is drawn (AW_ItemsTorchLayer); a fighter
+     * drawing while it moves has its torso on the draw (ACTOR-DRAW-STOPS-LEGS-69), as r_alias.c draws it */
     layered=AW_ItemsTorchLayer(table[t].model,tab,f,&layer,&root);
-    if(tab!=last_table || f!=last_frame || layered!=last_layered){
-        AW_SkelPoseLayer(tab,(float)f,layer,layered?root:-1,world);last_table=tab;last_frame=f;last_layered=layered;
+    layers[0]=layer;roots[0]=layered?root:-1;layers[1]=0;roots[1]=-1;
+    if(actor && aw_items_torso_layer && !aw_items_torso_layer(actor,&layers[1],&roots[1])){layers[1]=0;roots[1]=-1;}
+    if(tab!=last_table || f!=last_frame || layered!=last_layered || memcmp(roots,last_roots,sizeof(roots)) ||
+       memcmp(layers,last_layers,sizeof(layers))){
+        AW_SkelPoseLayers(tab,(float)f,2,layers,roots,world);last_table=tab;last_frame=f;last_layered=layered;
+        memcpy(last_roots,roots,sizeof(roots));memcpy(last_layers,layers,sizeof(layers));
     }
     for(k=0;k<AW_ITEMS_KINDS;k++){
         int b=table[t].bone[k];
@@ -505,7 +686,7 @@ void AW_ItemsUpdate(edict_t *actor,edict_t *items[AW_ITEMS_KINDS]) {
         AW_ItemsHide(items);return;}   /* NPC-WEREWOLF-NO-MODEL-66: a werewolf holds nothing (turned in the fight too) */
     f=(int)actor->v.frame;if(f<0 || f>=table[t].frames)f=0;
     if(table[t].skel){
-        if(!skel_rows(t,f,skel)){AW_ItemsHide(items);return;}
+        if(!skel_rows(t,f,actor,skel)){AW_ItemsHide(items);return;}
         row=skel;
     }else row=&table[t].rows[f*AW_ITEMS_ROW];
     for(k=0;k<AW_ITEMS_KINDS;k++){
@@ -520,7 +701,7 @@ void AW_ItemsUpdate(edict_t *actor,edict_t *items[AW_ITEMS_KINDS]) {
 /* One carrier's light on its hand at the actor's frame now; what it was posed at is kept (AW_ItemsPreSend). */
 static void carried_pose(int i) {
     float rows[AW_ITEMS_ROW];edict_t *a=carriers[i].actor,*e=carriers[i].light;int t=carriers[i].table;
-    if(!skel_rows(t,(int)a->v.frame<0 || (int)a->v.frame>=table[t].frames?0:(int)a->v.frame,rows))return;
+    if(!skel_rows(t,(int)a->v.frame<0 || (int)a->v.frame>=table[t].frames?0:(int)a->v.frame,a,rows))return;
     AW_ItemsPose(&rows[6],a->v.origin,a->v.angles[1],e->v.origin,e->v.angles);
     SV_LinkEdict(e,false);
     posed_at(a,&carrier_posed[i].frame,carrier_posed[i].at);
@@ -541,7 +722,7 @@ void AW_ItemsPreSend(void) {
     for(i=shown_count-1;i>=0;i--){      /* backwards: a set that cannot be posed is hidden and leaves the list */
         edict_t *a=shown[i].actor,**items=shown[i].items;
         if(!a || a->free){AW_ItemsHide(items);continue;}
-        if(!AW_ItemsStale(shown[i].frame,shown[i].at,(int)a->v.frame,a->v.origin,a->v.angles[1]))continue;
+        if(!AW_ItemsStale(shown[i].frame,shown[i].at,pose_key(a),a->v.origin,a->v.angles[1]))continue;
         for(k=0;k<AW_ITEMS_KINDS;k++)if(items[k] && !items[k]->free)VectorCopy(items[k]->v.origin,was[k]);
         AW_ItemsUpdate(a,items);
         if(shown_of(items)!=i)continue;                 /* hidden by the update */
@@ -558,7 +739,7 @@ void AW_ItemsPreSend(void) {
     for(i=0;i<carrier_count;i++){
         edict_t *a=carriers[i].actor,*e=carriers[i].light;
         if(!a || a->free || !e || e->free || model_of(a)!=table[carriers[i].table].model)continue;
-        if(!AW_ItemsStale(carrier_posed[i].frame,carrier_posed[i].at,(int)a->v.frame,a->v.origin,a->v.angles[1]))continue;
+        if(!AW_ItemsStale(carrier_posed[i].frame,carrier_posed[i].at,pose_key(a),a->v.origin,a->v.angles[1]))continue;
         carried_pose(i);presend_lights++;
     }
 }
@@ -570,13 +751,18 @@ void AW_ItemsPreSendCount(unsigned long *sets,unsigned long *lights,float *far_u
 }
 /* dbg animkit pick (GUARD-WEAPON-INVISIBLE-65): the level's tag tables: counts[0] in use, [1] the table's size, [2]
  * read with the tag's own frame count (a model not loaded at spawn, a mover), [3] spawns of a tagged model that found
- * the table full. For ACTOR (NULL: none), the table of its model, else of its layout's mover: its model's name, the
- * tag's frames, the model's frames now and the count prep had (0: not known). 1 when ACTOR has one. */
-int AW_ItemsTables(edict_t *actor,int counts[4],const char **model,int info[3]);
-int AW_ItemsTables(edict_t *actor,int counts[4],const char **model,int info[3]) {
+ * the table full of entries in use, [4] entries of models nobody used given to another model, [5] the scans of the
+ * edicts made for that (HELD-ITEM-TABLE-FULL-69), [6] spawns whose held items came from the actor's own record, [7]
+ * from its model's tag (the record could not say), [8] item model names in use, [9] of so many, [10] items not loaded
+ * because the names were used up (ACTOR-HELD-ITEMS-NOT-LIVE-INVENTORY-69). For ACTOR (NULL: none), the table of its
+ * model, else of its layout's mover: its model's name, the tag's frames, the model's frames now and the count prep
+ * had (0: not known). 1 when ACTOR has one. */
+int AW_ItemsTables(edict_t *actor,int counts[11],const char **model,int info[3]);
+int AW_ItemsTables(edict_t *actor,int counts[11],const char **model,int info[3]) {
     int t=-1,i;const aw_anim_t *a;
     level_check();
-    counts[0]=used;counts[1]=TABLE;counts[2]=by_own_count;counts[3]=full_spawns;
+    counts[0]=used;counts[1]=TABLE;counts[2]=by_own_count;counts[3]=full_spawns;counts[4]=reclaims;counts[5]=slot_scans;
+    counts[6]=own_actors;counts[7]=own_tag_actors;counts[8]=named;counts[9]=NAMES;counts[10]=names_full;
     if(!actor || actor->free || !model_of(actor))return 0;
     if((t=entry_of(model_of(actor)))<0 && (a=AW_AnimOf(actor))->mover[0])
         for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)
@@ -631,12 +817,22 @@ void AW_ItemsHide(edict_t *items[AW_ITEMS_KINDS]) {
     for(k=0;k<AW_ITEMS_KINDS;k++){if(items[k] && !items[k]->free)ED_Free(items[k]);items[k]=NULL;}
     shown_drop(items);
 }
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a shown set handed from one holder to another (a fight slot's to the sheathe
+ * list of aw_combat.c while its put-away plays): the entities and the send's pose of them follow (AW_ItemsPreSend);
+ * FROM is left empty. Declared where it is called (aw_combat.c), not in aw_items.h (a build stage reads that header). */
+void AW_ItemsMoveSet(edict_t *from[AW_ITEMS_KINDS],edict_t *to[AW_ITEMS_KINDS]);
+void AW_ItemsMoveSet(edict_t *from[AW_ITEMS_KINDS],edict_t *to[AW_ITEMS_KINDS]) {
+    int k,i=shown_of(from);
+    for(k=0;k<AW_ITEMS_KINDS;k++){to[k]=from[k];from[k]=NULL;}
+    if(i>=0)shown[i].items=to;
+}
 
 int AW_ItemsKinds(edict_t *actor) {
-    int t,k,kinds=0;
+    int t,k,kinds=0,own;
     level_check();
     if(!actor || actor->free || (t=entry_of(model_of(actor)))<0)return 0;
-    for(k=0;k<AW_ITEMS_KINDS;k++)if(table[t].item[k])kinds|=1<<k;
+    own=own_of(actor);
+    for(k=0;k<AW_ITEMS_KINDS;k++)if(own?own_item[own][k]>0:table[t].item[k])kinds|=1<<k;
     if(carries_light(t))kinds|=AW_ITEMS_LIGHT;
     return kinds;
 }

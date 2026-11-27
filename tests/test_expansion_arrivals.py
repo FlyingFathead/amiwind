@@ -141,9 +141,10 @@ class NamesFile(unittest.TestCase):
             self.assertTrue(out.startswith(base))
             names = world_doors.teleport_names(out)
             self.assertEqual(set(names), set(world_doors.teleport_names(base)) | {n for p in places for n in p['names']})
-            # the image check: a "-" row says why itself, a present room row leads into a room the image holds
+            # the image check: a "-" row says why itself, a present room row leads into a room the image holds, a
+            # being row (lordvivec, DBG-TP-LORDVIVEC-69) to one being row of the image's teleport list
             self.assertEqual(world_doors.teleport_name_problems(names, dict(ROOMS, **{
-                'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed', 'vivec, arena pit': 'vai000'})), [])
+                'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed', 'vivec, arena pit': 'vai000'}), {'vivec_god': 1}), [])
         out = world_doors.teleport_names(E.text(base, E.rows(places, TRIBUNAL, ROOMS, None)))
         self.assertEqual(out['mournhold'][0], 'rid3587e40b7')
         self.assertEqual(out['godsreach'][0], world_doors.NOT_HERE)

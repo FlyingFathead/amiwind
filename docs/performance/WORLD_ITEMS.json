@@ -1,0 +1,1068 @@
+{
+ "measurements": [
+  {
+   "gaps": {
+    "drawn twice outdoors: the placed list and a CHIM piece at the same spot": {
+     "by_master": {
+      "Bloodmoon.esm": 65,
+      "Morrowind.esm": 360,
+      "Tribunal.esm": 49
+     },
+     "cells": 84,
+     "examples": [
+      "19,-5: Metal Bucket `misc_com_bucket_metal` (reference 481211)",
+      "19,-5: Flask `misc_flask_03` (reference 481212)",
+      "19,-5: Goblet `misc_com_metal_goblet_01` (reference 481213)",
+      "Sadrith Mora (18,4): Steel Halberd `steel halberd` (reference 437389)"
+     ],
+     "items": 474
+    },
+    "no use-table row: the record has no name": {
+     "by_master": {
+      "Tribunal.esm": 10
+     },
+     "cells": 1,
+     "examples": [
+      "Old Mournhold: Temple Sewers West: ? `light_com_torch_burnedout_uni` (reference 1067174)",
+      "Old Mournhold: Temple Sewers West: ? `light_com_torch_burnedout_uni` (reference 1067176)",
+      "Old Mournhold: Temple Sewers West: ? `light_com_torch_burnedout_uni` (reference 1067179)",
+      "Old Mournhold: Temple Sewers West: ? `light_com_torch_burnedout_uni` (reference 1067182)"
+     ],
+     "items": 10
+    },
+    "not drawn: no placed list row, frame map entity or CHIM piece": {
+     "by_master": {
+      "Morrowind.esm": 8
+     },
+     "cells": 2,
+     "examples": [
+      "Seyda Neen (-2,-9): Travel Lantern `light_com_lantern_02` (reference 146615)",
+      "Seyda Neen (-2,-9): Travel Lantern `light_com_lantern_02` (reference 146616)",
+      "Seyda Neen (-2,-9): Travel Lantern `light_com_lantern_02` (reference 146620)",
+      "Seyda Neen (-2,-9): Travel Lantern `light_com_lantern_02` (reference 146622)"
+     ],
+     "items": 8
+    },
+    "taken, but its CHIM piece stays drawn: no hide row": {
+     "by_master": {
+      "Bloodmoon.esm": 60,
+      "Morrowind.esm": 355,
+      "Tribunal.esm": 49
+     },
+     "cells": 80,
+     "examples": [
+      "19,-5: Metal Bucket `misc_com_bucket_metal` (reference 481211)",
+      "19,-5: Flask `misc_flask_03` (reference 481212)",
+      "19,-5: Goblet `misc_com_metal_goblet_01` (reference 481213)",
+      "Sadrith Mora (18,4): Steel Halberd `steel halberd` (reference 437389)"
+     ],
+     "items": 464
+    }
+   },
+   "masters": [
+    "Morrowind.esm",
+    "Tribunal.esm",
+    "Bloodmoon.esm"
+   ],
+   "run": {
+    "hide_rows": 1282,
+    "masters_built": [
+     0,
+     1,
+     2
+    ],
+    "name": "2026_11_26_v0.0.69-dev5_full-v0.0.69-dev5_6bbf562",
+    "pieces": 144885,
+    "placed_keys": 1196,
+    "rooms": 1323,
+    "rooms_with_records": 1321,
+    "stores": [
+     "chimi"
+    ],
+    "table": "areas.awa"
+   },
+   "schema": "amiwind-world-item-census-1",
+   "totals": {
+    "Bloodmoon.esm": {
+     "exterior": {
+      "all": {
+       "aimable": 76,
+       "drawn": 76,
+       "in_build": 76,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 76,
+       "takeable": 16
+      },
+      "armour": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "book": {
+       "aimable": 3,
+       "drawn": 3,
+       "in_build": 3,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 3,
+       "takeable": 2
+      },
+      "clothing": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "ingredient": {
+       "aimable": 16,
+       "drawn": 16,
+       "in_build": 16,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 16,
+       "takeable": 0
+      },
+      "light": {
+       "aimable": 11,
+       "drawn": 11,
+       "in_build": 11,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 11,
+       "takeable": 11
+      },
+      "misc": {
+       "aimable": 22,
+       "drawn": 22,
+       "in_build": 22,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 22,
+       "takeable": 0
+      },
+      "potion": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "repair item": {
+       "aimable": 6,
+       "drawn": 6,
+       "in_build": 6,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 6,
+       "takeable": 0
+      },
+      "weapon": {
+       "aimable": 15,
+       "drawn": 15,
+       "in_build": 15,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 15,
+       "takeable": 3
+      }
+     },
+     "interior": {
+      "all": {
+       "aimable": 2598,
+       "drawn": 2598,
+       "in_build": 2598,
+       "owned": 2088,
+       "owner_kept": 2088,
+       "placed": 2598,
+       "takeable": 2598
+      },
+      "apparatus": {
+       "aimable": 8,
+       "drawn": 8,
+       "in_build": 8,
+       "owned": 8,
+       "owner_kept": 8,
+       "placed": 8,
+       "takeable": 8
+      },
+      "armour": {
+       "aimable": 55,
+       "drawn": 55,
+       "in_build": 55,
+       "owned": 34,
+       "owner_kept": 34,
+       "placed": 55,
+       "takeable": 55
+      },
+      "book": {
+       "aimable": 306,
+       "drawn": 306,
+       "in_build": 306,
+       "owned": 291,
+       "owner_kept": 291,
+       "placed": 306,
+       "takeable": 306
+      },
+      "clothing": {
+       "aimable": 27,
+       "drawn": 27,
+       "in_build": 27,
+       "owned": 14,
+       "owner_kept": 14,
+       "placed": 27,
+       "takeable": 27
+      },
+      "gold": {
+       "aimable": 152,
+       "drawn": 152,
+       "in_build": 152,
+       "owned": 9,
+       "owner_kept": 9,
+       "placed": 152,
+       "takeable": 152
+      },
+      "ingredient": {
+       "aimable": 136,
+       "drawn": 136,
+       "in_build": 136,
+       "owned": 95,
+       "owner_kept": 95,
+       "placed": 136,
+       "takeable": 136
+      },
+      "key": {
+       "aimable": 2,
+       "drawn": 2,
+       "in_build": 2,
+       "owned": 1,
+       "owner_kept": 1,
+       "placed": 2,
+       "takeable": 2
+      },
+      "light": {
+       "aimable": 166,
+       "drawn": 166,
+       "in_build": 166,
+       "owned": 123,
+       "owner_kept": 123,
+       "placed": 166,
+       "takeable": 166
+      },
+      "misc": {
+       "aimable": 1555,
+       "drawn": 1555,
+       "in_build": 1555,
+       "owned": 1408,
+       "owner_kept": 1408,
+       "placed": 1555,
+       "takeable": 1555
+      },
+      "potion": {
+       "aimable": 112,
+       "drawn": 112,
+       "in_build": 112,
+       "owned": 66,
+       "owner_kept": 66,
+       "placed": 112,
+       "takeable": 112
+      },
+      "probe": {
+       "aimable": 2,
+       "drawn": 2,
+       "in_build": 2,
+       "owned": 2,
+       "owner_kept": 2,
+       "placed": 2,
+       "takeable": 2
+      },
+      "repair item": {
+       "aimable": 7,
+       "drawn": 7,
+       "in_build": 7,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 7,
+       "takeable": 7
+      },
+      "weapon": {
+       "aimable": 70,
+       "drawn": 70,
+       "in_build": 70,
+       "owned": 31,
+       "owner_kept": 31,
+       "placed": 70,
+       "takeable": 70
+      }
+     }
+    },
+    "Morrowind.esm": {
+     "exterior": {
+      "all": {
+       "aimable": 489,
+       "drawn": 489,
+       "in_build": 497,
+       "owned": 151,
+       "owner_kept": 151,
+       "placed": 497,
+       "takeable": 134
+      },
+      "apparatus": {
+       "aimable": 2,
+       "drawn": 2,
+       "in_build": 2,
+       "owned": 2,
+       "owner_kept": 2,
+       "placed": 2,
+       "takeable": 0
+      },
+      "armour": {
+       "aimable": 16,
+       "drawn": 16,
+       "in_build": 16,
+       "owned": 15,
+       "owner_kept": 15,
+       "placed": 16,
+       "takeable": 0
+      },
+      "book": {
+       "aimable": 24,
+       "drawn": 24,
+       "in_build": 24,
+       "owned": 2,
+       "owner_kept": 2,
+       "placed": 24,
+       "takeable": 2
+      },
+      "clothing": {
+       "aimable": 7,
+       "drawn": 7,
+       "in_build": 7,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 7,
+       "takeable": 0
+      },
+      "gold": {
+       "aimable": 9,
+       "drawn": 9,
+       "in_build": 9,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 9,
+       "takeable": 3
+      },
+      "ingredient": {
+       "aimable": 85,
+       "drawn": 85,
+       "in_build": 85,
+       "owned": 12,
+       "owner_kept": 12,
+       "placed": 85,
+       "takeable": 0
+      },
+      "key": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "light": {
+       "aimable": 122,
+       "drawn": 122,
+       "in_build": 130,
+       "owned": 9,
+       "owner_kept": 9,
+       "placed": 130,
+       "takeable": 122
+      },
+      "lockpick": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "misc": {
+       "aimable": 172,
+       "drawn": 172,
+       "in_build": 172,
+       "owned": 75,
+       "owner_kept": 75,
+       "placed": 172,
+       "takeable": 4
+      },
+      "potion": {
+       "aimable": 12,
+       "drawn": 12,
+       "in_build": 12,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 12,
+       "takeable": 0
+      },
+      "probe": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "repair item": {
+       "aimable": 6,
+       "drawn": 6,
+       "in_build": 6,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 6,
+       "takeable": 0
+      },
+      "weapon": {
+       "aimable": 31,
+       "drawn": 31,
+       "in_build": 31,
+       "owned": 18,
+       "owner_kept": 18,
+       "placed": 31,
+       "takeable": 3
+      }
+     },
+     "interior": {
+      "all": {
+       "aimable": 37478,
+       "drawn": 37478,
+       "in_build": 37478,
+       "owned": 29374,
+       "owner_kept": 29374,
+       "placed": 37478,
+       "takeable": 37478
+      },
+      "apparatus": {
+       "aimable": 285,
+       "drawn": 285,
+       "in_build": 285,
+       "owned": 227,
+       "owner_kept": 227,
+       "placed": 285,
+       "takeable": 285
+      },
+      "armour": {
+       "aimable": 717,
+       "drawn": 717,
+       "in_build": 717,
+       "owned": 485,
+       "owner_kept": 485,
+       "placed": 717,
+       "takeable": 717
+      },
+      "book": {
+       "aimable": 3561,
+       "drawn": 3561,
+       "in_build": 3561,
+       "owned": 2802,
+       "owner_kept": 2802,
+       "placed": 3561,
+       "takeable": 3561
+      },
+      "clothing": {
+       "aimable": 904,
+       "drawn": 904,
+       "in_build": 904,
+       "owned": 693,
+       "owner_kept": 693,
+       "placed": 904,
+       "takeable": 904
+      },
+      "gold": {
+       "aimable": 1255,
+       "drawn": 1255,
+       "in_build": 1255,
+       "owned": 319,
+       "owner_kept": 319,
+       "placed": 1255,
+       "takeable": 1255
+      },
+      "ingredient": {
+       "aimable": 2581,
+       "drawn": 2581,
+       "in_build": 2581,
+       "owned": 1500,
+       "owner_kept": 1500,
+       "placed": 2581,
+       "takeable": 2581
+      },
+      "key": {
+       "aimable": 129,
+       "drawn": 129,
+       "in_build": 129,
+       "owned": 26,
+       "owner_kept": 26,
+       "placed": 129,
+       "takeable": 129
+      },
+      "light": {
+       "aimable": 2111,
+       "drawn": 2111,
+       "in_build": 2111,
+       "owned": 1216,
+       "owner_kept": 1216,
+       "placed": 2111,
+       "takeable": 2111
+      },
+      "lockpick": {
+       "aimable": 53,
+       "drawn": 53,
+       "in_build": 53,
+       "owned": 19,
+       "owner_kept": 19,
+       "placed": 53,
+       "takeable": 53
+      },
+      "misc": {
+       "aimable": 22416,
+       "drawn": 22416,
+       "in_build": 22416,
+       "owned": 19651,
+       "owner_kept": 19651,
+       "placed": 22416,
+       "takeable": 22416
+      },
+      "potion": {
+       "aimable": 2072,
+       "drawn": 2072,
+       "in_build": 2072,
+       "owned": 1477,
+       "owner_kept": 1477,
+       "placed": 2072,
+       "takeable": 2072
+      },
+      "probe": {
+       "aimable": 55,
+       "drawn": 55,
+       "in_build": 55,
+       "owned": 29,
+       "owner_kept": 29,
+       "placed": 55,
+       "takeable": 55
+      },
+      "repair item": {
+       "aimable": 159,
+       "drawn": 159,
+       "in_build": 159,
+       "owned": 104,
+       "owner_kept": 104,
+       "placed": 159,
+       "takeable": 159
+      },
+      "weapon": {
+       "aimable": 1180,
+       "drawn": 1180,
+       "in_build": 1180,
+       "owned": 826,
+       "owner_kept": 826,
+       "placed": 1180,
+       "takeable": 1180
+      }
+     }
+    },
+    "Tribunal.esm": {
+     "exterior": {
+      "all": {
+       "aimable": 49,
+       "drawn": 49,
+       "in_build": 49,
+       "owned": 45,
+       "owner_kept": 45,
+       "placed": 49,
+       "takeable": 0
+      },
+      "armour": {
+       "aimable": 10,
+       "drawn": 10,
+       "in_build": 10,
+       "owned": 10,
+       "owner_kept": 10,
+       "placed": 10,
+       "takeable": 0
+      },
+      "book": {
+       "aimable": 10,
+       "drawn": 10,
+       "in_build": 10,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 10,
+       "takeable": 0
+      },
+      "clothing": {
+       "aimable": 6,
+       "drawn": 6,
+       "in_build": 6,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 6,
+       "takeable": 0
+      },
+      "ingredient": {
+       "aimable": 13,
+       "drawn": 13,
+       "in_build": 13,
+       "owned": 13,
+       "owner_kept": 13,
+       "placed": 13,
+       "takeable": 0
+      },
+      "misc": {
+       "aimable": 5,
+       "drawn": 5,
+       "in_build": 5,
+       "owned": 5,
+       "owner_kept": 5,
+       "placed": 5,
+       "takeable": 0
+      },
+      "weapon": {
+       "aimable": 5,
+       "drawn": 5,
+       "in_build": 5,
+       "owned": 5,
+       "owner_kept": 5,
+       "placed": 5,
+       "takeable": 0
+      }
+     },
+     "interior": {
+      "all": {
+       "aimable": 1874,
+       "drawn": 1884,
+       "in_build": 1884,
+       "owned": 1296,
+       "owner_kept": 1296,
+       "placed": 1884,
+       "takeable": 1874
+      },
+      "apparatus": {
+       "aimable": 11,
+       "drawn": 11,
+       "in_build": 11,
+       "owned": 11,
+       "owner_kept": 11,
+       "placed": 11,
+       "takeable": 11
+      },
+      "armour": {
+       "aimable": 69,
+       "drawn": 69,
+       "in_build": 69,
+       "owned": 45,
+       "owner_kept": 45,
+       "placed": 69,
+       "takeable": 69
+      },
+      "book": {
+       "aimable": 406,
+       "drawn": 406,
+       "in_build": 406,
+       "owned": 372,
+       "owner_kept": 372,
+       "placed": 406,
+       "takeable": 406
+      },
+      "clothing": {
+       "aimable": 68,
+       "drawn": 68,
+       "in_build": 68,
+       "owned": 56,
+       "owner_kept": 56,
+       "placed": 68,
+       "takeable": 68
+      },
+      "gold": {
+       "aimable": 29,
+       "drawn": 29,
+       "in_build": 29,
+       "owned": 3,
+       "owner_kept": 3,
+       "placed": 29,
+       "takeable": 29
+      },
+      "ingredient": {
+       "aimable": 52,
+       "drawn": 52,
+       "in_build": 52,
+       "owned": 31,
+       "owner_kept": 31,
+       "placed": 52,
+       "takeable": 52
+      },
+      "key": {
+       "aimable": 5,
+       "drawn": 5,
+       "in_build": 5,
+       "owned": 1,
+       "owner_kept": 1,
+       "placed": 5,
+       "takeable": 5
+      },
+      "light": {
+       "aimable": 144,
+       "drawn": 154,
+       "in_build": 154,
+       "owned": 14,
+       "owner_kept": 14,
+       "placed": 154,
+       "takeable": 144
+      },
+      "lockpick": {
+       "aimable": 3,
+       "drawn": 3,
+       "in_build": 3,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 3,
+       "takeable": 3
+      },
+      "misc": {
+       "aimable": 915,
+       "drawn": 915,
+       "in_build": 915,
+       "owned": 679,
+       "owner_kept": 679,
+       "placed": 915,
+       "takeable": 915
+      },
+      "potion": {
+       "aimable": 82,
+       "drawn": 82,
+       "in_build": 82,
+       "owned": 43,
+       "owner_kept": 43,
+       "placed": 82,
+       "takeable": 82
+      },
+      "probe": {
+       "aimable": 6,
+       "drawn": 6,
+       "in_build": 6,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 6,
+       "takeable": 6
+      },
+      "repair item": {
+       "aimable": 10,
+       "drawn": 10,
+       "in_build": 10,
+       "owned": 2,
+       "owner_kept": 2,
+       "placed": 10,
+       "takeable": 10
+      },
+      "weapon": {
+       "aimable": 74,
+       "drawn": 74,
+       "in_build": 74,
+       "owned": 39,
+       "owner_kept": 39,
+       "placed": 74,
+       "takeable": 74
+      }
+     }
+    },
+    "all": {
+     "exterior": {
+      "all": {
+       "aimable": 614,
+       "drawn": 614,
+       "in_build": 622,
+       "owned": 202,
+       "owner_kept": 202,
+       "placed": 622,
+       "takeable": 150
+      },
+      "apparatus": {
+       "aimable": 2,
+       "drawn": 2,
+       "in_build": 2,
+       "owned": 2,
+       "owner_kept": 2,
+       "placed": 2,
+       "takeable": 0
+      },
+      "armour": {
+       "aimable": 27,
+       "drawn": 27,
+       "in_build": 27,
+       "owned": 25,
+       "owner_kept": 25,
+       "placed": 27,
+       "takeable": 0
+      },
+      "book": {
+       "aimable": 37,
+       "drawn": 37,
+       "in_build": 37,
+       "owned": 8,
+       "owner_kept": 8,
+       "placed": 37,
+       "takeable": 4
+      },
+      "clothing": {
+       "aimable": 14,
+       "drawn": 14,
+       "in_build": 14,
+       "owned": 12,
+       "owner_kept": 12,
+       "placed": 14,
+       "takeable": 0
+      },
+      "gold": {
+       "aimable": 9,
+       "drawn": 9,
+       "in_build": 9,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 9,
+       "takeable": 3
+      },
+      "ingredient": {
+       "aimable": 114,
+       "drawn": 114,
+       "in_build": 114,
+       "owned": 25,
+       "owner_kept": 25,
+       "placed": 114,
+       "takeable": 0
+      },
+      "key": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "light": {
+       "aimable": 133,
+       "drawn": 133,
+       "in_build": 141,
+       "owned": 9,
+       "owner_kept": 9,
+       "placed": 141,
+       "takeable": 133
+      },
+      "lockpick": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "misc": {
+       "aimable": 199,
+       "drawn": 199,
+       "in_build": 199,
+       "owned": 80,
+       "owner_kept": 80,
+       "placed": 199,
+       "takeable": 4
+      },
+      "potion": {
+       "aimable": 13,
+       "drawn": 13,
+       "in_build": 13,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 13,
+       "takeable": 0
+      },
+      "probe": {
+       "aimable": 1,
+       "drawn": 1,
+       "in_build": 1,
+       "owned": 0,
+       "owner_kept": 0,
+       "placed": 1,
+       "takeable": 0
+      },
+      "repair item": {
+       "aimable": 12,
+       "drawn": 12,
+       "in_build": 12,
+       "owned": 6,
+       "owner_kept": 6,
+       "placed": 12,
+       "takeable": 0
+      },
+      "weapon": {
+       "aimable": 51,
+       "drawn": 51,
+       "in_build": 51,
+       "owned": 29,
+       "owner_kept": 29,
+       "placed": 51,
+       "takeable": 6
+      }
+     },
+     "interior": {
+      "all": {
+       "aimable": 41950,
+       "drawn": 41960,
+       "in_build": 41960,
+       "owned": 32758,
+       "owner_kept": 32758,
+       "placed": 41960,
+       "takeable": 41950
+      },
+      "apparatus": {
+       "aimable": 304,
+       "drawn": 304,
+       "in_build": 304,
+       "owned": 246,
+       "owner_kept": 246,
+       "placed": 304,
+       "takeable": 304
+      },
+      "armour": {
+       "aimable": 841,
+       "drawn": 841,
+       "in_build": 841,
+       "owned": 564,
+       "owner_kept": 564,
+       "placed": 841,
+       "takeable": 841
+      },
+      "book": {
+       "aimable": 4273,
+       "drawn": 4273,
+       "in_build": 4273,
+       "owned": 3465,
+       "owner_kept": 3465,
+       "placed": 4273,
+       "takeable": 4273
+      },
+      "clothing": {
+       "aimable": 999,
+       "drawn": 999,
+       "in_build": 999,
+       "owned": 763,
+       "owner_kept": 763,
+       "placed": 999,
+       "takeable": 999
+      },
+      "gold": {
+       "aimable": 1436,
+       "drawn": 1436,
+       "in_build": 1436,
+       "owned": 331,
+       "owner_kept": 331,
+       "placed": 1436,
+       "takeable": 1436
+      },
+      "ingredient": {
+       "aimable": 2769,
+       "drawn": 2769,
+       "in_build": 2769,
+       "owned": 1626,
+       "owner_kept": 1626,
+       "placed": 2769,
+       "takeable": 2769
+      },
+      "key": {
+       "aimable": 136,
+       "drawn": 136,
+       "in_build": 136,
+       "owned": 28,
+       "owner_kept": 28,
+       "placed": 136,
+       "takeable": 136
+      },
+      "light": {
+       "aimable": 2421,
+       "drawn": 2431,
+       "in_build": 2431,
+       "owned": 1353,
+       "owner_kept": 1353,
+       "placed": 2431,
+       "takeable": 2421
+      },
+      "lockpick": {
+       "aimable": 56,
+       "drawn": 56,
+       "in_build": 56,
+       "owned": 19,
+       "owner_kept": 19,
+       "placed": 56,
+       "takeable": 56
+      },
+      "misc": {
+       "aimable": 24886,
+       "drawn": 24886,
+       "in_build": 24886,
+       "owned": 21738,
+       "owner_kept": 21738,
+       "placed": 24886,
+       "takeable": 24886
+      },
+      "potion": {
+       "aimable": 2266,
+       "drawn": 2266,
+       "in_build": 2266,
+       "owned": 1586,
+       "owner_kept": 1586,
+       "placed": 2266,
+       "takeable": 2266
+      },
+      "probe": {
+       "aimable": 63,
+       "drawn": 63,
+       "in_build": 63,
+       "owned": 31,
+       "owner_kept": 31,
+       "placed": 63,
+       "takeable": 63
+      },
+      "repair item": {
+       "aimable": 176,
+       "drawn": 176,
+       "in_build": 176,
+       "owned": 112,
+       "owner_kept": 112,
+       "placed": 176,
+       "takeable": 176
+      },
+      "weapon": {
+       "aimable": 1324,
+       "drawn": 1324,
+       "in_build": 1324,
+       "owned": 896,
+       "owner_kept": 896,
+       "placed": 1324,
+       "takeable": 1324
+      }
+     }
+    }
+   }
+  }
+ ],
+ "what": "Every placed item of the game masters that a player can take or steal, against what a build makes of it (tools/room_item_census.py world); docs/performance/WORLD_ITEMS.md explains the columns. The newest measurement is last; tests/test_room_item_census.py reads it."
+}

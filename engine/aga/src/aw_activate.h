@@ -80,4 +80,23 @@ float AW_FocusDistance(const aw_focus_aim_t *aim,int kind);
 int AW_SceneFocusKind(void);
 extern aw_focus_aim_t aw_focus_last;
 
+/* PLANT-BOX-AIM-69: a container aimed by its measured box (tools/prepare_focus.py CONTAINER_BOXES: the visible vertex
+ * box of its whole model; since FARGOTH-STASH-STUMP-69 every plant that opens as a container has one, and a plant's box
+ * is far coarser than its leaves and stems: a bush's reaches past the mushroom, the sign, the person or the smaller
+ * plant standing in it). The original's activation ray meets the drawn shapes (OpenMW 0.51 World::getFacedObject), so
+ * what stands inside such a box is met where it is, not behind the box. */
+/* 1 when POINT lies inside the box CENTRE +- the half axes AXIS (aw_inventory.c focus_board_axis: three half axes,
+ * turned as drawn); a degenerate axis holds nothing. */
+int AW_BoxHolds(const float centre[3],const float axis[3][3],const float point[3]);
+/* 1 when what the view ray meets at T takes the aim from the best so far, met at NEAREST (HAVE_BEST 0: none yet): the
+ * nearer, except that what the ray meets inside a container's measured box stands in it and wins over that container:
+ * BEST_BOX_HOLDS_T (T lies inside the best's box: the candidate wins although farther) and OWN_BOX_HOLDS_NEAREST (the
+ * best's point lies inside the candidate's own box: the candidate yields although nearer). Never past REACH, never
+ * below 0. */
+int AW_AimTakes(float t,float nearest,float reach,int have_best,int best_box_holds_t,int own_box_holds_nearest);
+/* 1 when the use goes to the plant to pick at PLANT along the ray (aw_harvest_runtime.c) rather than to the item or
+ * container at ITEM (each below 0 when none): the nearer of the two, and a plant met inside the container's measured
+ * box (ITEM_BOX_HOLDS_PLANT). Before, an item or container always went first, also from behind the plant. */
+int AW_PlantFirst(float item,float plant,int item_box_holds_plant);
+
 #endif

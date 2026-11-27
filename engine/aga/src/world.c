@@ -126,6 +126,16 @@ Offset is filled in to contain the adjustment that must be added to the
 testing object's origin to get a point to use with the returned hull.
 ================
 */
+/* SOL-SEA-INVISIBLE-BLOCKER-68: the top a body collides up to: a creature's drawn top when aw_actor_clip.c set one
+ * (its box, the hull it walks the world with, is unchanged), else its box top. NULL: the box top. Declared in
+ * aw_actor_clip.h, not world.h: quakedef.h's headers are in the CHIM world's stage key (chim_zone.c's includes). */
+float (*aw_actor_clip_top)(const edict_t *e);
+
+static float ClipTop (const edict_t *e)
+{
+	return aw_actor_clip_top ? aw_actor_clip_top (e) : e->v.maxs[2];
+}
+
 hull_t *SV_HullForEntity (edict_t *ent, vec3_t mins, vec3_t maxs, vec3_t offset)
 {
 	model_t		*model;
@@ -161,6 +171,7 @@ hull_t *SV_HullForEntity (edict_t *ent, vec3_t mins, vec3_t maxs, vec3_t offset)
 
 		VectorSubtract (ent->v.mins, maxs, hullmins);
 		VectorSubtract (ent->v.maxs, mins, hullmaxs);
+		hullmaxs[2] = ClipTop (ent) - mins[2];
 		hull = SV_HullForBox (hullmins, hullmaxs);
 
 		VectorCopy (ent->v.origin, offset);
@@ -595,7 +606,7 @@ int AW_BodyOverlap (const edict_t *mover, const edict_t *touch, const float *sta
 	if (start[0] == end[0] && start[1] == end[1] && start[2] == end[2])
 		return 0;		/* a position test */
 	for (i=0 ; i<3 ; i++)
-		if (start[i] + mins[i] >= touch->v.origin[i] + touch->v.maxs[i] ||
+		if (start[i] + mins[i] >= touch->v.origin[i] + (i == 2 ? ClipTop (touch) : touch->v.maxs[i]) ||
 			start[i] + maxs[i] <= touch->v.origin[i] + touch->v.mins[i])
 			return 0;	/* apart (or only touching) at the start: Quake's clip */
 	n[0] = start[0] - touch->v.origin[0];
@@ -632,8 +643,8 @@ edict_t *AW_BodyOverlapping (edict_t *ent)
 		if (e == ent || e->free || e->v.solid != SOLID_SLIDEBOX)
 			continue;
 		for (k=0 ; k<3 ; k++)
-			if (ent->v.origin[k] + ent->v.mins[k] >= e->v.origin[k] + e->v.maxs[k] ||
-				ent->v.origin[k] + ent->v.maxs[k] <= e->v.origin[k] + e->v.mins[k])
+			if (ent->v.origin[k] + ent->v.mins[k] >= e->v.origin[k] + (k == 2 ? ClipTop (e) : e->v.maxs[k]) ||
+				ent->v.origin[k] + (k == 2 ? ClipTop (ent) : ent->v.maxs[k]) <= e->v.origin[k] + e->v.mins[k])
 				break;
 		if (k == 3)
 			return e;

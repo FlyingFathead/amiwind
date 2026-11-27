@@ -1,6 +1,6 @@
 # How AmiWind reduces a model, and how to check it
 
-_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -55,6 +55,16 @@ head and hair part ids, so every character sharing that head and hair gets it), 
 more) and the measured result. An entry is accepted only from a bake measured with no uncovered opening and every
 limb at 0.5 or more, and the bake's stop still judges every bake that reads it; the receipt names the floor used.
 The default floor is not lowered for everyone.
+
+The items of a compiled room have no class budget: the room converter draws every triangle of the original model,
+except those its surface pass leaves out for being smaller than its area floor (a triangle of under 0.4 square
+original units). That floor is right for walls and furniture, but on a small item it can take the fine parts. An
+item that must keep them has an entry in `config/room-item-faces.json`: the room, the model, the triangles it may
+keep under the floor, the reason, the cost in drawn faces as before / added / total, and the Raspberry Pi check. The
+room's stage then draws the whole model and stops the build if the drawn model is smaller than the original along
+any axis or in area. The first entry is the Iron Dagger standing in the note on the Census and Excise Office table:
+the floor took 118 of its 206 triangles, among them the ends of its guard, so it was drawn at two thirds of its
+width; with its entry it is drawn at the original's size (206 faces, one room).
 
 ## 3. The reduction
 

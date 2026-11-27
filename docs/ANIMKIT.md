@@ -1,17 +1,20 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [The build switch](#the-build-switch)
 - [Skeletal actors: the layout from the table](#skeletal-actors-the-layout-from-the-table)
+  - [An NPC's own animation file](#an-npcs-own-animation-file)
 - [Console: dbg animkit](#console-dbg-animkit)
+  - [The animation stage (MiniWind)](#the-animation-stage-miniwind)
 - [Morrowind's groups: wired and not wired yet](#morrowinds-groups-wired-and-not-wired-yet)
 - [Every group hooked up](#every-group-hooked-up)
 - [Walk or run: the rules and their sources](#walk-or-run-the-rules-and-their-sources)
 - [Actor animation coverage table](#actor-animation-coverage-table)
+  - [Placed actor census](#placed-actor-census)
 - [MiniWind sandbox](#miniwind-sandbox)
 - [Known limits](#known-limits)
 
@@ -89,7 +92,18 @@ fight) has the mover's item tag read when it spawns with the tag's own frame cou
 then and loads only when it is worn, and its frames are checked against the tag at that moment (in earlier versions
 the tag was read against the unloaded mover's count and refused, so those actors fought with nothing in their hands).
 `dbg animkit pick` also lists the level's item tag tables (how many are in use of the level's 64, how many were read
-with the tag's own count) and the table of the NPC under the crosshair.
+with the tag's own count, how many were given on from a model nobody used any more), how many actors hold the weapon
+and shield their own record has equipped and how many those of their model's tag, how many item model names are in
+use, and the table of the NPC under the crosshair (see [the actor records](ACTOR_RECORDS.md#held-weapons)).
+
+The engine keeps one item tag table per armed actor model, 64 at a time. A session on the joined world never changes
+level, so once 64 different armed models have been met the table is full. A full table gives the entry of a model that
+no actor on the map stands on, wears, may wear as its walking and fighting model, or carries a light for, to the next
+armed model that arrives; in earlier versions it took no new model, and every armed actor met after the 64th drew no
+weapon, shield or torch until the next load. Only when all 64 are in use by actors on the map at once does a new model
+go without its items; the console says so once. The game data names 354 armed actor models. The cost is one pass over
+the map's entities when an armed model arrives at a full table, once for all the actors that arrive in the same
+moment, and no memory.
 
 ## Console: dbg animkit
 
@@ -233,7 +247,8 @@ mimic speed off it follows the distance rule.
 ## Actor animation coverage table
 
 Every image build writes `actor-anim-coverage.json` into its run folder (beside the other build tables): one
-row per actor placed in the image's maps, with its record id, map, name, model, which of idle, walk, run,
+row per actor placed in the image's `.bsp` maps (the census office and the prison ship; the rooms, towns and
+regions are `.chim` maps and are covered by the placed actor census below), with its record id, map, name, model, which of idle, walk, run,
 attack, hit and death its fights can play (from its own layout or its full-kit model), the full-kit model it
 is linked to, whether it can turn hostile, and any exception. The image step refuses an actor that can turn
 hostile and has no attack group, unless it is a named exception (`COVERAGE_EXCEPTIONS` in
@@ -251,6 +266,30 @@ their talk, blink and walk frames. The actor library also bakes their appearance
 each standing model's layout (`np_<name>.anm`) names that model; the engine wears it when a fight starts and
 takes it off when the fight ends. A scripted walk of the opening keeps the standing model
 (CENSUS-NPC-NO-ATTACK-ANIM-65).
+
+### Placed actor census
+
+Since v0.0.69 the image step also writes `actor-placed-census.json` (`tools/actor_placed_census.py`): one row
+per actor and body placed in every map of the image, `.bsp` and `.chim`, and one per base of the actor table
+(the exterior cells' actors), judged on the model the actor stands in. Each row holds the map, record id, reference, model, the groups of the model's own layout (without those
+of a linked fight model), the linked fight model and its groups, and the item tags of both. Four findings are
+counted:
+
+| Finding | Meaning |
+| --- | --- |
+| opening role kept | the row keeps an opening role 1 to 5: no talk, name, greeting, idle line, behaviour package or engage check |
+| fight groups only on the fight model | the standing model's own layout has no attack group; run, attack, hit and death exist only on the model swapped in for a fight |
+| no item tag on the standing model | the fight model carries a weapon or shield, the standing model none |
+| no layout | the model is in the image without a layout |
+
+`config/actor-placed-census.json` allows each finding up to a count and names the register entry that tracks
+it; a count over it stops the image. In v0.0.69-dev5 the findings are the opening's eight people on eleven map
+rows ([OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69](bugs/OPENING-PEOPLE-STAND-IN-OLD-BAKED-MODEL-69.md),
+[OPENING-SHIP-DOCK-ACTORS-ROLE-EXCLUDED-69](bugs/OPENING-SHIP-DOCK-ACTORS-ROLE-EXCLUDED-69.md)), the storm
+atronach (its mesh keeps a standing and a fight model, see [the actor records](ACTOR_RECORDS.md)) and Vivec,
+who is idle only by design. The actor record audit reads this table for the model a record is really placed with
+([ACTOR-CHECKS-MISS-PLACED-MODELS-69](bugs/ACTOR-CHECKS-MISS-PLACED-MODELS-69.md)). To run it on an image:
+`python3 tools/actor_placed_census.py --id1 <image>/boot/id1`.
 
 ## MiniWind sandbox
 

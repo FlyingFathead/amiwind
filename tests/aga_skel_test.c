@@ -128,6 +128,29 @@ static int layers_mode (char **argv)
 	return 0;
 }
 
+/* aga_skel_test layers3 TABLE FRAME LAYER0 ROOT0 LAYER1 ROOT1 LAYER2 ROOT2: every bone's world origin posed by
+ * AW_SkelPoseLayers with three layers (ACTOR-DRAW-STOPS-LEGS-69: a torso on a draw over legs on the walk, an arm's own
+ * layer nested under it), one line each. */
+static int layers3_mode (char **argv)
+{
+	long size;
+	unsigned char *data = read_file (argv[2], &size);
+	aw_skel_table_t t;
+	static float world[AW_SKEL_MAX_BONES][3][4];
+	float frames[3];
+	int b, j, roots[3];
+	assert (AW_SKEL_LAYERS >= 3 && AW_SkelParse (data, size, &t));
+	for (j=0 ; j<3 ; j++)
+	{
+		frames[j] = (float)atof (argv[4 + 2*j]);
+		roots[j] = atoi (argv[5 + 2*j]);
+	}
+	AW_SkelPoseLayers (&t, (float)atof (argv[3]), 3, frames, roots, world);
+	for (b=0 ; b<t.bones ; b++)
+		printf ("%.6f %.6f %.6f\n", world[b][0][3], world[b][1][3], world[b][2][3]);
+	return 0;
+}
+
 /* aga_skel_test append BASE OWN: an appended table (version 3, CREATURE-APPENDED-TABLE-54) linked to its base: the own
  * groups first, then the base's (frames after the own ones); a pose past the own frames is the base's pose, one
  * within them the own table's; the base's name in the file; refusals (other parents, a base that is itself
@@ -196,6 +219,8 @@ int main (int argc, char **argv)
 		return layer_mode (argv);
 	if (argc == 10 && !strcmp (argv[1], "layers"))
 		return layers_mode (argv);
+	if (argc == 10 && !strcmp (argv[1], "layers3"))
+		return layers3_mode (argv);
 	if (argc == 17 && !strcmp (argv[1], "tag"))
 		return tag_mode (argv);
 	if (argc == 13 && !strcmp (argv[1], "verts"))

@@ -212,5 +212,168 @@ class RoomItemCensusTests(unittest.TestCase):
                 self.assertEqual(census.main(args + ['--map', str(bad)]), 1)
 
 
+MEASUREMENT = ROOT / 'docs' / 'performance' / 'WORLD_ITEMS.json'
+
+
+def row(kind, reference, action=1, owned=0, name=b'Bowl'):
+    """A 96-byte use-table row (tools/prepare_focus.py layout): kind, owned, action, lock, reference, x y z, weight,
+    value, name, id."""
+    return (bytes([ord(kind), owned, action | (4 if owned else 0), 0]) + struct.pack('<I', reference) +
+            struct.pack('<iiifi', 0, 0, 0, 1.0, 5) + name.ljust(36, b'\0') + bytes(32))
+
+
+def place(reference, key, interior=True, owner=None, name='Bowl', position=(10.0, 20.0, 30.0)):
+    return {'reference': reference, 'master': 'Morrowind.esm', 'cell': 'Room' if interior else '', 'grid':
+            None if interior else [0, 0], 'interior': interior, 'presented': False, 'key': key, 'id': 'misc_bowl',
+            'name': name, 'category': 'misc', 'tag': 'MISC', 'position': list(position), 'owner': owner,
+            'script': ''}
+
+
+def sources(**over):
+    out = {'rows': {}, 'owners': {}, 'hides': {}, 'placed': {}, 'rooms': {}, 'room_placements': {}, 'outdoors': {},
+           'pieces': set(), 'masters_built': {0}, 'table': 'areas.awa', 'stores': [], 'args': {}}
+    out.update(over)
+    return out
+
+
+class WorldItemCensusTests(unittest.TestCase):
+    """The world census (WORLD-OBJECT-PLACEMENT-59): every placed takeable item judged by the engine's rules."""
+
+    def test_a_room_draws_its_item_by_entity_room_placement_or_placed_list(self):
+        import prepare_focus as pf
+        outdoor = pf.exterior_key(0, 0)
+        items = [place(11, 7), place(12, 7), place(13, 7), place(14, 7), place(15, 7, owner=('arrille', 0))]
+        src = sources(rows={7: [row('I', r) for r in (11, 12, 13, 15)] + [row('I', 15, owned=1)]},
+                      rooms={7: {'map': 'r.chim', 'kind': 'chim', 'record': ('chimi', 'r'), 'entities': {11: ['func_wall']}}},
+                      room_placements={7: {12}}, placed={7: {13: (10.0, 20.0, 30.0), 14: (10.0, 20.0, 30.0)},
+                                                         outdoor: {}})
+        census.judge_world(items, src)
+        by = {p['reference']: p['build'] for p in items}
+        self.assertEqual(by[11]['copies'], ['entity'])
+        self.assertEqual(by[12]['copies'], ['room placement'])
+        self.assertEqual(by[13]['copies'], ['placed list'])
+        for ref in (11, 12, 13):
+            self.assertTrue(by[ref]['takeable'] and by[ref]['owner_kept'], (ref, by[ref]))
+        # on the placed list but no use-table row: the engine never offers the row, so it is not drawn
+        self.assertFalse(by[14]['drawn'])
+        self.assertIn('not drawn: on the placed list, but it has no use-table row', by[14]['gaps'])
+        # owned in the original, the first row of that reference free to take: the steal is lost
+        self.assertIn('owned in the original, free to take in the row: taking it is not theft', by[15]['gaps'])
+
+    def test_outdoors_a_chim_piece_needs_its_hide_row(self):
+        # OUTDOOR-ITEM-CHIM-COPY-STAYS-69: the placed list and a CHIM piece both draw it; the take removes the placed
+        # copy only, the piece goes only through a 'P' effect link row
+        import prepare_focus as pf
+        key = pf.exterior_key(17, 4)
+        items = [place(48018, key, interior=False), place(48019, key, interior=False), place(480636, key, interior=False)]
+        src = sources(rows={key: [row('I', r) for r in (48018, 48019, 480636)]},
+                      placed={key: {r: (10.0, 20.0, 30.0) for r in (48018, 48019, 480636)}},
+                      pieces={48018, 48019}, hides={key: {48019}})
+        census.judge_world(items, src)
+        by = {p['reference']: p['build'] for p in items}
+        self.assertEqual(by[48018]['copies'], ['CHIM piece', 'placed list'])
+        self.assertFalse(by[48018]['takeable'])
+        self.assertIn('taken, but its CHIM piece stays drawn: no hide row', by[48018]['gaps'])
+        self.assertIn('drawn twice outdoors: the placed list and a CHIM piece at the same spot', by[48018]['gaps'])
+        self.assertTrue(by[48019]['takeable'])
+        self.assertEqual((by[480636]['copies'], by[480636]['gaps'], by[480636]['takeable']), (['placed list'], [], True))
+
+    def test_a_listed_hide_row_leaves_the_placed_model_the_one_copy(self):
+        # OUTDOOR-ITEM-CHIM-COPY-STAYS-69, the fix: the piece of an item the placed list draws has a 'P' row with aux
+        # PLACE_LISTED (tools/effect_links.py), gone whenever its area is applied: drawn once, taken whole; a listed
+        # piece whose item has no use row (the list never offers it) is not drawn at all, and named
+        import prepare_focus as pf
+        PLACE_LISTED = census.PLACE_LISTED
+        key = pf.exterior_key(17, 4)
+        items = [place(48018, key, interior=False), place(48020, key, interior=False)]
+        src = sources(rows={key: [row('I', 48018)]}, placed={key: {48018: (10.0, 20.0, 30.0), 48020: (1.0, 1.0, 1.0)}},
+                      pieces={48018, 48020}, hides={key: {48018: PLACE_LISTED, 48020: PLACE_LISTED}})
+        census.judge_world(items, src)
+        by = {p['reference']: p['build'] for p in items}
+        self.assertEqual((by[48018]['copies'], by[48018]['gaps'], by[48018]['takeable']), (['placed list'], [], True))
+        self.assertFalse(by[48020]['drawn'])
+        self.assertIn('not drawn: its CHIM piece is hidden for the placed list, which does not draw it',
+                      by[48020]['gaps'])
+
+    def test_items_with_no_row_and_rooms_not_in_the_image_are_named(self):
+        import prepare_focus as pf
+        items = [place(21, 9, name=''), place(22, 404), place(23, None),
+                 place(24, pf.exterior_key(1, 1), interior=False)]
+        src = sources(rooms={9: {'map': 'r.chim', 'kind': 'chim', 'record': None, 'entities': {}}},
+                      room_placements={9: {21}})
+        census.judge_world(items, src)
+        by = {p['reference']: p['build'] for p in items}
+        self.assertIn('no use-table row: the record has no name', by[21]['gaps'])
+        self.assertIn('not built: its room map is not in the image', by[22]['gaps'])
+        self.assertTrue(by[23]['gaps'][0].startswith('no place key'))
+        self.assertIn('not drawn: no placed list row, frame map entity or CHIM piece', by[24]['gaps'])
+        t = census.world_tally(('Morrowind.esm',), items)
+        self.assertEqual(t['totals']['all']['interior']['all']['placed'], 3)
+        self.assertEqual(t['gaps']['no use-table row: the record has no name']['items'], 1)
+        self.assertIn('| interior | misc | 3 |', census.world_md(t))
+
+    def test_the_window_counts_rows_in_the_engines_order(self):
+        # a room alone; outdoors the 3 x 3 cells, dx outer, dy inner (aw_inventory.c focus_load)
+        import prepare_focus as pf
+        self.assertEqual(census.window_keys(763), [763])
+        keys = census.window_keys(pf.exterior_key(0, 0))
+        self.assertEqual(keys[0], pf.exterior_key(-1, -1))
+        self.assertEqual(keys[1], pf.exterior_key(-1, 0))
+        self.assertEqual(len(keys), 9)
+        rows = {763: [row('A', 1)] * census.FOCUS_ROWS + [row('I', 2)]}
+        self.assertNotIn(2, census.item_slots(rows, 763))
+
+    def test_the_rules_judged_by_are_the_engines(self):
+        inventory = (ROOT / 'engine/aga/src/aw_inventory.c').read_text(encoding='utf-8')
+        self.assertTrue(census.PLACED_INDOORS_UNDRAWN_ONLY)
+        self.assertIn('if(focus_rows[j].drawn || focus_rows[j].live || (!focus_outdoor && !focus_rows[j].edict))'
+                      '{placed_seen[3]++;continue;}', inventory)
+        self.assertTrue(census.PIECES_HIDDEN_BY_ROW)
+        self.assertIn("if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable){", inventory)
+        self.assertIn('ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;', inventory)
+        self.assertIn('#define FOCUS_ROWS 1536', inventory)
+        self.assertEqual(census.FOCUS_ROWS, 1536)
+        self.assertEqual(census.stable_of_merged((1 << 22) | 1003), (1 << 20) | 1003)
+
+    def test_the_verdict_is_a_ratchet(self):
+        known = {'a gap': ('OUTDOOR-ITEM-CHIM-COPY-STAYS-69', 10)}
+        self.assertEqual(census.world_verdict({'gaps': {'a gap': {'items': 10}}}, known), [])
+        self.assertEqual(len(census.world_verdict({'gaps': {'a gap': {'items': 11}}}, known)), 1)
+        self.assertEqual(len(census.world_verdict({'gaps': {'new': {'items': 1}}}, known)), 1)
+
+    def test_the_image_step_arguments_are_read_from_the_build_state(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {'steps': [{'command': ['python3', '/src/tools/build_aga.py', 'engine', '--out', '/x']},
+                               {'command': ['python3', '/src/tools/build_aga.py', 'image', '--chim-layer-world',
+                                            'chimsol=/run/sol', '--chim-layer-world', 'chimmh=/run/mh',
+                                            '--presented-cells', '-12,-30:l -12,-29:l', '--jobs', '24']}]}
+            (Path(tmp) / 'build-state.json').write_text(json.dumps(state), encoding='utf-8')
+            args = census.image_step_args(tmp)
+        self.assertEqual(args['--chim-layer-world'], ['chimsol=/run/sol', 'chimmh=/run/mh'])
+        self.assertEqual(args['--presented-cells'], ['-12,-30:l -12,-29:l'])
+        self.assertNotIn('--out', args)
+
+    def test_committed_measurement_holds(self):
+        # the newest measurement of docs/performance/WORLD_ITEMS.json: every gap has its register entry and stays
+        # within its count (an item that stops being drawn, aimed at or taken, or a new reason, fails the gate)
+        import json
+        data = json.loads(MEASUREMENT.read_text(encoding='utf-8'))
+        newest = data['measurements'][-1]
+        self.assertEqual(newest['schema'], census.WORLD_SCHEMA)
+        self.assertEqual(census.world_verdict(newest), [])
+        bugs = {b['id'] for b in json.loads((ROOT / 'docs/bugs/bugs.json').read_text(encoding='utf-8'))}
+        for reason, (ids, _count) in census.KNOWN_GAPS.items():
+            for ident in ids.split():
+                self.assertIn(ident, bugs, reason)
+        for master, sides in newest['totals'].items():
+            for side, cats in sides.items():
+                for cat, v in cats.items():
+                    self.assertTrue(v['takeable'] <= v['aimable'] <= v['drawn'] <= v['in_build'] <= v['placed'],
+                                    (master, side, cat))
+                    self.assertLessEqual(v['owner_kept'], v['owned'])
+
+
 if __name__ == '__main__':
     unittest.main()

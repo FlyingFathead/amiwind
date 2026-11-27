@@ -81,6 +81,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
 - [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 - [VISUAL-EVERYWHERE-ROOMS-67](VISUAL-EVERYWHERE-ROOMS-67.md): The per-model replacements of the everywhere visual recipe reach the outdoor frames only, so rooms draw the heavy original models
+- [WALK-FIX-TOWN-FRAME-SPIKES-69](WALK-FIX-TOWN-FRAME-SPIKES-69.md): Three towns show a much longer worst frame after the change that lets residents walk where the ground is not loaded
 
 Related bugs in other categories:
 

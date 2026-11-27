@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_dial.h"
 #include "aw_talk.h"
 #include "aw_roll.h"
+#include "aw_actor_clip.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -214,6 +215,9 @@ void SetMinMaxSize (edict_t *e, float *min, float *max, qboolean rotate)
     VectorCopy (rmin, e->v.mins);
     VectorCopy (rmax, e->v.maxs);
     VectorSubtract (max, min, e->v.size);
+    /* SOL-SEA-INVISIBLE-BLOCKER-68: every new box of an actor (world.qc aw_npc_floor's person box, the arena's): a
+     * creature collides only up to its drawn body (aw_actor_clip.c); any other entity keeps its box */
+    AW_ActorClipSet (e);
 
     SV_LinkEdict (e, false);
 }

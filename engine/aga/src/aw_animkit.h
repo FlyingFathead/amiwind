@@ -69,4 +69,19 @@ void AW_AnimKitTick(void);
  * (no table, no group or keys, or the kit off or compiled out). */
 struct edict_s;
 float AW_AnimKitCast(struct edict_s *e,const char *variant);
+/* ACTOR-ATTACK-ONE-CLOCK-69, aw_combat.c at the start of a swing or shot (ATTACK: 0 chop, 1 slash, 2 thrust): 1 and
+ * the time of the span the pick will show for it (its weapon group's "<type> start" .. "<type> large follow stop", a
+ * shot's "shoot start" .. "shoot follow stop") in seconds at the table's rate, the weapon's speed not in, and the share
+ * of it where that group's hit key ("<type> hit", "shoot release") lies; 0 when the pick would not show such a span
+ * (no table, the pick or the kit off, a group or key missing, a creature's own attackN): the caller keeps its
+ * layout's clock. */
+int AW_AnimKitAttackTiming(struct edict_s *e,int attack,float *seconds,float *hit_fraction);
+/* ACTOR-ATTACK-ONE-CLOCK-69, aw_combat.c at the start of a hit recovery: 1 and the seconds of the hitN the pick will
+ * show for it (rolled here and kept for the send), its "start" .. "stop" at the table's rate; 0 as above (the caller
+ * keeps its layout's hit group). */
+int AW_AnimKitHitTiming(struct edict_s *e,float *seconds);
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69, aw_combat.c: 1 while E plays its draw (no swing or shot starts under it); 1 when
+ * the send will play E's put-away after its fight (its weapon and shield stay in the hand until the detach key). */
+int AW_AnimKitDrawing(struct edict_s *e);
+int AW_AnimKitSheathes(struct edict_s *e);
 #endif

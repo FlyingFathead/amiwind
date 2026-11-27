@@ -257,7 +257,8 @@ class ScriptedPlacements(unittest.TestCase):
         self.assertIn('static unsigned ref_merged(unsigned r){return r>=(1u<<20) && r<(3u<<20)?((r>>20)<<22)|'
                       '(r&0xFFFFFu):r;}', inv)
         self.assertIn("if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable)", inv)
-        self.assertIn('if(AW_ObjectDisabled(ref) || (ref_merged(ref)!=ref && AW_ObjectDisabled(ref_merged(ref))))', inv)
+        self.assertIn('AW_ObjectDisabled(ref) ||\n                              (ref_merged(ref)!=ref && '
+                      'AW_ObjectDisabled(ref_merged(ref))))', inv)
         from ref_identity import stable_ref
 
         def c_stable(r):
@@ -270,6 +271,49 @@ class ScriptedPlacements(unittest.TestCase):
             stable = stable_ref(master, number)
             merged = (['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'].index(master) << 22) + number
             self.assertEqual((c_stable(merged), c_stable(stable), c_merged(stable)), (stable, stable, merged))
+
+    def test_a_piece_of_an_item_the_placed_list_draws_is_hidden_for_good(self):
+        # OUTDOOR-ITEM-CHIM-COPY-STAYS-69: the Sadrith Mora bowl (48018) is drawn by the placed item list and by a CHIM
+        # piece; its piece gets a 'P' row with aux PLACE_LISTED in the area of the list's row, the check refuses an image
+        # without it, and an item the list does not draw (a scripted wall) keeps its plain row
+        from prepare_focus import exterior_key
+        from prepare_item_models import pack_placed
+        bowl, other, key = 48018, 101, exterior_key(17, 4)
+        world = {'frames': [(0, {'cell': (17, 4)}, [{'owned': [{'pid': 501, 'ref': bowl},
+                                                               {'pid': 502, 'ref': (1 << 24) | bowl},
+                                                               {'pid': 503, 'ref': other}]}])], 'models': []}
+        scripted = {other: {'id': 'strong_wall_02', 'master': 'Morrowind.esm', 'interior': False, 'cell': (17, 4),
+                            'position': (0.0, 0.0, 0.0), 'flames': False}}
+        with Image({}) as im:
+            (im.id1 / 'progs/items').mkdir(parents=True)
+            (im.id1 / L.PLACED).write_bytes(pack_placed({key: [(bowl, 0, 'progs/items/m0123456789abcdef.mdl',
+                                                                 146538.8, 39532.5, 687.4, 0, 0, 0, 1.0)],
+                                                          763: [(119554, 0, 'progs/items/m0123456789abcdef.mdl',
+                                                                 0, 0, 0, 0, 0, 0, 1.0)]}))
+            self.assertEqual(L.placed_list_outdoors(im.id1), {bowl: key})       # a room's rows are not outdoors
+            rows = L.area_rows(im.id1, world, {}, scripted)
+            self.assertEqual(rows[key], [(L.KIND_PLACE, L.PLACE_LISTED, 501, bowl),
+                                         (L.KIND_PLACE, L.PLACE_LISTED, 502, bowl), (L.KIND_PLACE, 0, 503, other)])
+            got = L.check(im.id1, {}, world, links=rows, scripted=scripted)
+            self.assertEqual(got['exterior pieces of placed list items'], 2)
+            without = {key: [r for r in rows[key] if not r[1] & L.PLACE_LISTED]}
+            with self.assertRaises(ValueError) as e:
+                L.check(im.id1, {}, world, links=without, scripted=scripted)
+            self.assertIn('CHIM placement 501 of reference %d is an item the placed list draws, but it has no hide row'
+                          % bowl, str(e.exception))
+            # the rows travel in the area record: the aux bit is read back from the section
+            self.assertEqual(L.read_section(L.section(rows[key]) + struct.pack('<I', 0) + L.MAGIC), rows[key])
+
+    def test_the_engine_hides_a_listed_piece_for_good(self):
+        # OUTDOOR-ITEM-CHIM-COPY-STAYS-69: the area apply hides a PLACE_LISTED piece whatever the world change list
+        # says, and an Enable leaves it hidden (the placed model is the item's one copy)
+        import room_item_census
+        inv = (SRC / 'aw_inventory.c').read_text(encoding='latin-1')
+        self.assertEqual(L.PLACE_LISTED, 1)
+        self.assertEqual(room_item_census.PLACE_LISTED, L.PLACE_LISTED)   # the census reads the same bit
+        self.assertIn('#define AREA_LINK_LISTED 1', inv)
+        self.assertIn("if(r[0]=='P'){if((r[2]&AREA_LINK_LISTED) || AW_ObjectDisabled(ref) ||", inv)
+        self.assertIn('if(!hide && (r[2]&AREA_LINK_LISTED))continue;', inv)
 
     def test_a_district_piece_goes_into_its_presented_cell(self):
         # Mournhold's districts (MOURNHOLD-EXTERIOR-CELLS-66): an interior cell the build presents outdoors; its pieces

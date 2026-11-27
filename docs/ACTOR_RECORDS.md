@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
+_Last updated with AmiWind v0.0.69-dev6 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -569,6 +569,42 @@ each, shared with the residents' (the image already holds 111 item models, the g
 about 1.3 seconds an appearance on one core and runs on all the stage's jobs. In play it adds one small item model
 per armed person drawn. Not yet checked in a running game.
 
+From v0.0.69 what an actor holds is its own record's, not its model's. The tag named one weapon and shield for every
+actor drawn with a model, chosen when the game was built: actors that share a model could not hold different weapons,
+a fighter with a bow held the melee weapon the tag was made with, and a creature (one model for every record of its
+mesh) held nothing. Now the actor table's item rows name the model each weapon and shield is held with: the item model
+of its mesh, the one the player holds and the world shows, so no model is baked for it (`tools/mwscript/actors.py`
+`held_model`). When an actor with a tag spawns, the engine reads from its record which weapon and shield it has
+equipped (`aw_actorstate.c` `AW_ActorHeldModels`) and loads those models; the tag gives the two bones and the actor's
+scale, and its own item models are loaded only for an actor whose record cannot say (an image built before the
+field: the engine then draws exactly what it drew before). The cost is a handful of small reads of the actor table at
+the spawn of an armed model's actor, five bytes of memory an entity, and up to 256 item model names a level
+(`dbg animkit pick` shows how many are in use). Not yet checked in a running game.
+
+Creatures hold their weapons the same way. A creature whose record has the "weapon and shield" flag had its weapon in
+its fight data and nothing in its hands, because no creature model had a tag. The actor library now writes one beside
+the model of every such creature that is on the shared humanoid table (`tools/creature_held_tags.py`, beside the
+bake, so no creature model is baked again): the table's frames, its weapon and shield bones and the model's scale,
+and no item, since one model serves every record of its mesh and those records carry different weapons (the
+skeleton's model: 23 records with 12 weapons). On the game data (27 November 2026) 58 creature records have the flag;
+47 of them, on six meshes, are on the humanoid table: the skeletons, the dremora, the golden saints, the liches, the
+goblins and Almalexia. The rieklings and the lich king are on tables of their own, which keep only the bones their
+animation moves and so leave the two item bones out; they are listed by the stage and still hold nothing
+(CREATURE-OWN-TABLE-NO-ITEM-BONES-69). Not yet checked in a running game.
+
+Since v0.0.69 the weapon goes into the hand when the draw reaches its attach key and leaves it at the put-away's detach
+key, as in the original (ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69). Before, it was in the hand from the first frame of the
+draw and gone before the put-away played, and a first swing could start under the draw's pose. Now the fight spawns
+the weapon and shield at its start as before but keeps them off the screen while the draw plays up to that key (at
+most 3 seconds), starts no swing or shot until the draw is over, and at the end of the fight leaves them on the hand
+of a person whose put-away is played until its detach key (at most 2 seconds; at once when the person is hidden or
+has no such group). A draw or put-away while the actor moves also no longer stops its legs
+(ACTOR-DRAW-STOPS-LEGS-69): the draw plays on the torso and the arms from the chest up (the stick figure's Spine2),
+the legs keep the walk or run, as the original plays its weapon groups on the upper body over the movement; standing,
+the draw poses the whole body as before. The held items follow the same pose. An actor the animation kit does not
+drive (a baked actor) shows and hides its items as before. `dbg combat` and `dbg animkit pick` count both. Not yet
+checked in a running game.
+
 ### A part that draws nothing
 
 A body part whose mesh holds no shape draws nothing in the original (OpenMW 0.51 `components/sceneutil/attach.cpp`: a
@@ -644,7 +680,10 @@ models) against 24.6 MB for the same meshes baked with `kf` (a standing and a mo
 about 14.5 MB smaller. In memory a placed creature holds one rest frame instead of two models of 16 and 38 frames; its
 table (12 to 56 KB, or the shared humanoid table for the two-legged ones) is held once per kind. Posing a skeletal
 model costs CPU per drawn frame, as every person already does; not yet measured in a running game. Fargoth's and the
-guard's missing layout is FARGOTH-STANDING-NO-LAYOUT-66.
+guard's missing layout is FARGOTH-STANDING-NO-LAYOUT-66. Since v0.0.69 the audit judges the model a record is placed
+with, from the image's placed actor census ([animation kit](ANIMKIT.md#placed-actor-census),
+ACTOR-CHECKS-MISS-PLACED-MODELS-69): the Fargoth placed in Seyda Neen stands in a skeletal model with the full
+layout, and the two models that entry describes are prototypes no map places.
 
 Since v0.0.67 the audit reads a creature's table as the engine plays it (ACTOR-AUDIT-APPENDED-TABLES-66). A creature on
 the humanoid skeleton (the skeletons, goblins, dremora, liches and others) has a table appended to the shared humanoid
@@ -652,6 +691,22 @@ table: its own groups first, then the humanoid table's. The audit read every tab
 creatures as playing nothing, or only their own few groups, while the game plays the whole humanoid set for them. On the
 v0.0.66 release build, read correctly, about 160 records lack a kind instead of up to 560, nearly all of them expansion
 actors that build does not place, and the gaps list says so.
+
+Since v0.0.69 a fighter's swing runs on the clock of the attack it is seen to play (ACTOR-ATTACK-ONE-CLOCK-69). Before,
+every swing and shot of a person or a creature on the humanoid skeleton took the time of one group, the hand-to-hand
+chop (about one second, the blow at 0.714 of it), while the picture showed the weapon's own group (one-handed,
+two-handed, two-wide, hand-to-hand, bow, crossbow or thrown; chop, slash or thrust) stretched onto that time. So the blow
+landed off the moment the picture struck: a one-handed thrust two frames after its hit, a crossbow bolt six frames late,
+a bow's arrow a frame before its release; every weapon and attack also took the same second. Now, as in the original,
+the swing lasts the time of the group's own keys from the attack's start to its large follow-through, over the weapon's
+speed, and the blow lands, or the shot leaves, at the group's hit or release key, which is the frame on screen at that
+moment. On the common skeleton, at speed 1, the melee swings now take 0.75 to 1.25 seconds and the shots 0.875 (a
+thrown weapon) to 2 seconds (a bow). A hit recovery likewise lasts the hit group the actor is seen to play: before,
+every one of hit1 to hit5 was stretched onto hit1's length; now the fight rolls the group when the blow lands and holds
+the recovery for that group's own time, as in the original. An actor whose model has no such group (a baked actor, a
+creature with its own attacks) keeps the earlier timing, and `dbg animkit pick` says which clock the actor under the
+crosshair swings and recovers by. The AmiWind miss style (`aw_combat_miss 1`, the default) is unchanged: a missed blow
+still shows the block or the sidestep. Not yet checked in a running game.
 
 ### Whole creature models and the surface check
 

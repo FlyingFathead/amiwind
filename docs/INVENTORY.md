@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -194,7 +194,13 @@ is aimed at and taken like any other: the furniture's collision is one solid hul
 looks past the furniture it meets first and takes the item standing inside it, as the original's aim meets the
 drawn item ([CENSUS-SHELF-PLATE-BAKED-67](bugs/CENSUS-SHELF-PLATE-BAKED-67.md)). The image step counts every placed
 reference of the opening's two rooms against what their maps hold (tools/room_item_census.py; the image's
-opening-item-sweep.md) and stops when an item there could not be taken or a container opened.
+opening-item-sweep.md) and stops when an item there could not be taken or a container opened. The same tool counts
+the whole world after every full build (`room_item_census.py world`): every item the three masters place in a room or
+outdoors, whether it is drawn, aimed at and taken with its owner kept; the measurements and what is still missing are on
+[performance/WORLD_ITEMS.md](performance/WORLD_ITEMS.md), and a gate test holds them. An item lying outdoors is drawn
+once, by its model from the placed item list: a piece of the world's scenery that would draw it again at the same spot
+is hidden by the item's row in its area (the hide rows that also carry the taken lights), so the take leaves nothing
+behind ([OUTDOOR-ITEM-CHIM-COPY-STAYS-69](bugs/OUTDOOR-ITEM-CHIM-COPY-STAYS-69.md)).
 Refused placement retains the item, quantity and condition. Aim at the dropped item
 and press E to pick it up. Full inventory or incompatible condition retains the
 world item. Save/load and scene re-entry restore the records: drops are rows of the world change list

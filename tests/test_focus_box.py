@@ -250,22 +250,39 @@ class FocusTableTests(unittest.TestCase):
         self.assertIn("row[0]!='C'", inventory)
 
     def test_container_opens_or_is_harvested_and_carries_its_lock(self):
-        """CONTAINER-WINDOW-59: a container's row action 1 opens it (+4 owned); an organic one (CONT FLAG bit 0,
-        flora) has none and flag 4 on its contents; the row's byte 3 is the placement's lock level (FLTV, 0..100)."""
+        """CONTAINER-WINDOW-59: a container's row action 1 opens it (+4 owned); an organic one (CONT FLAG bit 0) keeps
+        flag 4 on its contents and is picked in the world (no action) only when its model is a harvest kind (the small
+        mushrooms, the bracket fungi); FARGOTH-STASH-STUMP-69: every other organic container opens its window, as in
+        the original and OpenMW (a wickwheat plant, Fargoth's hollow treestump; before, none opened); the row's byte 3
+        is the placement's lock level (FLTV, 0..100)."""
         import prepare_focus as focus
         master = self.MASTER + b''.join([
             rec('CONT', sub('NAME', z('basket_a')), sub('FNAM', z('Basket')), sub('FLAG', struct.pack('<I', 8))),
-            rec('CONT', sub('NAME', z('flora_a')), sub('FNAM', z('Wickwheat')), sub('FLAG', struct.pack('<I', 1 | 2))),
+            rec('CONT', sub('NAME', z('flora_a')), sub('FNAM', z('Wickwheat')), sub('MODL', z('o\\flora_wickwheat_01.nif')),
+                sub('FLAG', struct.pack('<I', 1 | 2))),
+            rec('CONT', sub('NAME', z('flora_treestump_unique')), sub('FNAM', z('Hollow Treestump')),
+                sub('MODL', z('f\\flora_treestump_wg_01.nif')), sub('FLAG', struct.pack('<I', 1))),
+            rec('CONT', sub('NAME', z('flora_bc_mushroom_a')), sub('FNAM', z('Luminous Russula')),
+                sub('MODL', z('f\\flora_bc_mushroom_01.nif')), sub('FLAG', struct.pack('<I', 1 | 2))),
             rec('CELL', sub('NAME', z('Store')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
                 ref(50, 'basket_a', (1, 1, 1)), ref(51, 'basket_a', (1, 1, 1), sub('ANAM', z('clerk')),
                                                      sub('FLTV', struct.pack('<i', 50))),
-                ref(52, 'flora_a', (1, 1, 1)), ref(53, 'basket_a', (1, 1, 1), sub('FLTV', struct.pack('<i', 400))))])
+                ref(52, 'flora_a', (1, 1, 1)), ref(53, 'basket_a', (1, 1, 1), sub('FLTV', struct.pack('<i', 400))),
+                ref(54, 'flora_bc_mushroom_a', (1, 1, 1)), ref(55, 'flora_treestump_unique', (1, 1, 1)))])
         objects = focus.objects_of(master)
         self.assertEqual(objects['basket_a'][4], focus.ACT_TAKE)
-        self.assertEqual((objects['flora_a'][4], objects['flora_a'][6] & focus.CFLAG_ORGANIC), (focus.ACT_NONE, 4))
+        # PLANT-PICK-DIRECT-DEFAULT-69: the plant opens (its window under the Original value) and carries the AmiWind
+        # pick's bit; Fargoth's treestump, a stash, opens and has none
+        self.assertEqual((objects['flora_a'][4], objects['flora_a'][6] & focus.CFLAG_ORGANIC),
+                         (focus.ACT_TAKE | focus.PLANT_PICK['pick'], 4))
+        self.assertEqual(objects['flora_treestump_unique'][4], focus.ACT_TAKE)
+        self.assertEqual((objects['flora_bc_mushroom_a'][4], objects['flora_bc_mushroom_a'][6] & focus.CFLAG_ORGANIC),
+                         (focus.ACT_NONE, 4))
+        self.assertTrue(focus.harvest_picked('f\\flora_bc_shelffungus_01.nif'))
+        self.assertFalse(focus.harvest_picked('o\\flora_comberry_01.nif'))
         rows = {r[2]: r for r in focus.placements(master, objects, {'store': 9})[9]}
-        self.assertEqual([(rows[k][10], rows[k][13]) for k in (50, 51, 52, 53)],
-                         [(1, 0), (1 | focus.ACT_OWNED, 50), (0, 0), (1, 100)])
+        self.assertEqual([(rows[k][10], rows[k][13]) for k in (50, 51, 52, 53, 54, 55)],
+                         [(1, 0), (1 | focus.ACT_OWNED, 50), (1 | focus.PLANT_PICK['pick'], 0), (1, 100), (0, 0), (1, 0)])
         tail = focus.contents_list({52: rows[52][12]})
         self.assertEqual(struct.unpack_from('<IIHBB', tail, 8)[3], 4)
         inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
@@ -279,6 +296,75 @@ class FocusTableTests(unittest.TestCase):
         self.assertIn('free(strip)', strip)                          # and freed on close
         self.assertIn('AW_ContainerTake(strip->reference', strip)     # the deltas, never a copy
         self.assertIn('AW_ContainerPut(strip->reference', strip)
+
+    # PLANT-PICK-DIRECT-DEFAULT-69: every organic container of the three masters without the respawn flag (32 records),
+    # and the two that respawn but are supply chests, with what the AmiWind pick does with it: 'pick' (one press, shown
+    # picked), 'keep' (one press, stays drawn: the ore and gem rocks) or 'window' (a stash or supply barrel or chest: its
+    # window under both values). The respawn flag alone does not tell them apart: the egg sacks, rocks, kollops and the
+    # Horn Lily do not respawn, the guild supply chests do. Counted on the masters' CONT records and placements,
+    # 27 November 2026: 140 organic records, 12 the harvest's (the small mushrooms and bracket fungi, 2,945
+    # placements), 101 picked (22,502), 22 picked and kept drawn (234), 5 windows (14).
+    ORGANIC_NOT_RESPAWNING = dict({
+        'barrel_01_ahnassi_drink': ('o\\contain_barrel_01.nif', 'window'),
+        'barrel_01_ahnassi_food': ('o\\contain_barrel_01.nif', 'window'),
+        'cavern_spore00': ('o\\contain_cavern_spore00.nif', 'pick'),
+        'egg_kwama00': ('o\\contain_egg_kwama00.nif', 'pick'),
+        'flora_bc_fern_04_chuck': ('f\\flora_bc_fern_04.nif', 'pick'),
+        'flora_plant_01': ('o\\flora_plant_01.nif', 'pick'),
+        'flora_treestump_unique': ('f\\flora_treestump_wg_01.nif', 'window'),
+        'kollop_01': ('f\\furn_shell00.nif', 'pick'),
+        'kollop_02': ('f\\furn_shell10.nif', 'pick'),
+        'kollop_03': ('f\\furn_shell20.nif', 'pick'),
+        'rock_adam_py09': ('i\\contain_rock_apy_09.nif', 'keep')},
+        **{'rock_%s_%02d' % (kind, n): ('o\\contain_rock_%s_%02d.nif' % (kind, n), 'keep')
+           for kind in ('diamond', 'ebony', 'glass') for n in range(1, 8)})
+    ORGANIC_RESPAWNING_STASHES = {'com_chest_02_fg_supply': ('o\\contain_com_chest_02.nif', 'window'),
+                                  'com_chest_02_mg_supply': ('o\\contain_com_chest_02.nif', 'window')}
+
+    def test_plants_are_picked_and_stashes_keep_their_window(self):
+        """PLANT-PICK-DIRECT-DEFAULT-69 (the maintainer, 27 November 2026): the AmiWind pick is the default, the window an
+        option. The builder marks every organic container that is a plant, egg sack, kollop, spore pod or ore or gem
+        rock (PLANT_PICK 'pick', +'keep' for a rock) by config/harvest-flora.json's groups; the harvest's mushrooms keep no
+        action; the masters' non-respawning organic containers are listed here by name so none is picked by mistake."""
+        import prepare_focus as focus
+        pick, keep = focus.PLANT_PICK['pick'], focus.PLANT_PICK['keep']
+        self.assertEqual((pick, keep), (16, 32))      # the row's bits 4 and 5, above the owned and scroll bits
+        self.assertEqual(len(self.ORGANIC_NOT_RESPAWNING), 32)
+        verdicts = {0: 'window', pick: 'pick', pick | keep: 'keep'}
+        for ident, (model, want) in {**self.ORGANIC_NOT_RESPAWNING, **self.ORGANIC_RESPAWNING_STASHES}.items():
+            self.assertFalse(focus.harvest_picked(model), ident)
+            self.assertEqual(verdicts[focus.pick_bits(ident, model)], want, ident)
+        # respawning plants: picked; the harvest's kinds are the harvest's (no action, aw_harvest_runtime.c)
+        for ident, model in (('flora_comberry_01', 'f\\flora_comberry_01.nif'), ('flora_wickwheat_01', 'o\\flora_wickwheat_01.nif'),
+                             ('flora_marshmerrow_01', 'o\\flora_marshmerrow_01.nif'), ('contain_trama_shrub_01', 'o\\contain_trama_shrub_01.nif'),
+                             ('flora_bm_holly_04', 'o\\flora_bm_holly_04.nif')):
+            self.assertEqual(focus.pick_bits(ident, model), pick, ident)
+        self.assertTrue(focus.harvest_picked('f\\flora_bc_mushroom_01.nif'))
+        # the row carries the bits (action_code keeps them) and the engine reads the same ones
+        self.assertEqual(focus.action_code(focus.ACT_TAKE | pick | keep, 1), focus.ACT_TAKE | pick | keep | focus.ACT_OWNED)
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn('#define FOCUS_ACT_PICK %d\n' % pick, inventory)
+        self.assertIn('#define FOCUS_ACT_PICK_KEEP %d\n' % keep, inventory)
+        self.assertIn('if(plant_row(row))return plant_pick(row);', body(inventory, 'static int container_open(focus_row_t *row){'))
+        self.assertIn('if(row->hidden || (row->picked && plant_row(row)))continue;', body(inventory, 'static int placed_target(void){'))
+        # the plant's action line is the mushrooms' own, drawn by the scene (no new fixed key text in aw_inventory.c)
+        self.assertIn('if(plant_row(row) && container_lock(row)<=0)return 0;', body(inventory, 'static int container_prompt('))
+        self.assertNotIn('"E: Pick"', inventory)
+        scene = (SRC / 'aw_scene.c').read_text(encoding='utf-8')
+        self.assertIn('(name=AW_PlacedPlantHint(&steal))!=NULL', scene)
+        self.assertEqual(scene.count('"E: Pick"'), 1)
+        # the one saved value, AmiWind by default (the Options row, the console and dbg plantpick are views of it), and
+        # the pick sound is the mushrooms' own
+        strip = (SRC / 'aw_cstrip.c').read_text(encoding='utf-8')
+        self.assertIn('static cvar_t plant_pick={"aw_plant_pick","1",true};', strip)
+        self.assertIn('aw_plant_hide=ChimRoom_Hide;', body(strip, 'void AW_CStripInit(void){'))
+        sound = re.search(r'#define PICKUP_SOUND "([^"]+)"', (SRC / 'aw_harvest_runtime.c').read_text(encoding='utf-8')).group(1)
+        self.assertIn('#define PLANT_PICK_SOUND "%s"' % sound, strip)
+        menu = (SRC / 'aw_menu.c').read_text(encoding='utf-8')
+        self.assertIn('case ROW_PLANTS:Cvar_SetValue("aw_plant_pick",Cvar_VariableValue("aw_plant_pick")?0:1);break;', menu)
+        self.assertIn('"Plant and mushroom picking: AmiWind"', menu)
+        catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('\nPLAYTESTING|plantpick|aw_plant_pick|', catalogue)
 
     def test_exterior_container_carries_its_measured_box(self):
         """OUTDOOR-CONTAINER-AIM-66: an exterior container of a measured model (CONTAINER_BOXES) sits at its box's
@@ -316,6 +402,111 @@ class FocusTableTests(unittest.TestCase):
         inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
         self.assertIn("r->box=(short)(r->kind=='C'?focus_board_add(row+FOCUS_ROW):-1);", inventory)
         self.assertIn("focus_board_ray(focus_board_axis[row->box],at,eye,f)", body(inventory, 'static int placed_target(void){'))
+
+    def test_a_plant_that_opens_carries_its_measured_box(self):
+        """PLANT-BOX-AIM-69: an organic container that opens (FARGOTH-STASH-STUMP-69: no harvest kind covers its model)
+        carries its measured box outdoors as any container that opens (before: the near-the-point aim only, 19,879
+        placements of the three masters); a harvest kind (a mushroom) keeps its record id; the build's preflight asks for
+        the box of every one that opens and none of a harvest kind."""
+        import prepare_focus as focus
+        stump = 'f\\flora_treestump_wg_01.nif'
+        for model in (stump, 'o\\flora_wickwheat_01.nif', 'f\\flora_comberry_01.nif', 'o\\contain_trama_shrub_01.nif',
+                      'o\\flora_bm_holly_04.nif'):
+            self.assertIn(model, focus.CONTAINER_BOXES)
+            self.assertFalse(focus.harvest_picked(model))
+        self.assertNotIn('f\\flora_bc_mushroom_01.nif', focus.CONTAINER_BOXES)
+        # flora_bm_holly_04 measured with the repo's NIF reader reads exactly as flora_bm_holly_06 measured with PyFFI
+        self.assertEqual(focus.CONTAINER_BOXES['o\\flora_bm_holly_04.nif'], focus.CONTAINER_BOXES['o\\flora_bm_holly_06.nif'])
+        master = self.MASTER + b''.join([
+            rec('CONT', sub('NAME', z('flora_treestump_unique')), sub('FNAM', z('Hollow Treestump')),
+                sub('MODL', z('f\\Flora_TreeStump_WG_01.nif')), sub('FLAG', struct.pack('<I', 1))),
+            rec('CONT', sub('NAME', z('flora_bc_mushroom_a')), sub('FNAM', z('Luminous Russula')),
+                sub('MODL', z('f\\flora_bc_mushroom_01.nif')), sub('FLAG', struct.pack('<I', 1 | 2))),
+            rec('CONT', sub('NAME', z('flora_new_a')), sub('FNAM', z('New Plant')),
+                sub('MODL', z('o\\flora_not_measured_01.nif')), sub('FLAG', struct.pack('<I', 1))),
+            rec('CELL', sub('NAME', z('')), sub('DATA', struct.pack('<Iii', 0, -2, -9)),
+                ref(70, 'flora_treestump_unique', (-14000, -71000, 300)), ref(71, 'flora_bc_mushroom_a', (-14100, -71000, 300)),
+                ref(72, 'flora_new_a', (-14200, -71000, 300)))])
+        rows = {r[2]: r for r in focus.placements(master, focus.objects_of(master), {})[focus.exterior_key(-2, -9)]}
+        self.assertIsInstance(rows[70][9], bytes)
+        self.assertAlmostEqual(struct.unpack_from('<3f', rows[70][9])[0], (546.9 + 530.8) / 2, places=3)
+        self.assertEqual(rows[71][9], 'flora_bc_mushroom_a')
+        self.assertEqual(rows[72][9], 'flora_new_a')
+        self.assertEqual(focus.boxed_rows(list(rows.values())), 1)
+        # the preflight: the unmeasured plant that opens is asked for (before: no organic one ever was), the mushroom not
+        missing = focus.missing_boxes(master)
+        self.assertIn(('C', 'o\\flora_not_measured_01.nif', 'flora_new_a'), missing)
+        self.assertFalse([m for m in missing if m[2] in ('flora_bc_mushroom_a', 'flora_treestump_unique')])
+
+    def test_every_place_fits_the_engines_box_table(self):
+        """PLANT-BOX-AIM-69: the named boards and the boxed containers of a place share the engine's box table
+        (aw_inventory.c FOCUS_BOARDS: a room alone, outdoors the 3 x 3 cells); a board past it is not kept at all. With
+        the plants' boxes the most in one window of the three masters is 1,183: at the 256 of before 182 places were
+        over and 379 signposts left the focus. The box table now holds as many as the row table, and the focus stage
+        refuses a place past it, as it does for the rows. The table is allocated with the rows (55,296 bytes)."""
+        import prepare_focus as focus
+        self.assertEqual(focus.WINDOW_BOXES, focus.WINDOW_ROWS)
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertRegex(inventory, r'#define FOCUS_BOARDS %d\b' % focus.WINDOW_BOXES)
+        self.assertRegex(inventory, r'#define FOCUS_ROWS %d\b' % focus.WINDOW_ROWS)
+        self.assertIn('if(!focus_board_axis || focus_boards>=FOCUS_BOARDS)return -1;',
+                      body(inventory, 'static int focus_board_add('))
+        # allocated with the rows at the first place read, not in the BSS: the engine's static size comes off the Fast
+        # RAM before the heap and the automatic CHIM cache bank is sized from the rest in whole MiB
+        self.assertIn('static float (*focus_board_axis)[3][3];', inventory)
+        self.assertNotIn('static float focus_board_axis[', inventory)
+        load = body(inventory, 'static void focus_load(void)')
+        self.assertLess(load.index('focus_rows=(focus_row_t *)AW_TryMalloc(FOCUS_ROWS*sizeof(focus_row_t))'),
+                        load.index('focus_board_axis=(float (*)[3][3])AW_TryMalloc(FOCUS_BOARDS*sizeof(*focus_board_axis))'))
+        # a window like the busiest of the masters: 9 cells of 131 boxes (1,179) is past the old 256 and fits now; a
+        # room counts alone
+        counts = {focus.exterior_key(x, y): 131 for x in (-1, 0, 1) for y in (-1, 0, 1)}
+        counts[7] = 300
+        most, key = focus.window_boxes(counts)
+        self.assertEqual((most, key), (1179, focus.exterior_key(0, 0)))
+        self.assertGreater(most, 256)
+        self.assertLessEqual(most, focus.WINDOW_BOXES)
+        self.assertEqual(focus.window_boxes({7: 300, 8: 12}), (300, 7))
+        self.assertEqual(focus.window_boxes({}), (0, 0))
+        # the focus stage checks it beside the rows and says it in its receipt
+        build = (ROOT / 'tools/prepare_focus.py').read_text(encoding='utf-8')
+        start = build.index('def build(data_files, presented=None):')
+        build = build[start:build.index('\ndef main():', start)]
+        self.assertIn('boxes[number] = boxed_rows(rows)', build)
+        self.assertIn('box_window, box_key = window_boxes(boxes)', build)
+        self.assertIn('if box_window > WINDOW_BOXES:', build)
+        self.assertIn("'most_place_boxes': box_window, 'box_limit': WINDOW_BOXES", build)
+
+    def test_an_item_without_a_name_is_taken(self):
+        """ITEM-NAMELESS-NOT-TAKEN-69: OpenMW 0.51 takes the faced object when its class hasToolTip; for a light that is
+        its carry flag (mwclass/light.cpp Light::hasToolTip = showsInInventory), every other item class keeps
+        Class::hasToolTip's true. The ten burned-out torches of Old Mournhold's Temple Sewers West
+        (light_com_torch_burnedout_UNI: no FNAM, carry flag) had no row and could not be aimed at; a fixed light without a
+        name is still no item, and an activator or container without a name still has no row."""
+        import prepare_focus as focus
+        master = self.MASTER + b''.join([
+            rec('LIGH', sub('NAME', z('light_com_torch_burnedout_UNI')), sub('MODL', z('l\\Light_Com_Torch_01.NIF')),
+                sub('LHDT', struct.pack('<fiiiBBBBi', 0, 1, 0, 16, 0, 0, 0, 0, 0x22))),
+            rec('LIGH', sub('NAME', z('light_com_torch_01_UNI')), sub('MODL', z('l\\Light_Com_Torch_01.NIF')),
+                sub('LHDT', struct.pack('<fiiiBBBBi', 0, 5, -1, 256, 0, 0, 0, 0, 0x19))),
+            rec('MISC', sub('NAME', z('misc_nameless')), sub('MCDT', struct.pack('<fii', .5, 2, 0))),
+            rec('CELL', sub('NAME', z('Sewers')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
+                ref(80, 'light_com_torch_burnedout_UNI', (1, 1, 1)), ref(81, 'light_com_torch_01_UNI', (1, 1, 1)),
+                ref(82, 'misc_nameless', (2, 2, 2)))])
+        objects = focus.objects_of(master)
+        self.assertEqual(objects['light_com_torch_burnedout_uni'][:5], ('I', '', 0.0, 1, focus.ACT_TAKE))
+        self.assertEqual(objects['misc_nameless'][:2], ('I', ''))
+        self.assertNotIn('light_com_torch_01_uni', objects)          # not carried: a fixed light, no item
+        rows = {r[2]: r for r in focus.placements(master, objects, {'sewers': 4})[4]}
+        self.assertEqual(sorted(k for k in rows if k >= 80), [80, 82])
+        packed = focus.pack_name_and_id('I', rows[80][8], rows[80][9])
+        self.assertEqual(packed[:focus.NAME], bytes(focus.NAME))       # an empty name field
+        self.assertEqual(packed[focus.NAME:].rstrip(b'\0'), b'light_com_torch_burnedout_uni')
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        add = body(inventory, 'static void focus_add_row(const byte *row){')
+        self.assertIn("if((!r->name[0] && r->kind!='I') || !(r->weight>=0 && r->weight<1000000))return;", add)
+        take = body(inventory, 'static int take_row(focus_row_t *row){')
+        self.assertIn('if(row->name[0])AW_UIPickupTaken(row->name,1,3);', take)
 
     def test_row_layout(self):
         import prepare_focus as focus

@@ -167,6 +167,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - CRASH-01 (no report page): Heap exhaustion on sn012 after Hors travel from Jiub name entry
 - [ENGINE-HEAP-FIXED-SIZE-43](ENGINE-HEAP-FIXED-SIZE-43.md): The game heap is a fixed 11 MiB from the build: with 128 MB of RAM Vivec still runs under the 2 MiB safety gap and loads pause
 - [ESTIMATE-HEAP-STALE-32](ESTIMATE-HEAP-STALE-32.md): World estimate heap coefficients were fitted to the old loader model
+- [FAST-RAM-MODEL-STALE-32MB-69](FAST-RAM-MODEL-STALE-32MB-69.md): The 32 MB memory checks assume 13 MiB of Fast RAM free after the game heap and a 7 MiB cache bank; the game reports 11 MiB and 5 MiB
 - [HEAP-12MB-FAST-ROOM-33](HEAP-12MB-FAST-ROOM-33.md): A 12 MiB game heap leaves 342 KB of Fast RAM in one block: the guard torch's 1 MiB probe can never pass
 - [HEAP-MODEL-SUM-32](HEAP-MODEL-SUM-32.md): Summing per-object costs overestimates a map's heap (11 % median, 39 % worst)
 - [HELD-ITEM-NAME-HUNK-GROWS-68](HELD-ITEM-NAME-HUNK-GROWS-68.md): Every held weapon, shield or torch shown takes 32 bytes of level memory that are not given back until the map changes

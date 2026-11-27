@@ -14,7 +14,11 @@ Usage:
   mwscript_features.py check                      validate the JSON and fail if a state or the page is stale, or if a
                                                   function the scripts call has no effect class
                                                   (config/mwscript-effects.json: full, part or none in play, with
-                                                  what is missing and how it is known: source, test or play)
+                                                  what is missing, how it is known: source, test or play, and what
+                                                  was seen in play), if an effect row is stale against the register
+                                                  (docs/bugs/bugs.json: an entry about the function that the row
+                                                  does not name, or a fix step newer than the one the row was
+                                                  checked against), or if a script listed as not used can run
 
 measure needs the game data (run it in the builder container: the masters are read there and nothing of their text
 is written; the JSON keeps record ids, counts and function names only). render and check need only the repository.
@@ -26,6 +30,10 @@ other scripts and in dialogue results), every function it calls and every functi
 state:
   runs               compiles whole, and the build attaches or starts it; or it calls no function at all, so it only
                      sets its own locals, which the dialogue keeps on the speaker without it (MWSCRIPT-COMPLETE-LANDMARK)
+  carried            an AmiWind adaptation: AmiWind's own code does the script's work, feature complete, every step
+                     of the script carried out (config/mwscript-counterparts.json, each step "same")
+  adaptation-gap     AmiWind's own code does it, but a step of the script is missing or different: a gap, never
+                     counted as an adaptation (MWSCRIPT-EFFECT-PARITY-69)
   missing-function   calls a function the interpreter does not carry out yet (it compiles; those calls read 0)
   attached-not-run   the game attaches it, but the build does not run it: a hand-written rule carries it
                      (config/mwscript.json), or nothing it does is seen yet (left out of the file)
@@ -63,15 +71,22 @@ from mwscript import gamedata  # noqa: E402
 DATA = ROOT / 'docs' / 'mwscript-features.json'
 OUT = ROOT / 'docs' / 'MWSCRIPT_FEATURES.md'
 SCHEMA = 'mwscript-features 1'
-STATES = ('runs', 'carried', 'missing-function', 'attached-not-run', 'not-attached', 'not-in-image', 'inert',
-          'not-converted')
-LABELS = {'runs': 'runs', 'carried': 'carried by AmiWind\'s own code',
+# 'carried' is the AmiWind adaptation (the key is kept: older data and other tools read it): AmiWind's own code does
+# the script's work and every step of the script is carried out. 'adaptation-gap': own code does it, but a step of the
+# script is missing or different, so it is a gap, not an adaptation (MWSCRIPT-EFFECT-PARITY-69).
+STATES = ('runs', 'carried', 'adaptation-gap', 'missing-function', 'attached-not-run', 'not-attached', 'not-in-image',
+          'inert', 'not-converted')
+LABELS = {'runs': 'runs', 'carried': 'AmiWind adaptation',
+          'adaptation-gap': 'AmiWind\'s own code, steps open',
           'missing-function': 'uses a function the interpreter lacks',
           'attached-not-run': 'attached, not run', 'not-attached': 'compiled, not attached',
           'not-in-image': 'only in an add-on world', 'inert': 'named by nothing', 'not-converted': 'not converted'}
-SHORT = {'runs': 'Runs', 'carried': 'AmiWind code', 'missing-function': 'Function missing', 'attached-not-run': 'Attached, not run',
+SHORT = {'runs': 'Runs', 'carried': 'Adaptation', 'adaptation-gap': 'Own code, steps open',
+         'missing-function': 'Function missing', 'attached-not-run': 'Attached, not run',
          'not-attached': 'Not attached', 'not-in-image': 'Add-on world', 'inert': 'Named by nothing',
          'not-converted': 'Not converted'}
+# the states that count as done: the script's work happens in the game as the original's does
+DONE_STATES = ('runs', 'carried')
 # the record types the player can carry (tools/mwscript/awms.py CARRIED: their scripts run while carried, PADD rows)
 CARRIED = ('ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'WEAP')
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
@@ -143,10 +158,28 @@ def counterparts(path=None):
     return _counterparts
 
 
+def open_steps(entry):
+    """The steps of a counterpart entry that are not the same as the script's (partial or different): with one, the
+    script is no AmiWind adaptation but a gap."""
+    return [s for s in (entry or {}).get('steps') or () if s.get('verdict') != 'same']
+
+
+def is_adaptation(entry):
+    """An AmiWind adaptation: own code does the script's work, with every step of the script carried out."""
+    return bool(entry) and bool(entry.get('steps')) and not open_steps(entry) and entry.get('verdict') == 'same'
+
+
 def counterpart_problems(doc):
     """What the counterparts tracker refuses: an entry without a counterpart file and function, a verdict outside
-    VERDICTS, a step without its four fields, an in-game check left empty."""
+    VERDICTS, a step without its four fields, an in-game check left empty, and an entry called the same as its script
+    while one of its steps is not (an adaptation has no open step)."""
     out = []
+    for e in doc.get('entries', []):
+        if e.get('verdict') == 'same' and open_steps(e):
+            out.append('%s: called the same as the script, but %d of its steps are not: an AmiWind adaptation has no '
+                       'open step' % (e.get('script') or '?', len(open_steps(e))))
+        if e.get('verdict') in VERDICTS and e.get('verdict') != 'same' and e.get('steps') and not open_steps(e):
+            out.append('%s: every step is the same, but the entry is not called the same' % (e.get('script') or '?'))
     if doc.get('schema') != 'mwscript-counterparts 1':
         out.append('schema is not mwscript-counterparts 1')
     for e in doc.get('entries', []):
@@ -182,22 +215,28 @@ def counterpart_functions():
 
 
 def counterparts_section():
-    """The "carried by AmiWind's own code" section: per script its counterpart, verdict, in-game check, register IDs
-    and the step table."""
+    """The "AmiWind adaptations" section: per script its counterpart, whether it is an adaptation (every step the
+    same) or own code with open steps, the in-game check, register IDs and the step table."""
     entries = sorted(counterparts().values(), key=lambda e: e['script'].casefold())
     if not entries:
         return []
-    out = ['## Carried by AmiWind\'s own code', '',
-           'The game scripts AmiWind carries with its own code instead of running them, each with the code that does '
-           'it and a step-by-step comparison with the script (the tracker of these is config/mwscript-counterparts.json, '
-           'checked by its test). Decided for the project: the opening from the prison ship to the census office is '
-           'AmiWind\'s own implementation.', '',
-           '| Script | What it does | AmiWind counterpart | Parity | In game | Register |',
-           '| --- | --- | --- | --- | --- | --- |']
+    out = ['## AmiWind adaptations', '',
+           'The game scripts whose work AmiWind\'s own code does instead of running them, each with the code that '
+           'does it and a step-by-step comparison with the script (the tracker of these is '
+           'config/mwscript-counterparts.json, checked by its test). A script is an **AmiWind adaptation** only when '
+           'it is feature complete: every step the original\'s script does is carried out. With a step that is '
+           'missing or different it is not an adaptation but a gap, counted as "%s", and its open steps are listed '
+           'under its name below. Of the %d scripts here, %d are adaptations and %d have open steps. Decided for the '
+           'project: the opening from the prison ship to the census office is AmiWind\'s own implementation.' % (
+               LABELS['adaptation-gap'], len(entries), sum(1 for e in entries if is_adaptation(e)),
+               sum(1 for e in entries if not is_adaptation(e))), '',
+           '| Script | What it does | AmiWind counterpart | State | Open steps | Seen in play | Register |',
+           '| --- | --- | --- | --- | ---: | --- | --- |']
     for e in entries:
-        out.append('| %s | %s | %s %s | %s | %s | %s |' % (
+        out.append('| %s | %s | %s %s | %s | %d | %s | %s |' % (
             e['script'], _cell(e['what']), e['counterpart']['file'], _cell(e['counterpart']['function']),
-            e['verdict'], _cell(e['ingame']), ', '.join(e['register']) or '-'))
+            LABELS['carried'] if is_adaptation(e) else LABELS['adaptation-gap'], len(open_steps(e)),
+            _cell(e['ingame']), ', '.join(e['register']) or '-'))
     out.append('')
     funcs = counterpart_functions()
     if funcs:
@@ -234,14 +273,23 @@ def state_of(row):
     """(state, why) of one script row."""
     if row['error']:
         return 'not-converted', 'does not compile'
-    if row['handwritten']:
+    main = row.get('id', '').casefold() == gamedata.MAIN_SCRIPT
+    if row['handwritten'] or main:
         c = counterparts().get(row.get('id', '').casefold())
         if c:
-            return 'carried', 'carried by %s %s' % (c['counterpart']['file'], c['counterpart']['function'])
+            where = '%s %s' % (c['counterpart']['file'], c['counterpart']['function'])
+            if main:
+                where += ' (the game always runs it, OpenMW GlobalScripts::addStartup)'
+            if is_adaptation(c):
+                return 'carried', 'an AmiWind adaptation: %s does every step of the script' % where
+            gaps = open_steps(c)
+            return 'adaptation-gap', '%s does it, but %d of its %d steps %s not as the script: %s' % (
+                where, len(gaps), len(c.get('steps') or ()), 'is' if len(gaps) == 1 else 'are',
+                '; '.join(s['step'] for s in gaps))
+        if main:
+            return 'adaptation-gap', ('the game always runs it (OpenMW GlobalScripts::addStartup); AmiWind\'s own '
+                                      'code does part of it, and no step-by-step comparison is recorded')
         return 'attached-not-run', 'a hand-written rule carries it'
-    if row.get('id', '').casefold() == gamedata.MAIN_SCRIPT:
-        return 'carried', ('the game always runs it (OpenMW GlobalScripts::addStartup); AmiWind runs the new game '
-                           'scripts it starts (Startup, VampireCheck) and carries CharGen')
     game = row['refs']
     started = row['start'] or row['started_by'] or game['dialogue_starts']
     if not (started or row['bound'] or row.get('held') or game['records']):
@@ -256,7 +304,13 @@ def state_of(row):
     missing = missing_now(row['notyet'])
     if missing:
         return 'missing-function', '%d not carried out: %s' % (len(missing), ', '.join(missing))
-    if row['inert'] and (started or game['placed'].get('Morrowind.esm')):
+    # MWSCRIPT-EFFECT-PARITY-69: the placements in cells the image carries, bound or not (measure, placed_in_image). A
+    # script the build leaves out of the file (nothing to run) has no binding, so its add-on placements were read as
+    # "only in an add-on world" although their cells are in the image (two scripts with no function: an add-on
+    # merchant's and the fort soldiers'). Data measured before the count has only the base game's placements.
+    in_image = game.get('placed_in_image')
+    here = bool(game['placed'].get('Morrowind.esm')) if in_image is None else bool(sum(in_image.values()))
+    if row['inert'] and (started or here):
         if row.get('functions') == {}:
             # MWSCRIPT-COMPLETE-LANDMARK: no function at all, so it can only set its own locals, and nothing reads
             # them but the dialogue, which keeps them on the speaker without the script (the parked locals: a result
@@ -268,6 +322,9 @@ def state_of(row):
     if row.get('held') and not row['inert']:
         return 'runs', 'runs on the items placed containers and actors hold, while their area is loaded'
     placed_addon = any(game['placed'].get(m) for m in MASTERS[1:])
+    if placed_addon and in_image is not None and any(in_image.get(m) for m in MASTERS[1:]):
+        # its cells are in the image and the build attaches nothing: a fault of the build, not a missing world
+        return 'not-attached', 'placed in cells the image carries, but the build does not attach it there'
     if placed_addon:
         return 'not-in-image', 'placed only in cells of an add-on world that the image does not carry'
     runtime = runtime_attach(row)
@@ -643,10 +700,19 @@ def measure(data_files, image_build=None):
             by_script.setdefault(script, []).append((tag, base))
     base_of = {base: script for base, (tag, script) in data.bases.items() if script}
     placed_by = {}
+    # MWSCRIPT-EFFECT-PARITY-69: the placements in cells the image carries, whether the build binds them or not (a
+    # script with nothing to run is left out of the file and has no binding): the base game's all, an add-on's in the
+    # image's interior cells (the rooms of its store and the presented districts) and add-on exterior cells
+    image_inside = set((image or {}).get('interiors') or ())
+    image_outside = {tuple(c) for c in (image or {}).get('exteriors') or ()}
+    in_image = {}
     for p in placed:
         script = base_of.get(p['id'])
         if not script:
             continue
+        if p['master'] == MASTERS[0] or (p['cell'] in image_inside if p['interior'] else
+                                         tuple(p['cell']) in image_outside):
+            in_image.setdefault(script, Counter())[p['master']] += 1
         if p['interior']:
             area = inner.get(p['cell']) or ADDON_AREA.get(p['master']) or 'interior with no way out'
         else:
@@ -705,6 +771,7 @@ def measure(data_files, image_build=None):
             'area': area, 'areas': dict(sorted(areas.items())),
             'refs': {'records': records_,
                      'placed': {m: dict(sorted(n.items())) for m, n in per_master.items()},
+                     'placed_in_image': {m: in_image[ident][m] for m in MASTERS if in_image.get(ident, {}).get(m)},
                      'levelled': sum(levelled.get(b, 0) for _, b in by_script.get(ident, [])),
                      'dialogue_starts': from_dialogue, 'dialogue_speaker': speakers.get(ident, 0),
                      'placed_by_scripts': place_made.get(i, 0),
@@ -803,6 +870,9 @@ def problems(doc):
         for n in list(row['functions']) + row['notyet']:
             if n not in FUNCTIONS:
                 out.append('%s: function %s is not in tools/mwscript/functions.py' % (rid, n))
+        if row['state'] == 'inert' and reachable(row):
+            out.append('%s: listed as not used in the original game, but it can run there (%s)'
+                       % (rid, ', '.join(reachable(row))))
     if doc['dialogue'] != dialogue_counts(doc['dialogue_results']):
         out.append('dialogue counts are stale: run tools/mwscript_features.py render')
     for n in list(doc['dialogue_results']['functions']) + [n for g in doc['dialogue_results']['gaps']
@@ -907,11 +977,84 @@ def effects(path=None):
     return _effects
 
 
-def effect_problems(doc, table=None):
+REGISTER = ROOT / 'docs' / 'bugs' / 'bugs.json'
+# a register id's first word that is an everyday word as well as a function's name: such an entry is about a function
+# only when its id begins with MWSCRIPT
+EVERYDAY = frozenset(('journal', 'random', 'cast', 'drop', 'fall', 'face', 'move', 'choice', 'position', 'activate',
+                      'enable', 'disable', 'lock', 'unlock', 'say', 'show', 'help', 'equip', 'rotate', 'goodbye'))
+
+
+def register_entries(path=None):
+    """{id: entry} of the bug register (docs/bugs/bugs.json); {} when the file is missing."""
+    p = Path(path) if path else REGISTER
+    if not p.is_file():
+        return {}
+    found = json.loads(p.read_text(encoding='utf-8'))
+    return {b['id']: b for b in (found.get('bugs', ()) if isinstance(found, dict) else found)}
+
+
+def fix_mark(entry):
+    """The newest fix step of a register entry, as the effect rows record it under "checked": its last closure step
+    (stage and where), else its fixed state; '' while nothing is fixed. A row is checked against that step; a newer
+    step (shipped, confirmed in play) asks for the row to be checked again."""
+    steps = entry.get('closure') or []
+    if isinstance(steps, list) and steps:
+        return '%s: %s' % (steps[-1].get('stage'), steps[-1].get('where'))
+    if entry.get('state') in ('fixed', 'closed'):
+        return 'fixed: %s' % (entry.get('fixed_in') or 'closed')
+    return ''
+
+
+def entries_about(name, register):
+    """The register entries whose id says they are about the function NAME: an id that begins with MWSCRIPT and has
+    the name as one of its words, or an id whose first word is the name (unless it is an everyday word)."""
+    out = []
+    for rid in register:
+        words = rid.casefold().split('-')
+        if (words[0] == 'mwscript' and name in words[1:]) or (words[0] == name and name not in EVERYDAY):
+            out.append(rid)
+    return sorted(out)
+
+
+def stale_effect_rows(rows, register):
+    """MWSCRIPT-TRACKER-EFFECT-ROWS-STALE-69: the effect rows that must be looked at again. A row names the register
+    entries about its function; when one of them has a fix step (fixed in source, shipped, confirmed, or the fixed
+    state), the row records that step under "checked" once it was read against the fix. A row is stale when an entry
+    about its function has a fix step and is not named, when a named entry is not in the register, or when a named
+    entry's newest fix step is not the one the row was checked against."""
+    out = []
+    for n, e in sorted(rows.items()):
+        named = e.get('register') if isinstance(e.get('register'), list) else []
+        checked = e.get('checked') or {}
+        for rid in entries_about(n, register):
+            # an open entry may be filed anywhere, at any time, without touching this file; once it has a fix step
+            # the row must name it, which makes the row checked against that fix (the next loop)
+            if rid not in named and fix_mark(register[rid]):
+                out.append('effects: %s: the register entry %s is about this function and has the fix step "%s", '
+                           'and the row does not name it' % (n, rid, fix_mark(register[rid])))
+        for rid in named:
+            if rid not in register:
+                out.append('effects: %s names %s, which is not in the register' % (n, rid))
+                continue
+            mark = fix_mark(register[rid])
+            if mark and checked.get(rid) != mark:
+                out.append('effects: %s names %s, which has the fix step "%s": check the row against the fix '
+                           '(its class, its line and what was seen in play) and record the step under "checked"'
+                           % (n, rid, mark))
+        for rid in checked:
+            if rid not in named:
+                out.append('effects: %s: checked names %s, which the row\'s register does not' % (n, rid))
+    return out
+
+
+def effect_problems(doc, table=None, register=None):
     """What the effects file is refused for: a function the game's scripts call without a class (DOC = the features
     data), a class or basis outside the lists, a part or none row without its line of what is missing, a full row
-    with one, a name that is no function, a register field that is no list."""
+    with one, a name that is no function, a register field that is no list, a basis of play without what was seen in
+    play, an in-play note without its three fields, and a row that is stale against the register
+    (stale_effect_rows). REGISTER: {id: entry}, None for the repository's (no register file: that check is left)."""
     eff = table if table is not None else effects()
+    reg = register if register is not None else register_entries()
     out = []
     if eff.get('schema') != EFFECTS_SCHEMA:
         out.append('config/mwscript-effects.json: schema must be %r' % EFFECTS_SCHEMA)
@@ -930,6 +1073,16 @@ def effect_problems(doc, table=None):
             out.append('effects: %s: a full effect has nothing missing' % n)
         if not isinstance(e.get('register'), list):
             out.append('effects: %s: register is a list' % n)
+        seen = e.get('in_play', [])
+        if not isinstance(seen, list) or any(not isinstance(s, dict) or not all(
+                str(s.get(k) or '').strip() for k in ('what', 'version', 'date')) or
+                not re.match(r'^\d{4}-\d\d-\d\d$', str(s.get('date'))) for s in seen):
+            out.append('effects: %s: in_play is a list of notes, each with what was seen, the version and the date '
+                       '(YYYY-MM-DD)' % n)
+        elif e.get('basis') == 'play' and not seen:
+            out.append('effects: %s: a class known from play needs its in_play note' % n)
+    if reg:
+        out += stale_effect_rows(rows, reg)
     for n in sorted(function_table(doc)):
         if n not in rows:
             out.append('effects: %s is called by the game\'s scripts and has no effect class in '
@@ -942,27 +1095,57 @@ def effects_section(table):
     is missing, by the number of scripts that call it."""
     rows = effects().get('functions', {})
     called = [n for n in table if n in rows]
-    count = Counter(rows[n]['effect'] for n in called)
-    known = Counter(rows[n]['basis'] for n in called)
+    c = effect_counts(table)
     out = ['### Effect in play', '',
            'Carried out says that a call is executed; Effect in play says whether what the engine then does is what '
            'the original game does. Of the %d functions the game\'s scripts call, %d have the original\'s effect in '
            'full, %d in part and %d have none yet (the call is accepted and nothing of its effect happens). How each '
            'class is known: %d read from the source against the original\'s rules, %d kept by a test, %d checked in '
-           'play. A class read from the source is not yet proven in play.' % (
-               len(called), count['full'], count['part'], count['none'], known['source'], known['test'],
-               known['play']), '']
+           'play. A class read from the source is not yet proven in play. Seen in play: what of a function\'s effect '
+           'a play session has shown, with its build and date; %d functions have such a note, and a note covers only '
+           'what it says, not the whole function. The rows were last checked against the source and the register '
+           'for AmiWind v%s (%s).' % (
+               c['called'], c['full'], c['part'], c['none'], c['source'], c['test'], c['play'], c['seen_in_play'],
+               (effects().get('measured') or {}).get('version', '?'),
+               long_date((effects().get('measured') or {}).get('date', '1970-01-01'))), '']
     gaps = [n for n in called if rows[n]['effect'] != 'full']
     if gaps:
-        out += ['| Function | Effect | Scripts | Dialogue | What is missing | Known from | Register |',
-                '| --- | --- | ---: | ---: | --- | --- | --- |']
+        out += ['| Function | Effect | Scripts | Dialogue | What is missing | Known from | Seen in play | Register |',
+                '| --- | --- | ---: | ---: | --- | --- | --- | --- |']
         for n in sorted(gaps, key=lambda n: (-table[n]['scripts'], -table[n]['dialogue'], n)):
             e = rows[n]
-            out.append('| %s | %s | %d | %d | %s | %s | %s |' % (
+            out.append('| %s | %s | %d | %d | %s | %s | %s | %s |' % (
                 n, EFFECT_LABELS[e['effect']], table[n]['scripts'], table[n]['dialogue'], _cell(e['missing']),
-                e['basis'], ', '.join(e['register']) or '-'))
+                e['basis'], _cell(_seen(e)), ', '.join(e['register']) or '-'))
+        out.append('')
+    whole = [n for n in called if rows[n]['effect'] == 'full' and rows[n].get('in_play')]
+    if whole:
+        out += ['Functions with the original\'s effect in full and a note of what was seen in play:', '',
+                '| Function | Seen in play | Known from | Register |', '| --- | --- | --- | --- |']
+        out += ['| %s | %s | %s | %s |' % (n, _cell(_seen(rows[n])), rows[n]['basis'],
+                                          ', '.join(rows[n]['register']) or '-') for n in sorted(whole)]
         out.append('')
     return out
+
+
+def _seen(e):
+    """The in-play notes of one effect row as a cell: what was seen (version, date), or "not yet"."""
+    return '; '.join('%s (v%s, %s)' % (s['what'], s['version'], long_date(s['date']))
+                     for s in e.get('in_play') or ()) or 'not yet'
+
+
+def effect_counts(table=None, doc=None):
+    """The counts of the effect classes over the functions the game's scripts call: called, full, part, none, how
+    the classes are known (source, test, play) and how many functions have something seen in play. TABLE:
+    function_table(DOC), or DOC itself."""
+    rows = effects().get('functions', {})
+    table = table if table is not None else function_table(doc)
+    called = [n for n in table if n in rows]
+    count = Counter(rows[n]['effect'] for n in called)
+    known = Counter(rows[n]['basis'] for n in called)
+    return {'called': len(called), 'full': count['full'], 'part': count['part'], 'none': count['none'],
+            'source': known['source'], 'test': known['test'], 'play': known['play'],
+            'seen_in_play': sum(1 for n in called if rows[n].get('in_play'))}
 
 
 # The Solstheim regions (Bloodmoon's exteriors): a script whose area is one of them belongs to an add-on world
@@ -996,6 +1179,64 @@ def why_not_run(rows):
     return out
 
 
+GAMES = {'Morrowind.esm': 'Morrowind (base game)', 'Tribunal.esm': 'Tribunal', 'Bloodmoon.esm': 'Bloodmoon'}
+
+
+def script_summary(doc):
+    """The counts the progress pages draw (MWSCRIPT-EFFECT-PARITY-69, TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69): per
+    master and over all, the scripts used in the original, run, AmiWind adaptations (feature complete only), not yet
+    (every other state), and those not used in the original, which never count toward completion; and the functions'
+    effect in play (effect_counts). Every row's state is worked out again from the function table of today."""
+    use(doc)
+
+    def count(rows):
+        st = Counter(state_of(r)[0] for r in rows)
+        used = len(rows) - st['inert']
+        done = st['runs'] + st['carried']
+        return {'used': used, 'run': st['runs'], 'adaptation': st['carried'], 'not_yet': used - done,
+                'unused': st['inert'], 'done': done,
+                'percent': round(100.0 * done / used, 1) if used else 0.0}
+    masters = [dict(count([r for r in doc['scripts'] if r.get('master') == m]), master=m, game=GAMES[m])
+               for m in MASTERS]
+    return {'source': 'docs/mwscript-features.json', 'version': doc.get('version'),
+            'measured': (doc.get('measured') or {}).get('date'), 'masters': masters, 'all': count(doc['scripts']),
+            'dialogue_results': {'total': doc['dialogue_results']['total'],
+                                 'run': dialogue_counts(doc['dialogue_results'])['runs']},
+            'functions': effect_counts(doc=doc)}
+
+
+def reachable(row):
+    """What could bring a script into the game at run time, from the row's measured references: [] for a script the
+    original never runs. The "not used" list holds only rows with none (the check refuses another)."""
+    game = row['refs']
+    out = []
+    if row.get('start'):
+        out.append('a start record')
+    if row.get('started_by') or game.get('dialogue_starts'):
+        out.append('StartScript')
+    if any(game.get('placed', {}).values()):
+        out.append('a placed record')
+    if game.get('levelled'):
+        out.append('a levelled list')
+    if game.get('made_by') or game.get('placed_by_scripts'):
+        out.append('a script or dialogue result that makes its record')
+    if row.get('bound') or row.get('held'):
+        out.append('a binding of the build')
+    if set(game.get('records') or ()) & set(CARRIED):
+        out.append('an item a script could hand out')
+    return out
+
+
+def unused_note(rows):
+    """One sentence of counts for the Not used section, from the rows' own data."""
+    mine = [r for r in rows if r['state'] == 'inert']
+    bare = sum(1 for r in mine if not r['refs']['records'])
+    kinds = Counter(k for r in mine for k in r['refs']['records'])
+    held = ', '.join('%d on %s records' % (n, KIND_NAMES.get(k, k)) for k, n in sorted(kinds.items()))
+    return ('Of the %s scripts here, %s are carried by no record at all and %s by records that exist nowhere in the '
+            'game%s.' % (_n(len(mine)), _n(bare), _n(len(mine) - bare), ' (%s)' % held if held else ''))
+
+
 def render(doc):
     import doc_toc
     use(doc)
@@ -1005,12 +1246,17 @@ def render(doc):
     lines = ['# MWScript features', '',
              '_Last updated with AmiWind v%s (%s)._' % (doc['version'], long_date(doc['updated'])), '',
              GENERATED, '', doc['intro'], '',
-             'Of the %s scripts the original game uses, **%s run** as scripts and **%s are carried by AmiWind\'s own '
-             'code**; of the rest, %s use a function the interpreter lacks, %s are attached but not run, %s are '
-             'compiled but not attached, %s are placed only in add-on cells the image does not carry, %s are not converted. '
-             'The %s scripts that nothing in the original game ever names (test and example scripts, replaced '
-             'versions, cut content) are listed apart under Not used in the original game.' % (
-                 _n(len(rows) - st['inert']), _n(st['runs']), _n(st['carried']), _n(st['missing-function']),
+             'Of the %s scripts the original game uses, **%s run** as scripts and **%s are AmiWind adaptations** '
+             '(AmiWind\'s own code does every step of the script). The rest, by state: done by AmiWind\'s own code '
+             'with steps still open %s, using a function the interpreter lacks %s, attached but not run %s, '
+             'compiled but not attached %s, placed only in add-on cells the image does not carry %s, not converted %s. '
+             'A script that runs is not yet a script that plays as the original: Effect in play, under By function, '
+             'says for each function the scripts call how much of the original\'s effect the engine has. '
+             'The %s scripts not used in the original game (they never run there either: test and example scripts, '
+             'replaced versions, cut content) are not counted toward completion and are listed apart under Not used '
+             'in the original game.' % (
+                 _n(len(rows) - st['inert']), _n(st['runs']), _n(st['carried']), _n(st['adaptation-gap']),
+                 _n(st['missing-function']),
                  _n(st['attached-not-run']), _n(st['not-attached']), _n(st['not-in-image']), _n(st['not-converted']),
                  _n(st['inert'])), '',
              '| State | Scripts | What it means |', '| --- | ---: | --- |']
@@ -1030,14 +1276,19 @@ def render(doc):
                'not-attached': 'compiles whole, but nothing in the build attaches or starts it: its records are never '
                                'placed, and nothing makes them at run time yet',
                'not-converted': 'does not compile',
-               'carried': 'not run as a script because AmiWind\'s own code does what it does (the section Carried by '
-                          'AmiWind\'s own code names the code and compares it step by step)'}
+               'carried': 'not run as a script because AmiWind\'s own code does what it does, feature complete: every '
+                          'step the original\'s script does is carried out (the section AmiWind adaptations names '
+                          'the code and compares it step by step)',
+               'adaptation-gap': 'not run as a script; AmiWind\'s own code does part of what it does, and at least '
+                                 'one step of the script is missing or different: a gap, not an adaptation (its '
+                                 'open steps are in the section AmiWind adaptations)'}
     for s in STATES:
         if s != 'inert':
             lines.append('| %s | %s | %s |' % (LABELS[s], _n(st[s]), meaning[s]))
     d = doc['dialogue']
     lines += ['| **Used in the original game** | **%s** | |' % _n(len(rows) - st['inert']),
-              '| Not used in the original game (listed apart) | %s | %s |' % (_n(st['inert']), meaning['inert']),
+              '| Not used in the original game (never runs there either; not counted toward completion) | %s | %s |'
+              % (_n(st['inert']), meaning['inert']),
               '| **All script records** | **%s** | |' % _n(len(rows)), '',
               '| Game file | All | Used in the original | ' + ' | '.join(SHORT[s] for s in STATES if s != 'inert') +
               ' | Not used |',
@@ -1165,7 +1416,12 @@ def render(doc):
               'Scripts that no object, character, item, dialogue line, start record or other script ever names or '
               'starts, so they never ran in the original game either: the developers\' test and example scripts, '
               'earlier versions replaced by others, and cut content. They stay in the game as they are; the counts '
-              'above count only the scripts the original uses, and the data file keeps every script with its state.', '']
+              'above count only the scripts the original uses, and the data file keeps every script with its state. '
+              'The rule, checked for every script here: no record carries the script and no start record, StartScript '
+              'or dialogue result names it; or the records that carry it are placed in no cell of the three masters, '
+              'no levelled list gives them, no script or dialogue result makes one (PlaceAtPC, PlaceAtMe, PlaceItem, '
+              'PlaceItemCell), no container or character holds one, and they are not items a script could hand out '
+              '(a script on an item always counts as used). %s' % unused_note(rows), '']
     for master in MASTERS:
         mine = [r for r in rows if r['master'] == master and r['state'] == 'inert']
         if not mine:
@@ -1194,7 +1450,8 @@ def write(doc):
 INTRO = ('One row per script record of the game: what names it, where it stands, which functions it calls and what '
          'its conditions test, and what state AmiWind has it in. The data is measured from the game\'s masters with '
          'the builder\'s own compiler; the page lists record ids, counts and states only. When the work list runs '
-         'dry, the scripting work is taken from here row by row.')
+         'dry, the scripting work is taken from here row by row, toward the next landmark: every game script playing '
+         'as in the original.')
 
 
 def main(argv=None):

@@ -2464,10 +2464,13 @@ function chimHeadSend() {
   const expansions = EV ? EV.completion(chim) : null;
   // the unified count per land (TOOLKIT-EXPANSION-COMPLETION-67): the headline draws it instead of the per-land rows
   const readiness = readyOf();
-  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history, expansions, readiness};
+  // the game's scripts per land and the functions' effect in play (TOOLKIT-PROGRESS-MWSCRIPT-MASTERS-69): the data's own
+  // counts (completion.script_summary, from the MWScript tracker at the ingest), drawn in each land's block
+  const scripts = (chim.completion && chim.completion.script_summary) || null;
+  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history, expansions, readiness, scripts};
   if (window.parent !== window) window.parent.postMessage(msg, '*');
   else {
-    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true, expansions, readiness});
+    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true, expansions, readiness, scripts});
     // The summary line stays at the top; the colour chips, lighting and history lines move into the foldable legend block.
     const head = $('chimhead'), box = $('legendblock');
     for (const n of Array.from(box.children)) if (!n.classList.contains('foldbtn') && !n.classList.contains('foldtitle')) n.remove();

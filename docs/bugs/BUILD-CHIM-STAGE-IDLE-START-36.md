@@ -308,9 +308,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- [DEV-CHAIN-BUILD-CHECK-AFTER-GATE-69](DEV-CHAIN-BUILD-CHECK-AFTER-GATE-69.md): The snapshot route learns that the build needs expected rebuilds named only after the gate and publish have run
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - [GATE-IMAGE-REMOVED-52](GATE-IMAGE-REMOVED-52.md): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - [GATE-PRIVACY-NOT-IN-PREGATE-52](GATE-PRIVACY-NOT-IN-PREGATE-52.md): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GATES-BESIDE-FULL-BUILD-OVERSUBSCRIBED-69](GATES-BESIDE-FULL-BUILD-OVERSUBSCRIBED-69.md): Test runs started beside a full build share its cores, so the build runs on a third of its planned cores
 - [GC-RUN-WALK-ONE-CORE-68](GC-RUN-WALK-ONE-CORE-68.md): The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume)
 - [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
@@ -321,6 +323,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): The image step's room heap check measures every room on one core
 - [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
 - [IMAGE-TORCHES-GUARD-3X-BASELINE-68](IMAGE-TORCHES-GUARD-3X-BASELINE-68.md): The image step's torch check takes about three times its recorded time with the same six units
+- [INTRO-STAGE-SERIAL-NPC-BAKE-69](INTRO-STAGE-SERIAL-NPC-BAKE-69.md): The opening-scene stage bakes its eight people one after another on a few cores
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-NPCS-ONE-WORKER-64](MINIWIND-NPCS-ONE-WORKER-64.md): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers
@@ -345,6 +348,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
+- [TOWN-STAGE-SERIAL-RESIDENT-BAKE-69](TOWN-STAGE-SERIAL-RESIDENT-BAKE-69.md): The town stages bake their residents one after another on a single core
 - [TRIBUNAL-STAGE-UNDERUSED-68](TRIBUNAL-STAGE-UNDERUSED-68.md): The builder's Tribunal stage uses fewer than half of the cores it is given
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word
 - [UNIT-KEY-WHOLE-FILE-63](UNIT-KEY-WHOLE-FILE-63.md): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again

@@ -1,9 +1,9 @@
 {
  "schema": "mwscript-effects 1",
- "about": "The effect in play of every function the game's scripts call: full, part (what is missing) or none. basis: source = read from the engine source against the original's rules, test = kept by a test, play = checked in play. Read by tools/mwscript_features.py (the page docs/MWSCRIPT_FEATURES.md, Effect in play).",
+ "about": "The effect in play of every function the game's scripts call: full, part (what is missing) or none. basis: how the class is known: source = read from the engine source against the original's rules, test = kept by a test, play = checked in play. in_play: what of the effect was seen in play (what, version, date), filled from session checks. register: every register entry about the function; checked: the newest fix step of each of them that the row was checked against (the check refuses a row whose entry has a newer step). Read by tools/mwscript_features.py (the page docs/MWSCRIPT_FEATURES.md, Effect in play).",
  "measured": {
-  "version": "0.0.68-dev7",
-  "date": "2026-11-22"
+  "version": "0.0.69-dev6",
+  "date": "2026-11-27"
  },
  "functions": {
   "activate": {
@@ -12,377 +12,552 @@
    "register": [
     "CONTAINER-SCRIPT-ACTIVATE-67"
    ],
-   "basis": "test"
+   "basis": "test",
+   "in_play": [],
+   "checked": {
+    "CONTAINER-SCRIPT-ACTIVATE-67": "fixed in source: v0.0.67 (e5905aea)"
+   }
   },
   "additem": {
    "effect": "part",
    "missing": "A person given an item does not put it on when it is better than what it wears, as people do in the original; the count itself is right for the player, people, creatures and containers.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ADDITEM-NO-EQUIP-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "addspell": {
    "effect": "part",
    "missing": "The spell joins the actor's list and can be cast, and resistances, water breathing and similar effects of an ability count where they are read, but the attribute, skill, health, magicka and fatigue effects of an ability, disease or curse added this way (a disease's drain, vampirism's gains) are never applied to the stats.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "addtopic": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "aiescort": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "aifollow": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "aifollowcell": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "aitravel": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "aiwander": {
    "effect": "part",
-   "missing": "A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes.",
-   "register": [],
-   "basis": "source"
+   "missing": "A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes, and an actor that is not loaded when the call comes takes no wander.",
+   "register": [
+    "MWSCRIPT-AIWANDER-NOT-SAVED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "becomewerewolf": {
    "effect": "part",
-   "missing": "The player's stats change, his gear comes off, the hidden werewolf robe is worn, the readied spell and temporary effects end, the inventory and magic windows stay shut and the werewolf's body and arms are drawn (in source in v0.0.68, to be seen in play); his health, the witnesses, the refusals to use things, talk and sleep, the camera height and the screen overlay are not handled. An NPC it turns is drawn as the werewolf, with the player's werewolf body and animation, at its race's size, holds nothing, fights with its claws only and stays a werewolf after death, and the player in the form fights with his claws at his race's size (in source in v0.0.68, to be seen in play); silver weapons, the werewolf's own sounds and the readier attack on a werewolf are not handled.",
+   "missing": "Not handled: the doubled health; the witnesses of the change, the known-werewolf state and its bounty; people attacking a werewolf on sight and guards leaving him alone; the refusal to take, open, loot, read or use things and to sleep, with the game's message and sounds (the inventory and magic windows, spell casting and talk are refused); skills not improving in the form; carried weight not counting, and the run bonus applying only with the claws put away; the camera height, view angle, screen border and hand icon of the form; silver weapons doing double damage to a werewolf; the werewolf's own swing, hit, readying and running sounds; the werewolf name over a turned NPC, and attacks on a turned NPC not being a crime. Carried in source and not yet seen in play: the stats' values, the run bonus, and the form kept in a saved game.",
    "register": [
     "WEREWOLF-BODY-NOT-DRAWN-63",
     "WEREWOLF-RUN-SPEED-63",
     "WEREWOLF-TRANSFORM-RULES-PARTIAL-68",
-    "NPC-WEREWOLF-NO-MODEL-66"
+    "NPC-WEREWOLF-NO-MODEL-66",
+    "WEREWOLF-FIGHT-RULES-LEFT-68"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [
+    {
+     "version": "0.0.68-dev8",
+     "date": "2026-11-23",
+     "what": "the player's werewolf body and claws are drawn in first and third person at his race's size, his gear comes off, the inventory and magic windows stay shut and the use key talks to nobody"
+    },
+    {
+     "version": "0.0.68-dev8",
+     "date": "2026-11-23",
+     "what": "an NPC a script turns is drawn as the werewolf, holds nothing, fights with its claws only and cannot be talked to"
+    }
+   ],
+   "checked": {
+    "WEREWOLF-BODY-NOT-DRAWN-63": "fixed in source: v0.0.68-dev8 (f5e70930)",
+    "NPC-WEREWOLF-NO-MODEL-66": "fixed in source: v0.0.68-dev8 (81755190)"
+   }
   },
   "cast": {
    "effect": "part",
-   "missing": "A spell cast at the player lands only when every effect is a stat change, a cure or a plain effect, and its fire, frost, shock and poison damage lands with no resistance. Cast by the player himself does nothing. A Target spell lands at once with no bolt flying.",
-   "register": [],
-   "basis": "source"
+   "missing": "A spell cast at the player lands only when every effect is a stat change, a cure or a plain effect; then all of its effects land on him, also those meant for the caster, and its fire, frost, shock and poison damage lands with no resistance. A Target spell lands at once with no bolt flying. Cast by the player himself does nothing, where the original makes it his selected spell.",
+   "register": [
+    "MWSCRIPT-CAST-PARTIAL-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "cellchanged": {
    "effect": "part",
    "missing": "A global script sees it only when another map loads, and an object's script when its object is attached or comes into range; walking from one outdoor cell into the next within the same map does not set it.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-CELLCHANGED-OUTDOOR-STEP-68",
+    "MWSCRIPT-CELLCHANGED-VOLATILE-54"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "changeweather": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "choice": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "clearforcesneak": {
    "effect": "part",
    "missing": "On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-FORCED-STANCE-ACTORS-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "clearinfoactor": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disable": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-DISABLE-LOST-LEDGER-FULL-66"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disablelevitation": {
    "effect": "none",
-   "missing": "The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to stop.",
-   "register": [],
-   "basis": "source"
+   "missing": "The switch is kept and saved, but nothing reads it: a Levitate spell still lands and stays on the player, where the original ends it with a message that levitation is not allowed here. The engine has no Levitate movement for the switch to stop: a Levitate effect only spares the player fall damage.",
+   "register": [
+    "MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableplayercontrols": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableplayerfighting": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableplayerjumping": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableplayermagic": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableplayerviewswitch": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disableteleporting": {
    "effect": "none",
    "missing": "The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to stop.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "disablevanitymode": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "dontsaveobject": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "drop": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enable": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablebirthmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableclassmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableinventorymenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablelevitation": {
    "effect": "none",
-   "missing": "The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to allow again.",
-   "register": [],
-   "basis": "source"
+   "missing": "The switch is kept and saved, but nothing reads it: the engine has no Levitate movement for it to allow again, and a Levitate effect only spares the player fall damage.",
+   "register": [
+    "MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablemagicmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablemapmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablenamemenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableplayercontrols": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableplayerfighting": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableplayerjumping": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableplayermagic": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableplayerviewswitch": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableracemenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablerest": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablestatreviewmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablestatsmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enableteleporting": {
    "effect": "none",
    "missing": "The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to allow again.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-TELEPORT-LEVITATE-SWITCHES-UNREAD-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "enablevanitymode": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "explodespell": {
    "effect": "part",
-   "missing": "The Self and Touch effects with an area reach the actors around the object, but the spell's Target effects are not sent off as a bolt. Called on an actor or on the player it explodes at once where they stand instead of the actor casting the spell itself (the player only readies it in the original).",
-   "register": [],
-   "basis": "source"
+   "missing": "The Self and Touch effects with an area reach the actors around the object, but the spell's Target effects are not sent off as a bolt. Called on an actor or on the player it explodes at once where they stand, where the original has the actor cast the spell at itself and only makes it the player's selected spell.",
+   "register": [
+    "MWSCRIPT-CAST-PARTIAL-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "face": {
    "effect": "part",
    "missing": "The actor turns to the point at once instead of turning there at its turning speed.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-AIWANDER-NOT-SAVED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "fadein": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "fadeout": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "fall": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "forcegreeting": {
-   "effect": "part",
-   "missing": "A creature opens no conversation: the dialogue table holds rows for people only.",
+   "effect": "full",
+   "missing": "",
    "register": [
-    "DIALOGUE-CREATURE-SPEAKERS-66"
+    "DIALOGUE-CREATURE-SPEAKERS-66",
+    "MWSCRIPT-FORCEGREETING-TALK-RULES-68"
    ],
-   "basis": "test"
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "MWSCRIPT-FORCEGREETING-TALK-RULES-68": "fixed in source: v0.0.68-dev8 (c76fb504)"
+   }
   },
   "forcerun": {
    "effect": "part",
-   "missing": "A person or creature runs by it only on its wander and travel walks: as a follower or an escort it keeps its own pace.",
-   "register": [],
-   "basis": "source"
+   "missing": "A person or creature given it does not run: the flag is kept, saved and read back, but its walks keep their walking speed, on its wander and travel walks as when it follows or escorts.",
+   "register": [
+    "MWSCRIPT-FORCED-STANCE-ACTORS-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "forcesneak": {
    "effect": "part",
    "missing": "On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-FORCED-STANCE-ACTORS-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getagility": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getaipackagedone": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getangle": {
    "effect": "part",
-   "missing": "On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, so a script that turns such an object from its own reading goes wrong.",
+   "missing": "On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, also one that SetAngle or Rotate has turned, and so does an object in another place than the player's; a script that turns such an object from its own reading goes wrong.",
    "register": [
     "GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67",
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getattacked": {
    "effect": "part",
    "missing": "Only an attack by the player marks the actor; an attack by another person or creature does not, and the mark goes when the fight ends instead of staying until the crime is settled. It is not kept in a saved game.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getblightdisease": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getbuttonpressed": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getchameleon": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getcollidingactor": {
    "effect": "part",
@@ -390,7 +565,9 @@
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getcollidingpc": {
    "effect": "part",
@@ -398,261 +575,370 @@
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getcommondisease": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getcurrentaipackage": {
    "effect": "part",
-   "missing": "After a follow or an escort has ended, the actor reads 1 (travel) where the original keeps reading the package that ran last (3 or 2).",
-   "register": [],
-   "basis": "source"
+   "missing": "After a travel, a follow or an escort has ended, the actor goes on reading 1 (travel) and its package stays done; the original goes on to the package under it (its own wander reads 0), or reads -1 when none is left.",
+   "register": [
+    "MWSCRIPT-AIWANDER-NOT-SAVED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getcurrentweather": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getdeadcount": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getdetected": {
    "effect": "part",
    "missing": "When the observer is not a person (a creature or an object), only people nearby are asked whether they notice the actor; creatures nearby, the observer itself included, are not.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getdisabled": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getdisposition": {
    "effect": "part",
    "missing": "It reads the person's own base disposition, without the race, faction, reputation, personality and temporary changes the original adds, and without the limit to 0 to 100.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getdistance": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "geteffect": {
    "effect": "part",
    "missing": "Only the player is asked: on any NPC or creature it reads 0. An effect of an ability, disease or curse the player has (not cast) reads 0.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68",
+    "GETEFFECT-TABLE-84-OF-143-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "GETEFFECT-TABLE-84-OF-143-68": "shipped: v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382)"
+   }
   },
   "getendurance": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getfatigue": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getflee": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "gethealth": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getintelligence": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getinterior": {
    "effect": "part",
    "missing": "In the Mournhold districts shown as outdoor areas it reads 0, where the original reads 1 (they are interior cells that behave like outdoors).",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getitemcount": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getjournalindex": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getlevel": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getlocked": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getlos": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getluck": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getmagicka": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getmarksman": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getparalysis": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpccell": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpccrimelevel": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpcinjail": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpcrank": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpcsleep": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "GETPCSLEEP-NOT-CARRIED-OUT-67"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "GETPCSLEEP-NOT-CARRIED-OUT-67": "fixed in source: v0.0.67 (008e09f1)"
+   }
   },
   "getpcsneaking": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpctraveling": {
    "effect": "none",
    "missing": "Always reads 0: the frame right after a paid travel, in which the original reads 1, is never given.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpersonality": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getpos": {
    "effect": "part",
-   "missing": "An object named by its id that is drawn as scenery without its own entity and is no scripted mover reads 0 on every axis.",
+   "missing": "An object named by its id reads 0 on every axis when it is drawn as scenery without its own entity and is no scripted mover, or when it is in another place than the player's, where the original reads where it stands there.",
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getrace": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getsecondspassed": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getsecurity": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getsneak": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getsoundplaying": {
    "effect": "part",
    "missing": "It asks only about sounds the same script started: a sound another script or the game started on that object reads as not playing, and an object named before the call is not looked at.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getspeed": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getspell": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getspelleffects": {
    "effect": "part",
    "missing": "Reads 1 only while effects of the spell that were cast are active; an ability, disease or curse the actor carries (always active in the original) reads 0.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ABILITY-EFFECTS-NOT-APPLIED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getsquareroot": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getstandingactor": {
    "effect": "part",
@@ -660,7 +946,9 @@
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getstandingpc": {
    "effect": "part",
@@ -668,386 +956,593 @@
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getstat": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getstrength": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "gettarget": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getwaterlevel": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "GETWATERLEVEL-COLUMN-NOT-ROOM-67"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "GETWATERLEVEL-COLUMN-NOT-ROOM-67": "shipped: v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6)"
+   }
   },
   "getweapondrawn": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getweapontype": {
    "effect": "part",
-   "missing": "A lockpick or a probe in the player's hand reads -1 instead of -2 or -3, and a person reads the weapon of its game data rather than the one it holds now.",
-   "register": [],
-   "basis": "source"
+   "missing": "Lockpicks and probes cannot be held yet, and any held item that is not a weapon reads -1 where the original reads -2 for a lockpick and -3 for a probe. A person reads the weapon of its game data rather than the one it holds now.",
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68",
+    "INVENTORY-EQUIP-KINDS-NOT-YET-67"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "getwerewolfkills": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "WEREWOLF-TRANSFORM-RULES-PARTIAL-68"
+   ],
+   "basis": "test",
+   "in_play": [],
+   "checked": {}
   },
   "getwillpower": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "goodbye": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "gotojail": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "hasitemequipped": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "hassoulgem": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "hitonme": {
    "effect": "part",
    "missing": "Only a blow with the player's weapon is recorded: a blow by another person's or creature's weapon is not, and the player's own HitOnMe always reads 0.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "hurtcollidingactor": {
    "effect": "part",
-   "missing": "Only the player touching the object is hurt; people and creatures touching it are not.",
-   "register": [],
-   "basis": "source"
+   "missing": "Only the player touching the object is hurt; people and creatures touching it are not. An object drawn without its own entity hurts no one, and every object the game uses this on is one: the spikes, dicers and tenderizers of the Clockwork City do no harm.",
+   "register": [
+    "MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "hurtstandingactor": {
    "effect": "part",
-   "missing": "Only the player standing on the object is hurt; people and creatures standing on it are not, and scenery drawn without an entity hurts no one.",
-   "register": [],
-   "basis": "source"
+   "missing": "Only the player standing on the object is hurt; people and creatures standing on it are not. Scenery drawn without its own entity, which is every placement the game uses this on, hurts no one through this call; the lava hurts the player by the engine's own lava rule instead.",
+   "register": [
+    "MWSCRIPT-COMBAT-MARKS-PLAYER-ONLY-68",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "iswerewolf": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "journal": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "lock": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "loopgroup": {
    "effect": "part",
-   "missing": "Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read.",
-   "register": [],
-   "basis": "source"
+   "missing": "A person or creature with a converted skeleton plays the group, but its start-mode argument is not read. An animated object in a room is not seen moving: once its loops have played it shows the group's last pose and keeps it, also in a saved game. After the ice wall of the Halls of Penumbra breaks, the passage behind it stays blocked. An object outside the rooms and the player play nothing.",
+   "register": [
+    "MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68",
+    "MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68",
+    "PENUMBRA-ICE-WALL-NO-PASSAGE-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68": "shipped: v0.0.68-dev10 (0b2287c2)"
+   }
   },
   "menumode": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "messagebox": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modagility": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Agility. On an NPC or creature the change does not reach its fighting (hit chance, evasion and block keep the game data's Agility).",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modarmorer": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modathletics": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its movement in a fight, which keeps the game data's Athletics.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modaxe": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting: its axe attacks keep the game data's skill.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modblock": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its blocking in a fight, which keeps the game data's skill.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modbluntweapon": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting with blunt weapons.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modcurrentfatigue": {
    "effect": "part",
    "missing": "An NPC or creature whose fatigue a script takes below zero falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modcurrenthealth": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "moddisposition": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modendurance": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Endurance. On an NPC or creature the change does not reach its fighting (fatigue return in a fight keeps the game data's value).",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modfactionreaction": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modfatigue": {
    "effect": "part",
    "missing": "An NPC or creature whose fatigue falls below zero this way falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modfight": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modflee": {
    "effect": "part",
    "missing": "The changed Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modhealth": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modheavyarmor": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its armour rating in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modintelligence": {
    "effect": "part",
    "missing": "Maximum magicka does not follow the new Intelligence (the original recalculates it at once).",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modlongblade": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting with long blades.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modluck": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modmagicka": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modmarksman": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting with bows and thrown weapons.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modmediumarmor": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its armour rating in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modmercantile": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modpcfacrep": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modpersonality": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modregion": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MODREGION-KEEPS-UNGIVEN-CHANCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "MODREGION-KEEPS-UNGIVEN-CHANCES-68": "shipped: v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6)"
+   }
   },
   "modreputation": {
    "effect": "part",
    "missing": "Only the player's reputation changes: on a person (the speaker of a conversation, or the script's own object when no one is named) nothing happens.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-REPUTATION-DISPOSITION-PARTIAL-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modresistfire": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modresistfrost": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modresistmagicka": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modresistparalysis": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modresistpoison": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modrestoration": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modshortblade": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting with short blades.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modspear": {
    "effect": "part",
    "missing": "On an NPC or creature the change does not reach its fighting with spears.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modspeed": {
    "effect": "part",
    "missing": "On an NPC or creature the change counts for its walking but not in a fight, where it moves at the game data's Speed.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modstrength": {
    "effect": "part",
-   "missing": "Maximum fatigue does not follow the new Strength. On an NPC or creature the change does not reach its fighting: its damage keeps the game data's Strength.",
-   "register": [],
-   "basis": "source"
+   "missing": "Maximum fatigue does not follow the new Strength. On an NPC or creature only the load it carries in a fight follows the change; its damage keeps the game data's Strength.",
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "modwaterlevel": {
-   "effect": "part",
-   "missing": "The water moves only in a room whose water is one flat level of its map; a room built otherwise (lava carved under its water) keeps its water where it was built.",
+   "effect": "full",
+   "missing": "",
    "register": [
     "MWSCRIPT-WATER-LEVEL-STATIC-67"
    ],
-   "basis": "source"
+   "basis": "play",
+   "in_play": [
+    {
+     "what": "the water of the two Old Mournhold rooms rises and falls with their levers",
+     "version": "0.0.68-dev2",
+     "date": "2026-11-20"
+    }
+   ],
+   "checked": {
+    "MWSCRIPT-WATER-LEVEL-STATIC-67": "shipped: v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6)"
+   }
   },
   "modwillpower": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Willpower. On an NPC or creature it counts for its spellcasting and its resistance to spells, not for its fatigue in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "move": {
    "effect": "part",
-   "missing": "A scripted object drawn as scenery without its own entity does not move along its own axes (only along the world's axes). A moved object with its own entity goes back to its place when its map loads again or a game is loaded. Only the player is carried along when standing on it.",
+   "missing": "A scripted object drawn as scenery without its own entity does not move along its own axes (only along the world's axes). A moved object with its own entity that is no person or creature that is no person or creature goes back to its place when its map loads again or a game is loaded. Only the player is carried along when standing on it.",
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59",
-    "WORLD-OBJECT-STATE-NOT-SAVED-59"
+    "WORLD-OBJECT-STATE-NOT-SAVED-59",
+    "MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "moveworld": {
    "effect": "part",
-   "missing": "A moved object with its own entity goes back to its place when its map loads again or a game is loaded; only the player is carried along when standing on it. Scenery without an entity that is no scripted mover does not move.",
+   "missing": "A moved object that is no person or creature goes back to its place when its map loads again or a game is loaded; only the player is carried along when standing on it. Scenery drawn without its own entity moves only when its script reacts to its use or to the water, or another script names it, and then carries no one standing on it.",
    "register": [
-    "WORLD-OBJECT-STATE-NOT-SAVED-59"
+    "WORLD-OBJECT-STATE-NOT-SAVED-59",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "onactivate": {
    "effect": "full",
@@ -1055,444 +1550,650 @@
    "register": [
     "CONTAINER-SCRIPT-ACTIVATE-67"
    ],
-   "basis": "test"
+   "basis": "test",
+   "in_play": [],
+   "checked": {
+    "CONTAINER-SCRIPT-ACTIVATE-67": "fixed in source: v0.0.67 (e5905aea)"
+   }
   },
   "ondeath": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "onknockout": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "onmurder": {
-   "effect": "part",
-   "missing": "The murder mark is not kept in a saved game: a script that asks after a load reads 0.",
+   "effect": "full",
+   "missing": "",
    "register": [
     "CRIME-SAVE-PURSUERS-62"
    ],
-   "basis": "source"
+   "basis": "test",
+   "in_play": [],
+   "checked": {}
   },
   "payfine": {
    "effect": "part",
    "missing": "The bounty goes, stolen goods are taken and the witnesses calm down, but the player's weapon or spell is not put away as in the original.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "payfinethief": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "pcclearexpelled": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "pcexpell": {
    "effect": "part",
    "missing": "The player is marked expelled, but the message that tells him he was expelled from the faction is not shown.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "FACTION-EXPEL-MESSAGE-64",
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "pcexpelled": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "pcjoinfaction": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "pcraiserank": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "placeatme": {
    "effect": "part",
-   "missing": "An object no map converted (a record placed only by scripts) is made where it should be and runs its script, but it is not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out.",
+   "missing": "An object no map converted (a record placed only by scripts) is made where it should be and runs its script, but it is not drawn. An activator, static or container the world draws as scenery is not made. Past the script-made copies the build plans for one map (four of each record), a further copy appears but its script does not run, and a full map leaves a made object out.",
    "register": [
     "MWVM-PLACE-COPIES-FOUR-66",
     "MWSCRIPT-PLACE-OTHER-KINDS-62"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "placeatpc": {
    "effect": "part",
-   "missing": "An object no map converted is made but not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out.",
+   "missing": "An object no map converted is made but not drawn, and an activator, static or container the world draws as scenery is not made. Past the script-made copies the build plans for one map (four of each record), a further copy appears but its script does not run, and a full map leaves a made object out.",
    "register": [
     "MWVM-PLACE-COPIES-FOUR-66",
     "MWSCRIPT-PLACE-OTHER-KINDS-62"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "placeitem": {
    "effect": "part",
-   "missing": "An object no map converted is made and runs its script but is not drawn; a full map leaves it out.",
+   "missing": "An object no map converted is made and runs its script but is not drawn; an activator, static or container the world draws as scenery is not made. Past the copies the build plans, a copy's script does not run, and a full map leaves it out.",
    "register": [
-    "MWSCRIPT-PLACE-OTHER-KINDS-62"
+    "MWSCRIPT-PLACE-OTHER-KINDS-62",
+    "MWVM-PLACE-COPIES-FOUR-66"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "placeitemcell": {
    "effect": "part",
-   "missing": "An object no map converted is made but not drawn. A placement into an outdoor place appears only while that place's area is loaded.",
+   "missing": "An object no map converted is made but not drawn, and an activator, static or container the world draws as scenery is not made. Past the copies the build plans, a copy's script does not run, and a full map leaves a made object out.",
    "register": [
-    "MWSCRIPT-POSITIONCELL-OUTDOOR-62",
-    "MWSCRIPT-PLACE-OTHER-KINDS-62"
+    "MWSCRIPT-PLACE-OTHER-KINDS-62",
+    "MWVM-PLACE-COPIES-FOUR-66"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playbink": {
-   "effect": "part",
-   "missing": "The video plays over the game and the game goes on after it, but the second argument is ignored: every video can be skipped, also those the original does not let the player skip.",
-   "register": [],
-   "basis": "source"
+   "effect": "full",
+   "missing": "",
+   "register": [
+    "MWSCRIPT-PLAYBINK-SKIP-FLAG-68"
+   ],
+   "basis": "test",
+   "in_play": [],
+   "checked": {
+    "MWSCRIPT-PLAYBINK-SKIP-FLAG-68": "fixed in source: v0.0.69-dev3 (c7af072f)"
+   }
   },
   "playgroup": {
    "effect": "part",
-   "missing": "Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read.",
-   "register": [],
-   "basis": "source"
+   "missing": "A person or creature with a converted skeleton plays the group, but its start-mode argument is not read. An animated object in a room (a door, a lever) is not seen moving: when the group's time has passed it shows the group's last pose and keeps it, also in a saved game. An object outside the rooms and the player play nothing.",
+   "register": [
+    "MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68",
+    "MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68": "shipped: v0.0.68-dev10 (0b2287c2)"
+   }
   },
   "playloopsound3d": {
    "effect": "part",
    "missing": "A loop started on another object (named before the call) starts again at the script's own object once its first sample ends.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playloopsound3dvp": {
    "effect": "part",
    "missing": "The pitch argument is not used (the mixer has no pitch); the volume is. A loop started on another object starts again at the script's own object once its first sample ends.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playsound": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playsound3d": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playsound3dvp": {
    "effect": "part",
    "missing": "The pitch argument is not used (the mixer has no pitch); the volume is.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "playsoundvp": {
    "effect": "part",
    "missing": "The pitch argument is not used (the mixer has no pitch); the volume is.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "position": {
    "effect": "part",
-   "missing": "The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object without the actor rules goes back when its map loads again.",
+   "missing": "The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object that is no person or creature goes back when its map loads again. Scenery drawn without its own entity is not moved.",
    "register": [
-    "WORLD-OBJECT-STATE-NOT-SAVED-59"
+    "WORLD-OBJECT-STATE-NOT-SAVED-59",
+    "MWSCRIPT-POSITION-ROOM-ROTATION-68",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "positioncell": {
    "effect": "part",
-   "missing": "An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no actor moves only within the place the player is in, not to another place. A player move into a room the image lacks does nothing.",
+   "missing": "An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no person or creature moves only within the place the player is in, not to another place, and one drawn without its own entity does not move at all. A player move into a room the image lacks does nothing.",
    "register": [
-    "MWSCRIPT-POSITIONCELL-OUTDOOR-62"
+    "MWSCRIPT-POSITIONCELL-OUTDOOR-62",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59",
+    "MWSCRIPT-POSITIONCELL-NPC-62"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "raiserank": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "random": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "removeitem": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "removesoulgem": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "removespell": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "resurrect": {
    "effect": "part",
-   "missing": "Only an NPC or creature loaded in the player's map is brought back; one elsewhere, or the player, is not.",
-   "register": [],
-   "basis": "source"
+   "missing": "Only an NPC or creature loaded in the player's map is brought back; one elsewhere, or the player, is not. A living one is reset to its game data too, where the original leaves it alone. In a room the one brought back does not stand up where it fell: it is gone until the room is entered again, then stands where the game data puts it.",
+   "register": [
+    "MWSCRIPT-RESURRECT-LOADED-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "rotate": {
    "effect": "part",
-   "missing": "Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity is back at its angle when its map loads again or a game is loaded.",
+   "missing": "Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity that is no person or creature that is no person or creature is back at its angle when its map loads again or a game is loaded.",
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59",
     "WORLD-OBJECT-STATE-NOT-SAVED-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "rotateworld": {
    "effect": "part",
-   "missing": "Scenery without its own entity that is no scripted mover does not turn, and a turned object with its own entity is back at its angle when its map loads again or a game is loaded.",
+   "missing": "Scenery without its own entity that is no scripted mover does not turn, and a turned object with its own entity that is no person or creature that is no person or creature is back at its angle when its map loads again or a game is loaded.",
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59",
     "WORLD-OBJECT-STATE-NOT-SAVED-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "say": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "saydone": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "scriptrunning": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setagility": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Agility. On an NPC the change does not reach its fighting.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setalarm": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setalchemy": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setalteration": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setangle": {
    "effect": "part",
-   "missing": "On the player the angle about z is set 90 degrees off from the original's. A changed angle of an object with its own entity is not kept when its map loads again or a game is loaded.",
+   "missing": "On the player the angle about z is set 90 degrees off from the original's. Scenery drawn without its own entity turns only when its script reacts to its use or another script names it. A changed angle of an object that is no person or creature is not kept when its map loads again or a game is loaded.",
    "register": [
     "GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67",
-    "WORLD-OBJECT-STATE-NOT-SAVED-59"
+    "WORLD-OBJECT-STATE-NOT-SAVED-59",
+    "MWSCRIPT-ROTATE-NO-ENTITY-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setarmorer": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setathletics": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its movement in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setatstart": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setaxe": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its fighting with axes.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setblock": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its blocking in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setbluntweapon": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its fighting with blunt weapons.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setconjuration": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setdelete": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setdestruction": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setdisposition": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setenchant": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setendurance": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Endurance. On an NPC the change does not reach its fighting.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setfatigue": {
    "effect": "part",
    "missing": "An NPC or creature set below zero fatigue falls unconscious only if it is fighting. While the player fights, the new value is lost.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-FATIGUE-KNOCKOUT-FIGHT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setfight": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setflee": {
    "effect": "part",
    "missing": "The new Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "sethealth": {
    "effect": "full",
    "missing": "",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setheavyarmor": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its armour rating in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "sethello": {
    "effect": "none",
-   "missing": "The value is kept and read back by GetHello, but nothing uses it: the distance at which a person greets the player stays the one from its game data.",
-   "register": [],
-   "basis": "source"
+   "missing": "The value is kept and read back by GetHello (a value over 255 as 255), but nothing uses it: the distance at which a person greets the player stays the one from its game data.",
+   "register": [
+    "MWSCRIPT-ACTOR-SETTINGS-NOT-USED-68",
+    "ACTOR-HELLO-CLAMPED-61"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setillusion": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setlongblade": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its fighting with long blades.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setmagicka": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setmarksman": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its fighting with bows and thrown weapons.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setmediumarmor": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its armour rating in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setmercantile": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setmysticism": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setpccrimelevel": {
    "effect": "part",
-   "missing": "The bounty changes and pursuit ends at 0, but a crime level set to 0 does not clear the marks the crime left on the witnesses (their alarm and the disposition change).",
-   "register": [],
-   "basis": "source"
+   "missing": "The bounty changes and pursuit ends at 0, but a crime level set to 0 does not calm the witnesses as a paid fine does: their alarm and the disposition change stay, and those who attacked the player for the crime go on fighting him.",
+   "register": [
+    "MWSCRIPT-SMALL-DIFFERENCES-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setpos": {
    "effect": "part",
-   "missing": "A changed place of an object with its own entity is not kept when its map loads again or a game is loaded. Scenery without an entity that is no scripted mover does not move.",
+   "missing": "A changed place of an object with its own entity that is no person or creature that is no person or creature is not kept when its map loads again or a game is loaded. Scenery without an entity that is no scripted mover does not move.",
    "register": [
     "MWSCRIPT-ROTATE-NO-ENTITY-59",
-    "WORLD-OBJECT-STATE-NOT-SAVED-59"
+    "WORLD-OBJECT-STATE-NOT-SAVED-59",
+    "SETPOS-MOVER-NO-ENTITY-68"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {
+    "SETPOS-MOVER-NO-ENTITY-68": "shipped: v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6)"
+   }
   },
   "setrestoration": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setscale": {
    "effect": "part",
@@ -1500,134 +2201,218 @@
    "register": [
     "WORLD-OBJECT-STATE-NOT-SAVED-59"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setspear": {
    "effect": "part",
    "missing": "On an NPC the change does not reach its fighting with spears.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setspeed": {
    "effect": "part",
    "missing": "On an NPC the change counts for its walking but not in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setstrength": {
    "effect": "part",
-   "missing": "Maximum fatigue does not follow the new Strength. On an NPC the change does not reach its damage in a fight.",
-   "register": [],
-   "basis": "source"
+   "missing": "Maximum fatigue does not follow the new Strength. On an NPC or creature only the load it carries in a fight follows the change; its damage keeps the game data's Strength.",
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setwaterlevel": {
-   "effect": "part",
-   "missing": "The water moves only in a room whose water is one flat level of its map; a room built otherwise keeps its water where it was built.",
+   "effect": "full",
+   "missing": "",
    "register": [
     "MWSCRIPT-WATER-LEVEL-STATIC-67"
    ],
-   "basis": "source"
+   "basis": "play",
+   "in_play": [
+    {
+     "what": "the water of the two Old Mournhold rooms rises and falls with their levers",
+     "version": "0.0.68-dev2",
+     "date": "2026-11-20"
+    }
+   ],
+   "checked": {
+    "MWSCRIPT-WATER-LEVEL-STATIC-67": "shipped: v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6)"
+   }
   },
   "setwerewolfacrobatics": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "setwillpower": {
    "effect": "part",
    "missing": "Maximum fatigue does not follow the new Willpower. On an NPC it counts for spellcasting and spell resistance, not for its fatigue in a fight.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-NPC-STATS-SKIP-FIGHT-68",
+    "MWSCRIPT-DERIVED-MAXIMA-NOT-FOLLOWED-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "showmap": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "showrestmenu": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "startcombat": {
    "effect": "full",
    "missing": "",
    "register": [
-    "MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68"
+    "MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68",
+    "STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68"
    ],
-   "basis": "test"
+   "basis": "test",
+   "in_play": [],
+   "checked": {
+    "MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68": "fixed in source: v0.0.68-dev7 (db15e97a)",
+    "STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68": "shipped: v0.0.68-dev8 (db15e97a)"
+   }
   },
   "startscript": {
    "effect": "part",
    "missing": "A global script started from an object's script or from a conversation does not take that object or speaker as its own, so its calls that name no object act on nothing.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-STARTSCRIPT-NO-TARGET-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "stopcombat": {
    "effect": "part",
    "missing": "Only the actor's own fight ends: an actor it was fighting, and that actor's allies, go on fighting it.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-STOPCOMBAT-OTHER-SIDE-68",
+    "MWSCRIPT-STOPCOMBAT-UNWIRED-62"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "stopscript": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "stopsound": {
    "effect": "part",
    "missing": "It stops only a sound the same script started: a sound another script started on that object goes on, and an object named before the call is not looked at.",
-   "register": [],
-   "basis": "source"
+   "register": [
+    "MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68"
+   ],
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "streammusic": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "turnmoonred": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "turnmoonwhite": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "undowerewolf": {
    "effect": "part",
-   "missing": "The player's own stats and body come back, the werewolf robe is removed, temporary effects end and the windows open again (in source in v0.0.68, to be seen in play); the form's health is not handled. An NPC is drawn with its own body again (in source in v0.0.68, to be seen in play).",
+   "missing": "Not handled: the health going back from the doubled amount, the witnesses of the change back, and damage to the stats being healed on the change back.",
    "register": [
     "WEREWOLF-TRANSFORM-RULES-PARTIAL-68",
     "NPC-WEREWOLF-NO-MODEL-66"
    ],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [
+    {
+     "version": "0.0.68-dev8",
+     "date": "2026-11-23",
+     "what": "the player's own body, arms and stats come back, the werewolf robe is taken off and away, the windows open again and the items he wore stay in the inventory, as in the original"
+    },
+    {
+     "version": "0.0.68-dev8",
+     "date": "2026-11-23",
+     "what": "an NPC is drawn with its own body again and fights with its own weapon"
+    }
+   ],
+   "checked": {
+    "NPC-WEREWOLF-NO-MODEL-66": "fixed in source: v0.0.68-dev8 (81755190)"
+   }
   },
   "unlock": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "wakeuppc": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   },
   "xbox": {
    "effect": "full",
    "missing": "",
    "register": [],
-   "basis": "source"
+   "basis": "source",
+   "in_play": [],
+   "checked": {}
   }
  }
 }

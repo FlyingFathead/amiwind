@@ -51,7 +51,7 @@ class WerewolfFightWiring(unittest.TestCase):
         self.assertIn('int now=!s->f.creature && were_of(s->e);', were)    # an NPC, never a creature
         self.assertIn('AW_CombatWerewolfClaws(&aw_combat_settings,&s->f);', were)
         self.assertIn('s->spell=-1;', were)
-        self.assertIn('AW_ItemsHide(s->item);', were)
+        self.assertIn('items_hide(s);', were)                     # AW_ItemsHide, and no set held for a draw (v0.0.69)
         self.assertIn('s->f.weapon=s->worn.weapon;', were)       # its own gear again at UndoWerewolf
         self.assertIn('fighter_load(s);', were)
         self.assertIn('if(s->state==S_CAST){', were)             # a cast under way put away with the spell

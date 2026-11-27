@@ -35,12 +35,15 @@ static float pitch_value=.022f;
 static float player_steps;
 /* Prefs > Always use best attack (aw_combat_best_attack, BEST-ATTACK-OPTION-62: on by default, an AmiWind default). */
 static float best_attack=1;
+/* Prefs > Plant and mushroom picking (aw_plant_pick, PLANT-PICK-DIRECT-DEFAULT-69: 1 AmiWind by default, 0 Original). */
+static float plant_pick=1;
 /* Video > Fog distance indoors and Fog in large rooms (aw_fog.c, LARGE-ROOM-FOG-SETTING-64: 300 and on by default). */
 static float fog_indoors=300,fog_large_rooms=1;
 float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_fog_distance_interior"))return fog_indoors;
     if(!strcmp(name,"aw_fog_large_rooms"))return fog_large_rooms;
     if(!strcmp(name,"aw_combat_best_attack"))return best_attack;
+    if(!strcmp(name,"aw_plant_pick"))return plant_pick;
     if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_autoram"))return autoram;
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
@@ -68,6 +71,7 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
     if(!strcmp(name,"aw_combat_block")){combat_block=value;return;}
     if(!strcmp(name,"aw_sneak_toggle")){sneak_toggle=value;return;}
     if(!strcmp(name,"aw_combat_best_attack")){best_attack=value;return;}
+    if(!strcmp(name,"aw_plant_pick")){plant_pick=value;return;}
     for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
@@ -101,7 +105,7 @@ void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 /* What the Options page drew: labels by their start, every tab and box. */
 static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64],
-            best_label[64],room_fog_label[64],indoor_label[64],outdoor_label[64],fog_auto_label[64];
+            best_label[64],plants_label[64],room_fog_label[64],indoor_label[64],outdoor_label[64],fog_auto_label[64];
 static int outdoor_colour;
 /* The mouse cursor (aw_ui.c, CURSOR-MW-58): aw_cursor_type 2 = Morrowind's pointer (drawn when the image has it), 1 = AmiWind's. */
 static int cursor_kind=2,cursor_calls,cursor_art=1;
@@ -117,6 +121,7 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+
  if(!strncmp(s,"Crosshair shape",15))strcpy(shape_label,s);
  if(!strncmp(s,"Mouse cursor",12))strcpy(cursor_label,s);
  if(!strncmp(s,"Always use best attack",22)){strcpy(best_label,s);assert(AW_UIWidth(s)<=w-4);}
+ if(!strncmp(s,"Plant and mushroom picking",26)){strcpy(plants_label,s);assert(AW_UIWidth(s)<=w-4);}
  if(!strncmp(s,"Invert Y axis",13))strcpy(invert_label,s);
  if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
  if(x==10 && y==176)strcpy(help,s);
@@ -211,7 +216,13 @@ static void check_prefs(void){
  M_Keydown(K_ENTER);M_Draw();assert(best_attack==0 && !strcmp(best_label,"Always use best attack: Off"));
  M_Keydown(K_RIGHTARROW);M_Draw();assert(best_attack==1 && !strcmp(best_label,"Always use best attack: On"));
  best_attack=0;M_Draw();assert(!strcmp(best_label,"Always use best attack: Off"));best_attack=1;   /* a console change shows at once */
- down(1);assert(scroll_total==16 && scroll_top==9 && highlight_y==150); /* Autosave history, the last row (16 rows: topic colours, name labels, best attack, text box) */
+ /* Plant and mushroom picking (PLANT-PICK-DIRECT-DEFAULT-69): AmiWind by default; Enter or an arrow switches the one
+  * saved value to Original and back; a console change (aw_plant_pick, dbg plantpick) shows at once */
+ down(1);assert(!strcmp(plants_label,"Plant and mushroom picking: AmiWind") && plant_pick==1 && scroll_top==9 && highlight_y==150);
+ M_Keydown(K_ENTER);M_Draw();assert(plant_pick==0 && !strcmp(plants_label,"Plant and mushroom picking: Original"));
+ M_Keydown(K_RIGHTARROW);M_Draw();assert(plant_pick==1 && !strcmp(plants_label,"Plant and mushroom picking: AmiWind"));
+ plant_pick=0;M_Draw();assert(!strcmp(plants_label,"Plant and mushroom picking: Original"));plant_pick=1;
+ down(1);assert(scroll_total==17 && scroll_top==10 && highlight_y==150); /* Autosave history, the last row (17 rows: topic colours, name labels, best attack, plant picking, text box) */
  /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
  down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
  up(1);assert(highlight_y==150 && highlight_w==280);

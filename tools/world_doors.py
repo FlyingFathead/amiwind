@@ -389,6 +389,8 @@ TELEPORT_NAMES = 'teleport-names.txt'      # config/ and the game data: dbg tp N
 GLOBAL_PLACE = 'global'                    # the map of an outdoor place: x y z are original global coordinates
 NOT_HERE = '-'                             # the map of a place this image does not hold: the label says why, nothing
                                            # moves (tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66)
+BEING_PLACE = 'being'                      # the map of a person or creature: the label is its record id, and dbg tp
+                                           # takes the teleport list's own row of it (DBG-TP-LORDVIVEC-69)
 
 
 def teleport_names(raw):
@@ -413,12 +415,22 @@ def teleport_names(raw):
     return out
 
 
-def teleport_name_problems(names, rooms):
+def teleport_name_problems(names, rooms, beings=None):
     """One line per named place whose map is not a room the image holds (rooms: {cell: map}); a place written as not
-    held (NOT_HERE) says so itself."""
+    held (NOT_HERE) says so itself. A being place (BEING_PLACE, DBG-TP-LORDVIVEC-69) needs its record id (the label)
+    on exactly one being row of the image's teleport list, never a common kind's row (beings: {record id casefold:
+    rows}, tools/tp_places_lut.py being_ids; None: the image has no list)."""
     held = set(rooms.values())
-    return ['named place %s: map %s is not in this image' % (name, place[0])
-            for name, place in sorted(names.items()) if place[0] not in (GLOBAL_PLACE, NOT_HERE) and place[0] not in held]
+    out = []
+    for name, place in sorted(names.items()):
+        if place[0] == BEING_PLACE:
+            count = (beings or {}).get(place[3].casefold(), 0)
+            if count != 1:
+                out.append('named place %s: being %s is %s' % (
+                    name, place[3], 'on %d rows of the teleport list' % count if count else 'not in the teleport list'))
+        elif place[0] not in (GLOBAL_PLACE, NOT_HERE) and place[0] not in held:
+            out.append('named place %s: map %s is not in this image' % (name, place[0]))
+    return out
 
 
 def unresolved_problems(rows):

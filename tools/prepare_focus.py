@@ -72,6 +72,9 @@ OWNER_ID = 32           # the longest owner id the engine keeps (aw_ledger.h AW_
 OWNER_POOL = 65536      # the pool offsets are 16 bits
 MAX_ROWS = 1024        # per room or cell (the engine reads a 3 x 3 cell window into FOCUS_ROWS 1536, aw_inventory.c)
 WINDOW_ROWS = 1536     # FOCUS-ROWS-WINDOW-OVERFLOW-66: the engine's table, every 3 x 3 exterior window must fit it
+# PLANT-BOX-AIM-69: the engine's box table (aw_inventory.c FOCUS_BOARDS: the named boards and the containers aimed by their
+# measured box share it; a board past it is not kept at all): every room and every 3 x 3 exterior window must fit it
+WINDOW_BOXES = 1536
 PLACED_ITEMS = 1024    # the engine's drawn-item list (aw_placed.c PLACED_MAX): every room's and window's items fit it
 LIGHT_CARRY = 2         # LHDT flags: can be carried
 CELL = 8192             # game units per exterior cell
@@ -80,6 +83,17 @@ GRID_BIAS = 2048        # exterior keys: grid offset into 12 bits
 ACT_NONE, ACT_TAKE, ACT_READ, ACT_TALK = 0, 1, 2, 3      # bits 0-1
 ACT_OWNED = 4                                            # bit 2: taking it is theft
 ACT_MAGIC_SCROLL = 8                                     # bit 3: a BOOK with an enchantment (taken, never read)
+# PLANT-PICK-DIRECT-DEFAULT-69: the action code's bits 4-5 on an organic container that opens (ACT_TAKE), the AmiWind
+# pick (the default of the Options > Prefs entry "Plant and mushroom picking", aw_plant_pick 1): one press takes its
+# contents, the pick sound plays and no window opens; the Original value (0) opens its window. 'pick' (bit 4): picked
+# with one press; 'keep' (bit 5): it stays drawn after the pick (the ore and gem rocks, the group 'keep_register' of
+# config/harvest-flora.json); every other plant is shown picked where the engine can hide it (a room's placement).
+# 'stashes': organic containers that are stashes, not plants, with their window under both values. The masters'
+# organic containers without the respawn flag are 32 records, and most of them are plants all the same (the kwama egg
+# sacks, the ore and gem rocks, the kollops, the Horn Lily, the bloatspore): config/harvest-flora.json's groups tell a
+# plant from a supply barrel or chest; Fargoth's hollow treestump (the stash of the quest MS_Lookout) is the one stash
+# among the flora ids. A literal table: only the code that names it keys on it (tools/build_cache.py lazy_tables).
+PLANT_PICK = {'pick': 16, 'keep': 32, 'stashes': ('flora_treestump_unique',), 'keep_register': 'HARVEST-ORE-ROCKS-62'}
 
 # SIGNPOST-NAMES-MISSING-65, NAMED-ACTIVATOR-FOCUS-66: a named activator ('N' row): every placed activator (ACTI)
 # whose record has a name: the road signposts' boards (active_sign_*: each board its own record, named after the place
@@ -311,7 +325,8 @@ SIGN_BOARD_BOXES = FOCUS_BOXES   # the older name (the signposts first)
 # placement box the room ray reads; the near-the-reference-point test missed most sacks, barrels and chests: 987
 # exterior containers, none aimable in the v0.0.65 census, tools/container_census.py). A room's container carries it
 # too (the engine asks the room ray first; a room map that is not a CHIM room has only this box). A container whose
-# model is not here keeps its record id and the near-the-point aim.
+# model is not here keeps its record id and the near-the-point aim. Since PLANT-BOX-AIM-69 the organic containers that
+# open (no harvest kind covers them) are measured too (the last group); missing_boxes asks for them as for the others.
 CONTAINER_BOXES = {
     'f\\furn_dwrv_cabinet00.nif': ((-70.4, -24.1, -64.1), (96.1, 24.1, 106.3)),
     'i\\in_ci_mummy_01.nif': ((-32.0, -33.3, -41.3), (32.0, 29.6, 41.3)),
@@ -394,15 +409,133 @@ CONTAINER_BOXES = {
     'o\\contain_rock_ebony_06.nif': ((-145.9, -150.1, -112.8), (147.8, 140.8, 124.7)),
     'o\\contain_rock_ebony_07.nif': ((-200.5, -114.1, -149.1), (200.5, 116.7, 161.3)),
     'o\\flora_bm_holly_06.nif': ((-176.3, -174.1, -204.7), (203.8, 173.3, 241.3)),
+    # PLANT-BOX-AIM-69: every model of a placed, named organic container of the three masters that no harvest kind
+    # covers (FARGOTH-STASH-STUMP-69: they open their window as in the original; harvest_picked), measured the same
+    # way with the repo's own NIF reader (prepare_scenery.model_geometry, the visible vertices with node transforms) on
+    # 27 November 2026 (111 models; flora_bm_holly_04 reads exactly as the PyFFI measurement of flora_bm_holly_06
+    # above). Outdoors they had only the near-the-point aim (19,879 placements). A plant's box holds its leaves and
+    # stems whole, far coarser than they are: what stands inside it wins the aim over it (aw_activate.h AW_AimTakes)
+    'f\\flora_bc_fern_01.nif': ((-174.0, -161.2, -115.2), (174.0, 156.0, 90.8)),
+    'f\\flora_bc_fern_04.nif': ((-71.6, -66.8, -37.3), (71.6, 66.8, 34.5)),
+    'f\\flora_bc_podplant_01.nif': ((-3.8, -3.4, -57.7), (3.8, 3.4, 57.7)),
+    'f\\flora_bc_podplant_02.nif': ((-2.9, -2.7, -56.4), (6.0, 6.2, 58.4)),
+    'f\\flora_bc_podplant_03.nif': ((-6.8, -7.2, -62.2), (6.8, 7.2, 62.2)),
+    'f\\flora_comberry_01.nif': ((-161.7, -166.7, -78.9), (150.1, 146.3, 136.3)),
+    'f\\flora_corkbulb_01.nif': ((-104.3, -109.7, -40.5), (104.8, 102.2, 128.1)),
+    'f\\flora_heather_01.nif': ((-35.3, -66.2, -14.0), (35.6, 15.0, 30.4)),
+    'f\\flora_muckspunge_01.nif': ((-84.7, -84.7, -153.7), (84.7, 84.7, 153.7)),
+    'f\\flora_muckspunge_02.nif': ((-74.3, -74.3, -161.3), (74.3, 74.3, 161.3)),
+    'f\\flora_muckspunge_03.nif': ((-117.2, -116.9, -142.2), (117.2, 116.9, 142.2)),
+    'f\\flora_muckspunge_04.nif': ((-84.4, -76.3, -158.5), (84.4, 76.3, 158.5)),
+    'f\\flora_muckspunge_05.nif': ((-89.2, -84.7, -183.4), (89.2, 84.7, 183.4)),
+    'f\\flora_muckspunge_06.nif': ((-88.0, -84.7, -177.3), (88.0, 84.7, 177.3)),
+    'f\\flora_rm_scathecraw_01.nif': ((-117.8, -185.8, -162.2), (125.1, 169.9, 162.2)),
+    'f\\flora_rm_scathecraw_02.nif': ((-102.2, -115.1, -109.8), (102.2, 115.1, 109.6)),
+    'f\\flora_treestump_wg_01.nif': ((-530.8, -276.6, -536.0), (546.9, 276.6, 588.5)),
+    'f\\furn_shell00.nif': ((-43.9, -62.4, -12.1), (43.9, 62.4, 12.1)),
+    'f\\furn_shell10.nif': ((-32.3, -45.9, -8.9), (32.3, 45.9, 8.9)),
+    'f\\furn_shell20.nif': ((-24.7, -35.1, -6.8), (24.7, 35.1, 6.8)),
+    'o\\contain_egg_kwama00.nif': ((-43.5, -48.7, -2.3), (44.9, 44.6, 34.3)),
+    'o\\contain_rock_diamond_01.nif': ((-132.5, -93.7, -50.7), (132.5, 93.7, 52.8)),
+    'o\\contain_rock_diamond_02.nif': ((-84.3, -82.5, -109.1), (84.3, 82.5, 115.2)),
+    'o\\contain_rock_diamond_03.nif': ((-85.5, -59.8, -130.8), (85.5, 59.8, 135.4)),
+    'o\\contain_rock_diamond_04.nif': ((-125.7, -92.2, -149.1), (125.7, 91.7, 153.8)),
+    'o\\contain_rock_diamond_05.nif': ((-156.5, -113.3, -191.5), (156.5, 113.3, 194.0)),
+    'o\\contain_rock_diamond_06.nif': ((-121.1, -140.8, -112.8), (121.1, 140.8, 119.1)),
+    'o\\contain_rock_diamond_07.nif': ((-200.5, -111.7, -149.1), (200.5, 111.7, 156.5)),
+    'o\\contain_rock_ebony_03.nif': ((-85.5, -59.8, -130.8), (85.5, 59.8, 140.9)),
+    'o\\contain_rock_ebony_04.nif': ((-125.7, -97.0, -149.1), (125.7, 91.7, 158.1)),
+    'o\\contain_rock_glass_01.nif': ((-132.5, -93.7, -50.7), (132.5, 93.7, 99.4)),
+    'o\\contain_rock_glass_02.nif': ((-84.3, -82.5, -109.1), (84.3, 88.4, 124.9)),
+    'o\\contain_rock_glass_03.nif': ((-93.6, -63.8, -130.8), (85.5, 59.8, 148.2)),
+    'o\\contain_rock_glass_04.nif': ((-125.7, -92.2, -149.1), (125.7, 91.7, 177.8)),
+    'o\\contain_rock_glass_05.nif': ((-156.5, -129.9, -191.5), (156.5, 113.3, 205.1)),
+    'o\\contain_rock_glass_06.nif': ((-121.1, -140.8, -112.8), (121.1, 140.8, 143.4)),
+    'o\\contain_rock_glass_07.nif': ((-200.5, -113.2, -149.1), (200.5, 111.7, 184.7)),
+    'o\\contain_trama_shrub_01.nif': ((-417.3, -379.5, -253.5), (417.3, 377.5, 225.9)),
+    'o\\contain_trama_shrub_02.nif': ((-231.6, -160.7, -431.4), (105.2, 205.1, 302.0)),
+    'o\\contain_trama_shrub_03.nif': ((-143.0, -218.7, -430.0), (187.0, 220.0, 407.7)),
+    'o\\contain_trama_shrub_04.nif': ((-364.0, -270.2, -287.8), (353.5, 294.8, 278.6)),
+    'o\\contain_trama_shrub_05.nif': ((-417.3, -379.5, -253.5), (417.3, 377.5, 225.9)),
+    'o\\contain_trama_shrub_06.nif': ((-268.5, -270.2, -287.8), (353.5, 294.8, 254.4)),
+    'o\\contain_tramaroot_01.nif': ((-114.5, -42.8, -56.1), (117.5, 42.8, 56.1)),
+    'o\\contain_tramaroot_02.nif': ((-128.5, -38.4, -90.5), (131.6, 38.4, 91.9)),
+    'o\\contain_tramaroot_03.nif': ((-137.8, -47.6, -51.8), (137.8, 47.6, 51.8)),
+    'o\\contain_tramaroot_04.nif': ((-66.9, -58.8, -51.2), (66.9, 58.8, 51.2)),
+    'o\\contain_tramaroot_05.nif': ((-69.5, -56.3, -51.2), (69.5, 56.3, 51.2)),
+    'o\\flora_ash_yam_01.nif': ((-37.5, -38.4, -63.4), (37.5, 38.4, 63.4)),
+    'o\\flora_ash_yam_02.nif': ((-20.2, -20.2, -40.9), (22.6, 22.5, 35.0)),
+    'o\\flora_bc_podplant_04.nif': ((-6.8, -7.2, -40.4), (6.8, 7.2, 40.4)),
+    'o\\flora_bittergreen_01.nif': ((-104.9, -133.2, -68.8), (95.5, 127.8, 86.3)),
+    'o\\flora_bittergreen_02.nif': ((-173.7, -80.7, -63.7), (173.7, 80.7, 73.0)),
+    'o\\flora_bittergreen_03.nif': ((-115.0, -151.8, -125.0), (85.1, 173.8, 120.2)),
+    'o\\flora_bittergreen_04.nif': ((-82.5, -64.1, -76.8), (78.2, 86.6, 81.4)),
+    'o\\flora_bittergreen_05.nif': ((-174.4, -64.1, -91.0), (171.0, 67.2, 114.9)),
+    'o\\flora_bittergreen_06.nif': ((-173.7, -80.7, -61.4), (173.7, 80.7, 56.2)),
+    'o\\flora_bittergreen_07.nif': ((-101.8, -146.3, -120.2), (67.3, 162.4, 95.2)),
+    'o\\flora_bittergreen_08.nif': ((-69.6, -64.1, -76.8), (75.9, 76.0, 76.8)),
+    'o\\flora_bittergreen_09.nif': ((-171.0, -31.1, -91.0), (171.0, 61.7, 95.1)),
+    'o\\flora_bittergreen_10.nif': ((-89.6, -127.8, -68.8), (86.8, 127.8, 65.9)),
+    'o\\flora_black_anther_01.nif': ((-55.7, -43.6, -74.7), (54.9, 35.5, 64.9)),
+    'o\\flora_black_anther_02.nif': ((-22.9, -24.1, -70.3), (22.3, 24.9, 70.3)),
+    'o\\flora_black_lichen_01.nif': ((-31.1, -40.9, -10.2), (35.8, 36.0, 19.5)),
+    'o\\flora_black_lichen_02.nif': ((-15.5, -20.5, -5.1), (17.9, 18.0, 9.7)),
+    'o\\flora_bm_belladonna_01.nif': ((-21.8, -18.4, -54.2), (12.0, 12.0, 21.9)),
+    'o\\flora_bm_belladonna_02.nif': ((-21.8, -18.4, -54.2), (12.0, 12.0, 18.6)),
+    'o\\flora_bm_holly_01.nif': ((-186.9, -185.7, -221.0), (189.9, 185.0, 313.7)),
+    'o\\flora_bm_holly_02.nif': ((-186.9, -185.7, -221.0), (189.9, 185.0, 313.7)),
+    'o\\flora_bm_holly_04.nif': ((-176.3, -174.1, -204.7), (203.8, 173.3, 241.3)),
+    'o\\flora_bm_holly_05.nif': ((-186.9, -185.7, -221.0), (189.9, 185.0, 313.7)),
+    'o\\flora_bm_wolfbane_01.nif': ((-23.3, -22.0, -51.1), (15.5, 11.9, 52.3)),
+    'o\\flora_chokeweed_01.nif': ((-114.1, -87.4, -136.0), (73.7, 84.4, 177.2)),
+    'o\\flora_fire_fern_01.nif': ((-98.6, -98.2, -84.1), (98.6, 98.2, 84.1)),
+    'o\\flora_fire_fern_02.nif': ((-93.5, -92.8, -66.6), (49.1, 53.6, 86.1)),
+    'o\\flora_fire_fern_03.nif': ((-87.9, -71.5, -66.6), (31.9, 70.5, 62.6)),
+    'o\\flora_gold_kanet_01.nif': ((-40.7, -46.8, -66.8), (69.1, 55.3, 86.9)),
+    'o\\flora_gold_kanet_02.nif': ((-40.7, -19.7, -66.8), (49.9, 55.3, 86.9)),
+    'o\\flora_green_lichen_01.nif': ((-30.6, -40.1, -10.6), (36.2, 36.8, 23.3)),
+    'o\\flora_green_lichen_02.nif': ((-15.3, -20.1, -5.3), (18.1, 18.4, 11.6)),
+    'o\\flora_hackle-lo_01.nif': ((-106.0, -96.9, -66.3), (86.2, 95.5, 190.7)),
+    'o\\flora_hackle-lo_02.nif': ((-121.2, -107.8, -185.0), (122.6, 134.7, 243.1)),
+    'o\\flora_kreshweed_01.nif': ((-131.3, -137.3, -149.8), (131.3, 157.7, 149.8)),
+    'o\\flora_kreshweed_02.nif': ((-257.5, -215.7, -163.2), (257.5, 217.4, 159.0)),
+    'o\\flora_kreshweed_03.nif': ((-160.0, -160.1, -161.4), (160.0, 160.1, 161.4)),
+    'o\\flora_marshmerrow_01.nif': ((-28.9, -32.8, -90.2), (21.5, 35.1, 90.0)),
+    'o\\flora_marshmerrow_02.nif': ((-24.3, -34.8, -90.2), (22.8, 31.4, 90.7)),
+    'o\\flora_marshmerrow_03.nif': ((-8.6, -24.8, -92.5), (8.6, 24.8, 92.5)),
+    'o\\flora_plant_01.nif': ((-22.8, -23.4, -30.9), (22.8, 23.4, 30.9)),
+    'o\\flora_plant_02.nif': ((-36.2, -35.9, -59.2), (36.2, 35.9, 59.2)),
+    'o\\flora_plant_03.nif': ((-29.1, -29.7, -58.6), (29.1, 29.7, 58.6)),
+    'o\\flora_plant_04.nif': ((-49.8, -52.5, -35.0), (52.0, 49.3, 55.7)),
+    'o\\flora_plant_05.nif': ((-23.2, -22.2, -36.9), (22.4, 22.9, 39.4)),
+    'o\\flora_plant_06.nif': ((-22.7, -22.1, -36.4), (22.5, 22.8, 37.1)),
+    'o\\flora_plant_07.nif': ((-21.2, -22.3, -15.1), (21.2, 22.3, 15.1)),
+    'o\\flora_plant_08.nif': ((-49.4, -49.4, 0.0), (49.8, 49.5, 177.7)),
+    'o\\flora_red_lichen_01.nif': ((-32.7, -40.1, -10.7), (34.1, 36.8, 23.2)),
+    'o\\flora_red_lichen_02.nif': ((-16.4, -20.1, -5.4), (17.1, 18.4, 11.6)),
+    'o\\flora_roobrush_01.nif': ((-72.8, -92.4, -80.7), (48.0, 109.8, 99.8)),
+    'o\\flora_saltrice_01.nif': ((-52.0, -83.0, -63.7), (66.1, 71.5, 66.2)),
+    'o\\flora_saltrice_02.nif': ((-53.0, -70.1, -57.6), (53.0, 69.5, 62.0)),
+    'o\\flora_sedge_01.nif': ((-44.2, -38.4, -28.5), (44.2, 38.4, 42.4)),
+    'o\\flora_sedge_02.nif': ((-44.2, -38.4, -28.5), (44.2, 38.4, 42.4)),
+    'o\\flora_stoneflower_01.nif': ((-91.8, -102.1, -87.6), (82.8, 64.9, 81.0)),
+    'o\\flora_stoneflower_02.nif': ((-63.2, -79.7, -71.9), (70.8, 68.3, 78.1)),
+    'o\\flora_wickwheat_01.nif': ((-87.6, -90.5, -66.3), (87.6, 90.5, 91.4)),
+    'o\\flora_wickwheat_02.nif': ((-53.7, -41.4, -35.3), (53.7, 56.1, 69.4)),
+    'o\\flora_wickwheat_03.nif': ((-58.9, -88.1, -46.3), (84.3, 74.8, 146.0)),
+    'o\\flora_wickwheat_04.nif': ((-63.7, -85.6, -52.2), (91.6, 74.8, 94.1)),
+    'o\\flora_willow_flower_01.nif': ((-40.0, -57.9, -77.8), (56.7, 56.4, 77.7)),
+    'o\\flora_willow_flower_02.nif': ((-36.6, -36.2, -77.8), (36.6, 36.2, 77.8)),
 }
 
 
 def missing_boxes(raw):
     """EXPANSION-BASE-ONLY-TABLES-66: the boxes the master RAW (the merged master of the selected layers) needs and
     the tables above lack, as (kind, model, record id) sorted: 'N' every placed, named activator whose model is in
-    neither FOCUS_BOXES nor FOCUS_INVISIBLE (the focus stage stops on it), 'C' every placed, named, non-organic
-    container whose model is not in CONTAINER_BOXES (it would keep only the near-the-point aim). The build's
-    preflight runs it before any stage (tools/build.py focus_box_preflight)."""
+    neither FOCUS_BOXES nor FOCUS_INVISIBLE (the focus stage stops on it), 'C' every placed, named container that
+    opens (not organic, or organic and no harvest kind covers it: PLANT-BOX-AIM-69) whose model is not in
+    CONTAINER_BOXES (it would keep only the near-the-point aim). The build's preflight runs it before any stage
+    (tools/build.py focus_box_preflight)."""
     placed = set()
     for _cell, _interior, _grid, _region, refs in cells_of(raw):
         for ref in refs:
@@ -425,7 +558,7 @@ def missing_boxes(raw):
         else:
             flag = first(fields, 'FLAG')
             organic = len(flag) >= 4 and bool(struct.unpack_from('<I', flag)[0] & CONT_ORGANIC)
-            if not organic and model not in CONTAINER_BOXES:
+            if not (organic and harvest_picked(model)) and model not in CONTAINER_BOXES:
                 out.add(('C', model, ident))
     return sorted(out)
 
@@ -618,7 +751,12 @@ def objects_of(raw, levelled=None):
             weight, value = struct.unpack_from(fmt, data)
             if tag == 'LIGH' and (len(data) < 24 or not struct.unpack_from('<i', data, 20)[0] & LIGHT_CARRY):
                 continue      # a fixed light is not an item
-            if not math.isfinite(weight) or weight < 0 or value < 0 or not name:
+            # ITEM-NAMELESS-NOT-TAKEN-69: an item is taken whatever its name, as in OpenMW 0.51 (Player::activate takes
+            # the faced object when its class hasToolTip; for a light that is its carry flag, mwclass/light.cpp
+            # Light::hasToolTip = showsInInventory, and every other item class keeps Class::hasToolTip's true): the ten
+            # burned-out torches of Old Mournhold's Temple Sewers West (light_com_torch_burnedout_UNI, no FNAM) are
+            # taken with an empty title and "E: Take"
+            if not math.isfinite(weight) or weight < 0 or value < 0:
                 continue
             # STEAL-PROMPT-58: a BOOK without an enchantment is read; one with (a magic scroll) is taken like an item.
             # BLANK-PAPER-READ-60: one with no words to read (no TEXT, or only markup: sc_paper plain, the paper under
@@ -642,13 +780,44 @@ def objects_of(raw, levelled=None):
             out[ident] = out[ident][:5] + (contents, (cflags & 3) | ACTOR_INVENTORY)
     for ident, name, fields, organic in conts:
         contents, cflags = container_items(fields, items, levelled)
-        # CONTAINER-WINDOW-59: a container opens (ACT_TAKE: E opens its strip); an organic one (flora) is harvested,
-        # never opened (action none, flag 4)
+        # CONTAINER-WINDOW-59: a container opens (ACT_TAKE: E opens its strip). FARGOTH-STASH-STUMP-69: an organic one
+        # is picked in the world only when its model is a harvest kind (the small mushrooms, the bracket fungi:
+        # harvest_picked); every other organic container opens its window as in the original and OpenMW 0.51 (an
+        # organic container is harvested only when its mesh carries the herbalism switch, which the original meshes do
+        # not: apps/openmw/mwrender/animation.cpp ObjectAnimation::canBeHarvested), Fargoth's hollow treestump among
+        # them. Flag 4 keeps saying organic.
         model = string(first(fields, 'MODL'), 'MODL', errors='replace').replace('/', '\\').casefold() \
             if first(fields, 'MODL') else ''
-        out[ident] = ('C', name, 0.0, 0, ACT_NONE if organic else ACT_TAKE, contents,
+        out[ident] = ('C', name, 0.0, 0, ACT_NONE if organic and harvest_picked(model) else
+                      ACT_TAKE | (pick_bits(ident, model) if organic else 0), contents,
                       cflags | (CFLAG_ORGANIC if organic else 0), model)
     return out
+
+
+_HARVEST_FLORA = []
+
+
+def pick_bits(ident, model):
+    """PLANT-PICK-DIRECT-DEFAULT-69: the plant bits of an organic container that opens (PLANT_PICK 'pick', with 'keep'
+    for an ore or gem rock), by config/harvest-flora.json's group of the record (harvest_flora_census.classify, the
+    census the harvest step checks every organic record of the base master against): a plant, egg sack, kollop, spore
+    pod or rock group is picked; a supply barrel or chest (not_flora), a stash (PLANT_PICK 'stashes') or a record no
+    group names keeps its window. The config is read, never changed (the harvest stage keys it)."""
+    from harvest_flora_census import classify, load_config
+    if not _HARVEST_FLORA:
+        _HARVEST_FLORA.append(load_config())
+    group = classify(_HARVEST_FLORA[0], ident.casefold(), model)
+    if ident.casefold() in PLANT_PICK['stashes'] or not group or group.get('status') != 'pending':
+        return 0
+    return PLANT_PICK['pick'] | (PLANT_PICK['keep'] if group.get('register') == PLANT_PICK['keep_register'] else 0)
+
+
+def harvest_picked(model):
+    """True when an organic container of MODEL is picked in the world (its model is a harvest kind of
+    tools/prepare_harvest.py HARVEST_KINDS, harvest_flora_census.record_kind: the harvest stage places it); such a
+    container has no window (FARGOTH-STASH-STUMP-69)."""
+    from harvest_flora_census import record_kind
+    return record_kind(model) is not None
 
 
 def lock_level(ref):
@@ -794,9 +963,10 @@ def levelled_section(lists):
 
 
 def action_code(kind_action, owned):
-    """The row's action code (byte 2): the kind in bits 0-1, owned in bit 2, a magic scroll in bit 3. The engine
-    indexes its prompt table by it (aw_inventory.c AW_ItemPrompt); nothing is looked up per frame."""
-    return (kind_action & (3 | ACT_MAGIC_SCROLL)) | (ACT_OWNED if owned else 0)
+    """The row's action code (byte 2): the kind in bits 0-1, owned in bit 2, a magic scroll in bit 3, a plant's pick
+    in bits 4-5 (PLANT-PICK-DIRECT-DEFAULT-69, containers only). The engine indexes its item prompt table by bits 0-2
+    (aw_inventory.c AW_ItemPrompt); nothing is looked up per frame."""
+    return (kind_action & (3 | ACT_MAGIC_SCROLL | PLANT_PICK['pick'] | PLANT_PICK['keep'])) | (ACT_OWNED if owned else 0)
 
 
 def owner_of(ref):
@@ -1014,6 +1184,22 @@ def window_rows(counts):
     return best, at
 
 
+def boxed_rows(rows):
+    """PLANT-BOX-AIM-69: how many of a place's ROWS (placements' tuples) take a slot of the engine's box table
+    (aw_inventory.c focus_board_add): every named board ('N') and every container whose id field holds its box."""
+    return sum(1 for r in rows if r[0] == 'N' or (r[0] == 'C' and isinstance(r[9], bytes)))
+
+
+def window_boxes(counts):
+    """PLANT-BOX-AIM-69: (most boxes, its key) the engine holds at once, COUNTS {table key: boxed rows}: a room alone,
+    outdoors the 3 x 3 cells around the player's (window_rows); the engine's FOCUS_BOARDS (WINDOW_BOXES) must hold it,
+    or the boards past it leave the focus (379 signposts at 256 once the plants had their boxes)."""
+    window, key = window_rows(counts)
+    rooms = [(n, k) for k, n in counts.items() if k < 0x80000000]
+    room, room_key = max(rooms) if rooms else (0, 0)
+    return (window, key) if window >= room else (room, room_key)
+
+
 def presented_places(receipt, cells):
     """MOURNHOLD-EXTERIOR-CELLS-66: the districts this build presents as exterior cells and converts whole, from the
     presented data stage's receipt RECEIPT (a path) and the build's module cells CELLS ("x,y:k ..."), as the image
@@ -1034,11 +1220,12 @@ def build(data_files, presented=None):
     extras = {}
     levelled = item_lists(raw)
     rooms = placements(raw, objects_of(raw, levelled), numbers, extras, presented)
-    index, body, held, owners, containers = [], [], {}, {}, {}
+    index, body, held, owners, containers, boxes = [], [], {}, {}, {}, {}
     for number in sorted(rooms):
         rows = sorted(rooms[number], key=lambda r: r[2])
         if len(rows) > MAX_ROWS:
             held[number] = len(rows) - MAX_ROWS; rows = rows[:MAX_ROWS]
+        boxes[number] = boxed_rows(rows)
         index.append(struct.pack('<III', number, len(body), len(rows)))
         for kind, owned, reference, x, y, z, weight, value, name, ident, action, owner, contents, lock in rows:
             if contents is not None:
@@ -1052,7 +1239,12 @@ def build(data_files, presented=None):
     if window > WINDOW_ROWS:
         raise SystemExit('[focus] %d rows in the 3 x 3 cells around key %#x: over the engine\'s %d (FOCUS_ROWS)'
                          % (window, window_key, WINDOW_ROWS))
-    items = {number: sum(1 for r in rooms[number] if r[0] == 'I') for number in rooms}
+    box_window, box_key = window_boxes(boxes)
+    if box_window > WINDOW_BOXES:
+        raise SystemExit('[focus] %d boxes (named boards and boxed containers) in the place of key %#x: over the '
+                         'engine\'s %d (FOCUS_BOARDS): the boards past it would leave the focus' % (
+                             box_window, box_key, WINDOW_BOXES))
+    items ={number: sum(1 for r in rooms[number] if r[0] == 'I') for number in rooms}
     most_items = max([window_rows(items)[0]] + [n for k, n in items.items() if k < 0x80000000] + [0])
     if most_items > PLACED_ITEMS:
         raise SystemExit('[focus] %d placed items in one place: over the engine\'s %d (PLACED_MAX)'
@@ -1067,6 +1259,7 @@ def build(data_files, presented=None):
               'respawn': dict(zip(RESPAWN_GMSTS, respawn)), 'bytes': len(payload),
               'sha256': hashlib.sha256(payload).hexdigest(), 'master_sha256': hashes.get('Morrowind.esm'),
               'held_rows': held, 'most_window_rows': window, 'window_limit': WINDOW_ROWS,
+              'most_place_boxes': box_window, 'box_limit': WINDOW_BOXES, 'boxed_rows': sum(boxes.values()),
               'most_place_items': most_items, 'placed_limit': PLACED_ITEMS}
     # AREA-TABLES-59: traps and keys of placed containers and doors (not in focus.awf; read by
     # tools/prepare_area_tables.py from the stage's focus-extras.json)

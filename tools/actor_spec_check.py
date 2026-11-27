@@ -474,7 +474,14 @@ def check(run, data_files, town_join=True, records=True, allowlist=ALLOWLIST, ga
 
 def stage(run, data_files, out):
     """The image step's verdict: writes OUT/actor-spec-check.json and stops (ValueError) on any failure. The set-aside
-    places come from the run's own stage outputs (RUN/chim-room-batches, RUN/world-terrain: tools/build.py's names)."""
+    places come from the run's own stage outputs (RUN/chim-room-batches, RUN/world-terrain: tools/build.py's names).
+    First the placed actor census (tools/actor_placed_census.py, ACTOR-CHECKS-MISS-PLACED-MODELS-69): every actor row
+    of every map judged on the model it stands in; it writes OUT/actor-placed-census.json, which the record audit
+    reads for the model a record is really placed with, and stops on a finding over config/actor-placed-census.json."""
+    from actor_placed_census import stage as placed_census_stage
+    id1 = Path(run) / 'image' / 'boot' / 'id1'
+    if id1.is_dir():
+        placed_census_stage(id1, out)
     report = check(run, data_files)
     rows = report.pop('_expansion_rows', None)
     if rows is not None:   # every expansion actor placement, one row each (only with an expansion selected)

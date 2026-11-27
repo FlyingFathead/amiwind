@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
+_Last updated with AmiWind v0.0.69-dev5 (27 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.69-dev5 (26 November 2026)._
 - [Matching the baked map](#matching-the-baked-map)
 - [Ground support and feel](#ground-support-and-feel)
 - [Bodies that overlap, and arriving next to an actor](#bodies-that-overlap-and-arriving-next-to-an-actor)
+- [A creature collides only up to its drawn body](#a-creature-collides-only-up-to-its-drawn-body)
 - [Checkpoint-013 architectural ghost volumes](#checkpoint-013-architectural-ghost-volumes)
 - [Eye-height audit, checkpoint-016 development](#eye-height-audit-checkpoint-016-development)
 - [Dev1 regression comparison, 28 September 2026](#dev1-regression-comparison-28-september-2026)
@@ -327,6 +328,28 @@ Both are switches, on by default and written into `id1/default-game.cfg`: `aw_bo
 clip and stuck search back, `aw_arrival_clear 0` leaves the arrival where it is. The native tests are
 `tests/aga_body_overlap_test.c` (the engine's own collision, stuck search and walk, with the boxes and positions
 of that arrival) and the arrival case in `tests/aga_scene_test.c`.
+
+## A creature collides only up to its drawn body
+
+Every actor used to stand in the same person-sized box (0 to 33.25 units), creatures included. A creature lower
+than a person therefore had a column of collision over its back where nothing is drawn. In Solstheim's sea the
+levelled horkers (`bm_ex_horker_h20`) swim at their placed depth, wholly under the water surface, and their box
+reached up to 11 units above it: a player walking on the water from Khuul stopped against open sea at cell -19,17.
+The same column stood over every rat, mudcrab or scrib on land, and over 102 placed creatures in the water across
+the map (slaughterfish, dreugh, horkers).
+
+Since v0.0.69 a creature collides up to the top of its drawn idle pose (times its drawn scale), never higher than
+the box it was given; people keep the person box. Only collision changes: the hull a creature walks the world
+with, its eye height, its combat reach and its spell shells are as before. A step never lands on a body, as in the
+original, so a low creature is walked around, not climbed. The original gives each creature the box of its own
+model (OpenMW reads the model's "Bounding Box" node); the drawn top is the height that can be checked against what
+the player sees.
+
+The switch is `aw_actor_clip` (1, the default, written into `id1/default-game.cfg`; 0 gives the person box back);
+`dbg actorclip` turns it the other way, `dbg actorclip on` or `off` sets it. The native test is `tests/aga_actor_clip_test.c` (the
+engine's collision and walk with the horker's measured height: the walker on the water passes over it, meets it on
+land, and never steps onto a low creature). `tools/world_seams.py` checks every creature of a build's actor table
+against the water surface.
 
 ## Checkpoint-013 architectural ghost volumes
 

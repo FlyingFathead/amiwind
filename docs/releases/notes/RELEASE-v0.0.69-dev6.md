@@ -100,8 +100,6 @@ of the following has been seen in play yet:
   rest of the world in some of the paths they use (OPENING-ONE-PATH-65).
 - **A fast walker plays the run animation:** the walk or run animation is chosen by the speed, not by whether the
   character runs ([PLAYER-WALK-PLAYS-RUN-GROUP-69](../../bugs/PLAYER-WALK-PLAYS-RUN-GROUP-69.md)).
-- **Sellus Gravius stands at a different spot** than before in the second Census and Excise Office building
-  ([CENSUS-CAPTAIN-OUT-OF-PLACE-69](../../bugs/CENSUS-CAPTAIN-OUT-OF-PLACE-69.md)).
 - **The build monitor's first minutes:** [TOOLKIT-MONITOR-BLIND-PHASES-36](../../bugs/TOOLKIT-MONITOR-BLIND-PHASES-36.md).
 - **Water Walking is applied deep under the water too,** where the original refuses the spell
   ([WATER-WALKING-DEEP-CAST-NOT-REFUSED-68](../../bugs/WATER-WALKING-DEEP-CAST-NOT-REFUSED-68.md)).

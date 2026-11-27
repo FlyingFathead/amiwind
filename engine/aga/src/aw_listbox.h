@@ -147,6 +147,11 @@ void AW_TpPlacesRow(const unsigned char *data,long i,aw_tp_place_t *p);
 /* the console line that takes you there: "aw_teleport X Y [Z]\n" (the coordinate path), for a room row
  * "dbg tp <map>\n" (the room path, at its door's arrival); length or -1 */
 int AW_TpPlacesCommand(const aw_tp_place_t *p,char *out,int size);
+/* DBG-TP-LORDVIVEC-69: the being row of record id ID (case ignored) in the settlements table (F at BASE, SIZE bytes,
+ * version 3): flag AW_TP_BEING and never a common kind's row (AW_TP_NEAREST). Read row by row into one row's bytes,
+ * nothing allocated; the first such row (the builder lets a named place point only at an id one row holds). The row
+ * number with P filled, or -1 when no row is that being (or the table is bad or older than version 3). */
+long AW_TpPlacesBeingRow(FILE *f,long base,long size,const char *id,aw_tp_place_t *p);
 
 /* dbg tp with no argument (aw_tpplaces.c): the settlements box from id1/tp-places.lut, read when it opens and
  * freed when it closes; 0 when the table is not on this disk (the caller then opens the scene picker, as before). */
@@ -174,6 +179,10 @@ void AW_TpBeingArrival(const float *feet,float box_bottom,float *out);
 /* dbg tp's being arrival (aw_tpplaces.c): a chosen Beings row; on arrival in its scene the player is put on a free
  * spot beside the being, facing it (called from aw_scene.c AW_SceneSpawn and by aw_tp_being_arrive). */
 void AW_TpBeingGo(const aw_tp_place_t *p);
+/* dbg tp NAME for a named place that is a being (teleport-names.txt map "being", its label the record id;
+ * DBG-TP-LORDVIVEC-69): that being's row of this disk's table taken as the list's Beings row is (AW_TpBeingGo).
+ * 1 when the row was found and taken; 0 when the table holds no such row (nothing moved, nothing said). */
+int AW_TpBeingByIdGo(const char *id);
 void AW_TpBeingArrive(void);
 void AW_TpPlacesInit(void);
 

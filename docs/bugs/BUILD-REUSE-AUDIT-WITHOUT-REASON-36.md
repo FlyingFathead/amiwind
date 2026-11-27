@@ -158,6 +158,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-REUSE-ATTRIBUTION-33](BUILD-REUSE-ATTRIBUTION-33.md): Two stages that ran at the same time were both refused reuse when one wrote files under a folder the other only reads
 - [BUILD-REUSE-CASCADE-36](BUILD-REUSE-CASCADE-36.md): A fix in CHIM-native town code made 23 of 36 stages rebuild: the interior stage reran with different outputs and 5 rebuilds were unexpected
 - [BUILD-REUSE-CHAIN-ABSENT-STAGE-68](BUILD-REUSE-CHAIN-ABSENT-STAGE-68.md): A build that reuses a run rebuilds the stages that run had itself taken from an earlier run, because they are not stored in it
+- [BUILD-REUSE-COPY-SLOW-UNDER-LOAD-69](BUILD-REUSE-COPY-SLOW-UNDER-LOAD-69.md): Reusing the Solstheim sea stage took 18 seconds instead of its usual 5 while the machine was busy
 - [BUILD-REUSE-CUTOFF-MODE-36](BUILD-REUSE-CUTOFF-MODE-36.md): Early cutoff compared file modes with their write bits: a stage reused by hard link (read-only) never matched the same bytes written fresh, so 10 stages after dev3's bsp rerun were refused
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s)
@@ -216,6 +217,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [MESH-TABLE-SECOND-LAYER-REKEY-67](MESH-TABLE-SECOND-LAYER-REKEY-67.md): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
 - [READY-STAGE-REACH-BY-RULE-68](READY-STAGE-REACH-BY-RULE-68.md): A merge note stated the build stages a change re-keys from the rules, not from the planner's measured key, and a later file-list probe over-stated it
+- [REUSE-PREFLIGHT-MISSES-OUTPUT-CASCADE-69](REUSE-PREFLIGHT-MISSES-OUTPUT-CASCADE-69.md): A stage planned for reuse runs again during the build because an earlier stage it reads made a different output
 - [REUSE-STOP-OLD-GROUPS-67](REUSE-STOP-OLD-GROUPS-67.md): The strict reuse check counts the units an older version of a bake left in its cache as work the build would redo, so a one-unit table with history stops a build that would reuse it
 
 <!-- END GENERATED CATEGORY -->

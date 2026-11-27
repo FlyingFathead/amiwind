@@ -57,6 +57,9 @@ typedef struct {
     char start[AW_PICK_KEY],stop[AW_PICK_KEY];   /* its text keys, "start" / "stop" for a whole group */
     unsigned char loop;        /* loops while the state holds (else held on its last frame) */
     char loop_start[AW_PICK_KEY],loop_stop[AW_PICK_KEY];  /* a held one-shot's inner loop (knockout), "" none */
+    /* a weapon attack's key where the blow lands ("chop hit", "slash hit", "thrust hit") or the shot leaves ("shoot
+     * release"), between start and stop; "" for every other pick (a creature's own attackN included) */
+    char hit[AW_PICK_KEY];
     const char *rule;          /* the OpenMW rule it follows (the coverage report's "hooked by") */
 } aw_pick_t;
 
@@ -65,6 +68,14 @@ typedef int (*aw_pick_has_t)(void *context,const char *name);
 /* The group to play in state S, with OpenMW's fallbacks; 0 when the table has none of them (the caller keeps what
  * plays: OpenMW keeps the previous animation or the idle). */
 int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t has,void *context,aw_pick_t *out);
+/* ACTOR-ATTACK-ONE-CLOCK-69: the clock of a swing or shot played between a picked attack's start key (frame FROM),
+ * its hit or release key (HIT) and its stop key (TO) of a table sampled at RATE frames a second, at the weapon's
+ * SPEED (1 its own time; above 1 faster): 1 and *seconds (the span's time over SPEED) and *hit_fraction (the share of
+ * it at which the hit key lies), so a swing whose frame is FROM + its progress x (TO - FROM) shows the HIT frame at
+ * the moment the blow lands; 0 when a key is missing (-1), out of order or the span is empty, or RATE or SPEED is not
+ * above 0. The original's rule: the weapon group's own section at its key times scaled by the weapon's speed, the
+ * blow at its hit key (OpenMW 0.53 mwmechanics/character.cpp, read, not copied). Pure (tests/aga_attack_clock_test.c). */
+int AW_PickAttackClock(int from,int hit,int to,float rate,float speed,float *seconds,float *hit_fraction);
 /* OpenMW CharacterController::getWeaponShortGroup / getWeaponAnimation (long group), "" for none. */
 const char *AW_PickShortGroup(int weapon);
 const char *AW_PickLongGroup(int weapon);

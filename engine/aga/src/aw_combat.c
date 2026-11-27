@@ -64,12 +64,22 @@ typedef struct {
     float hit_fraction;
     unsigned char state,attack,struck,group,rolled;      /* rolled: no death frames (stand-in) */
     float state_time,next_think,last_think,cooldown,strength,swing_time;
+    /* ACTOR-ATTACK-ONE-CLOCK-69: the swing's own clock, set at its start (swing_clock): the share of swing_time at
+     * which its blow lands or its shot leaves, and where both came from (0 no swing yet, 1 the layout's attack group
+     * with hit_fraction, 2 the keys of the group the actor is seen to play, aw_animkit.c AW_AnimKitAttackTiming) */
+    float swing_hit;unsigned char swing_clock;
+    /* the same for a hit recovery, set at its start (start_hit): its time, from the layout's hit group (1) or the hitN
+     * the actor is seen to play (2, aw_animkit.c AW_AnimKitHitTiming) */
+    float hit_time;unsigned char hit_clock;
     float decide_at;            /* unreachable player: flee, re-decide at this time */
     signed char dodge_dir;      /* +1 right, -1 left */
     unsigned char has_block,has_dodge;
     float dodged;               /* units stepped of this dodge */
     func_t think;float nextthink;
     edict_t *item[AW_ITEMS_KINDS];  /* carried weapon/shield while fighting (aw_items.c) */
+    /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the set held out of the hand while the draw plays up to its attach key (the
+     * items' model indices kept aside, at most until items_hold_until) */
+    unsigned char items_held;short item_model[AW_ITEMS_KINDS];float items_hold_until;
     float run_x;                /* the run group's own speed (layout X, units a second; 0: by time) */
     float step_carry;           /* ACTOR-MECHANICS-USE-STATS-66: the part of a game unit the last step left over */
     float gait;vec3_t gait_at;  /* WALK-CYCLES-57: seconds into the run group by distance, and where it was counted */
@@ -787,6 +797,31 @@ static void animate(slot_t *s) {
 }
 static void set_state(slot_t *s,int state,int group) {s->state=(unsigned char)state;s->group=(unsigned char)group;s->state_time=0;}
 static float duration(slot_t *s,int g) {return s->count[g]*s->step[g];}
+/* ACTOR-ATTACK-ONE-CLOCK-69: the clock of the swing or shot of type s->attack that starts now, at SPEED (the weapon's;
+ * 1 without one). Every swing ran on the layout's one attack group (a person's the hand-to-hand chop: about 1 s, the
+ * blow at 0.714 of it) whatever group the actor was seen to play. Now a skeletal actor's swing takes the time of the
+ * span its picture plays (its weapon group's own keys, AW_AnimKitAttackTiming) and lands its blow, or lets its shot
+ * go, at that group's hit key (OpenMW 0.53 character.cpp: the weapon group at its own key times scaled by the
+ * weapon's speed, the damage at its "<type> hit" key, a shot at "shoot release"; read, not copied); an actor without
+ * such a span (a baked model, a creature's own attacks) keeps the layout's group and its hit fraction as before. */
+static void swing_clock(slot_t *s,float speed) {
+    float seconds=0,hit=0;
+    if(!(speed>0))speed=1;
+    s->swing_time=duration(s,G_ATTACK)/speed;s->swing_hit=s->hit_fraction;s->swing_clock=1;
+    if(AW_AnimKitAttackTiming(s->e,s->attack,&seconds,&hit) && seconds>0 && hit>=0 && hit<=1){
+        s->swing_time=seconds/speed;s->swing_hit=hit;s->swing_clock=2;
+    }
+}
+/* ACTOR-ATTACK-ONE-CLOCK-69: a hit recovery starts. Every hit lasted the layout's hit group (hit1's length) while the
+ * actor was seen to play a random hit1..hitN stretched onto it; now it lasts the span of the hitN the pick will show
+ * (AW_AnimKitHitTiming rolls it and keeps the roll for the send), as the original's hit state ends with its own group
+ * (OpenMW 0.53 character.cpp refreshHitRecoilAnims; read, not copied); an actor without one keeps the layout's group. */
+static void start_hit(slot_t *s) {
+    float seconds=0;
+    set_state(s,S_HIT,G_HIT);
+    s->hit_time=duration(s,G_HIT);s->hit_clock=1;
+    if(AW_AnimKitHitTiming(s->e,&seconds) && seconds>0){s->hit_time=seconds;s->hit_clock=2;}
+}
 
 /* ---- traces for aw_npcpath.c (the companion's: player passed through) ---- */
 static float player_solid;
@@ -820,9 +855,70 @@ void (*aw_combat_actor_died)(edict_t *e);
 /* `dbg combat calm` and `dbg combat off` (NULL: none; aw_mwhost.c binds it and declares it there: aw_combat.h is keyed
  * by the CHIM world stage) */
 void (*aw_combat_calmed)(void);
+/* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the weapon and shield go into the hand at the draw's attach key and leave it at the
+ * put-away's detach key, as in the original (OpenMW 0.53 character.cpp 1069-1082; aw_animkit.c over_items). Before,
+ * they were in the hand from the draw's first frame and gone before the put-away played. The set is spawned at the
+ * engage as before and held out of the hand (its model off the send) until the kit says the key has passed, at most
+ * ITEMS_HOLD_SECONDS; at the fight's end a resident whose put-away the send will play (AW_AnimKitSheathes) hands its
+ * set to the sheathe list, which keeps it on the hand until the detach key, at most SHEATHE_SECONDS. An actor the kit
+ * does not drive (a baked one, the kit off) shows and hides its set as before. Cost: a few compares a fight frame. */
+static const float items_hold_seconds=3,sheathe_seconds=2;
+static struct {edict_t *e,*item[AW_ITEMS_KINDS];float until;} sheathes[FIGHTS];
+static unsigned long items_held_count,sheathes_kept,sheathes_timed_out;   /* dbg combat */
+void AW_ItemsMoveSet(edict_t *from[AW_ITEMS_KINDS],edict_t *to[AW_ITEMS_KINDS]);   /* aw_items.c, declared there */
+static void items_drawn(slot_t *s,int in_hand) {
+    int k;
+    for(k=0;k<AW_ITEMS_KINDS;k++){
+        edict_t *i=s->item[k];
+        if(!i || i->free)continue;
+        if(!in_hand && i->v.modelindex>0){s->item_model[k]=(short)i->v.modelindex;i->v.modelindex=0;}
+        else if(in_hand && s->item_model[k]>0 && i->v.modelindex==0)i->v.modelindex=s->item_model[k];
+    }
+    if(in_hand)memset(s->item_model,0,sizeof(s->item_model));
+}
+static void items_hide(slot_t *s) {
+    AW_ItemsHide(s->item);s->items_held=0;memset(s->item_model,0,sizeof(s->item_model));
+}
+void AW_CombatItemsInHand(edict_t *e,int in_hand);   /* aw_animkit.c over_items; not in aw_combat.h (a stage keys it) */
+void AW_CombatItemsInHand(edict_t *e,int in_hand) {
+    slot_t *s=e?slot_of(e):NULL;
+    if(!s)return;
+    if(!in_hand && !s->items_held && (s->item[0] || s->item[1])){    /* nothing held: nothing to hold back */
+        items_drawn(s,0);s->items_held=1;s->items_hold_until=(float)sv.time+items_hold_seconds;items_held_count++;}
+    else if(in_hand && s->items_held){items_drawn(s,1);s->items_held=0;}
+}
+void AW_CombatSheathed(edict_t *e);                  /* aw_animkit.c over_items, at the put-away's detach key */
+void AW_CombatSheathed(edict_t *e) {
+    int i;
+    for(i=0;i<FIGHTS;i++)if(sheathes[i].e && sheathes[i].e==e){AW_ItemsHide(sheathes[i].item);sheathes[i].e=NULL;}
+}
+/* the fight is over for S's living actor: its set stays on its hand for the put-away the send will play, or goes now */
+static void items_put_away(slot_t *s,edict_t *alive) {
+    int i;
+    if(s->items_held || (!s->item[0] && !s->item[1]) || !alive || !AW_AnimKitSheathes(alive)){items_hide(s);return;}
+    AW_CombatSheathed(alive);
+    for(i=0;i<FIGHTS && sheathes[i].e;i++){}
+    if(i==FIGHTS){items_hide(s);return;}
+    AW_ItemsMoveSet(s->item,sheathes[i].item);sheathes[i].e=alive;sheathes[i].until=(float)sv.time+sheathe_seconds;
+    sheathes_kept++;
+}
+/* every fight frame: a set being put away follows its hand (aw_items.c poses it again at the frame sent) until the
+ * detach key, its actor gone or hidden (a Disable after StopCombat sets no model) or its time up; NOW 0: all go */
+static void sheathes_update(int now) {
+    int i;
+    for(i=0;i<FIGHTS;i++){
+        edict_t *e=sheathes[i].e;
+        if(!e)continue;
+        if(!now || e->free || e->v.modelindex<=0 || sv.time>=sheathes[i].until){
+            if(now && !e->free && e->v.modelindex>0)sheathes_timed_out++;
+            AW_ItemsHide(sheathes[i].item);sheathes[i].e=NULL;continue;
+        }
+        AW_ItemsUpdate(e,sheathes[i].item);
+    }
+}
 static void release(slot_t *s) {
     edict_t *alive=s->e && !s->e->free && s->state!=S_DEAD?s->e:NULL;
-    AW_ItemsHide(s->item);
+    items_put_away(s,alive);
     if(s->cast_look)AW_MagicCastLookRelease(s->cast_look,-1);   /* a cast under way ends with the fight */
     if(alive)AW_AnimMover(alive,0);
     if(alive){alive->v.think=s->think;alive->v.nextthink=s->nextthink>0?(float)sv.time+.1f:0;}
@@ -970,7 +1066,7 @@ static void fighter_were(slot_t *s) {
             s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);
         }
         s->spell=-1;s->shooting=0;s->ammo_known=0;   /* no spell, no shot: the claws (prepareNextAction 170-174) */
-        AW_ItemsHide(s->item);                       /* nothing held (aw_items.c draws nothing for it either) */
+        items_hide(s);                               /* nothing held (aw_items.c draws nothing for it either) */
         were_turns++;
     }else{
         s->f.weapon=s->worn.weapon;s->f.weapon_skill=s->worn.weapon_skill;s->f.shield=s->worn.shield;
@@ -1007,7 +1103,8 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
         for(i=0;i<FIGHTS && slots[i].e;i++){}
         s=&slots[i];}
     if(!engage_dead && !AW_CombatHostiles())begin_encounter();
-    AW_ItemsHide(s->item);      /* a re-engaged NPC: its items again from the start */
+    items_hide(s);              /* a re-engaged NPC: its items again from the start */
+    AW_CombatSheathed(e);       /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a set still being put away goes (a new draw comes) */
     memset(s,0,sizeof(*s));s->e=e;s->f=*fighter;s->f.aware=1;
     s->think=e->v.think;s->nextthink=e->v.nextthink;e->v.nextthink=0;    /* its QuakeC idle stops */
     if(!layout){
@@ -1045,6 +1142,7 @@ static void shots_clear(void);
 void AW_CombatClear(void) {
     int i;for(i=0;i<FIGHTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;
     you_hit_at=-1;you_down_seen=0;shots_clear();
+    sheathes_update(0);         /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a clear puts every set away at once */
 }
 int AW_CombatPlayerReaction(float *age,int *roll) {
     if(age)*age=0;
@@ -1099,6 +1197,28 @@ int AW_CombatFighterEdicts(edict_t **out,int max) {
     return n;
 }
 int AW_CombatAttackType(edict_t *e) {slot_t *s=slot_of(e);return s?s->attack:-1;}
+/* ACTOR-ATTACK-ONE-CLOCK-69: E's swing clock for the pick (aw_animkit.c drive shows a table-timed swing by it) and dbg
+ * animkit pick; declared there, not in aw_combat.h (the CHIM world stage keys that header) */
+int AW_CombatSwingClock(edict_t *e,float *seconds,float *hit,float *progress);   /* its prototype here, as above */
+int AW_CombatSwingClock(edict_t *e,float *seconds,float *hit,float *progress) {
+    slot_t *s=e?slot_of(e):NULL;
+    if(!s || !s->swing_clock)return 0;
+    if(seconds)*seconds=s->swing_time;
+    if(hit)*hit=s->swing_hit;
+    if(progress)*progress=(s->state!=S_SWING || !(s->swing_time>0))?-1.f:
+                          (s->state_time>=s->swing_time?1.f:s->state_time/s->swing_time);
+    return s->swing_clock;
+}
+/* the same for E's hit recovery (start_hit): its clock, its seconds and the share played now (-1 after it) */
+int AW_CombatHitClock(edict_t *e,float *seconds,float *progress);   /* its prototype here, as above */
+int AW_CombatHitClock(edict_t *e,float *seconds,float *progress) {
+    slot_t *s=e?slot_of(e):NULL;
+    if(!s || !s->hit_clock)return 0;
+    if(seconds)*seconds=s->hit_time;
+    if(progress)*progress=(s->state!=S_HIT || !(s->hit_time>0))?-1.f:
+                          (s->state_time>=s->hit_time?1.f:s->state_time/s->hit_time);
+    return s->hit_clock;
+}
 
 /* ---- reactions: the AmiWind style miss (dodge or block), stagger ---- */
 /* A side step of the NPC (+1 right, -1 left of its facing): the side with room. */
@@ -1248,7 +1368,7 @@ static int victim_outcome(slot_t *v,edict_t *attacker,const aw_swing_t *out) {
         return 1;
     }
     if(v->f.knocked && v->state!=S_KNOCK)set_state(v,S_KNOCK,G_KNOCK);
-    else if(out->outcome>=AW_HIT_FATIGUE && !out->no_effect && v->state!=S_KNOCK)set_state(v,S_HIT,G_HIT);
+    else if(out->outcome>=AW_HIT_FATIGUE && !out->no_effect && v->state!=S_KNOCK)start_hit(v);
     if(out->outcome>=AW_HIT_FATIGUE && !out->no_effect)voice(v->e,AW_VOICE_HIT);
     return 0;
 }
@@ -1582,7 +1702,7 @@ static void player_strike(edict_t *p) {
         killed=s->e;   /* CRIME-59: the murder, when it is one, after this strike (its witnesses may take slots) */
         if(!AW_CombatHostiles())ended(1);
     }else if(s->f.knocked && s->state!=S_KNOCK){set_state(s,S_KNOCK,G_KNOCK);sound(SND_FALL);}
-    else if(out.outcome>=AW_HIT_FATIGUE && !out.no_effect && s->state!=S_KNOCK)set_state(s,S_HIT,G_HIT);   /* hit recovery: every damaging hit */
+    else if(out.outcome>=AW_HIT_FATIGUE && !out.no_effect && s->state!=S_KNOCK)start_hit(s);   /* hit recovery: every damaging hit */
     if(!s->f.dead && out.outcome>=AW_HIT_FATIGUE && !out.no_effect)voice(s->e,AW_VOICE_HIT);
     /* WEAPON-STRIKE-ENCHANT-NOT-CAST-61: a weapon's Cast When Strikes on a blow that hit or was blocked, the killing
      * blow too (OpenMW npc.cpp hit: the enchantment is cast before the blow's damage; its charge is spent, its effects
@@ -1919,7 +2039,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
         return;
     }
     s->f.staggered=s->state==S_HIT;
-    if(s->state==S_HIT){if(s->state_time>=duration(s,G_HIT))set_state(s,S_CHASE,G_IDLE);s->f.staggered=s->state==S_HIT;return;}
+    if(s->state==S_HIT){if(s->state_time>=s->hit_time)set_state(s,S_CHASE,G_IDLE);s->f.staggered=s->state==S_HIT;return;}
     if(s->state==S_BLOCK){if(s->state_time>=(s->has_block?duration(s,G_BLOCK):block_seconds))set_state(s,S_CHASE,G_IDLE);return;}
     if(s->state==S_DODGE){
         if(s->dodged<DODGE_UNITS && !AW_ActorStationary(s->e)){
@@ -2050,11 +2170,11 @@ static void think(slot_t *s,edict_t *p,float dt) {
             if(AW_CombatShootNow(&s->f,s->ammo_left,gap/SCALE,tr.fraction>=1 && !tr.startsolid)){
                 if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);
                 AW_PathIdle(&s->path,(int)s->e->v.origin[0],(int)s->e->v.origin[1]);
-                if(s->cooldown<=0){
+                if(s->cooldown<=0 && !AW_AnimKitDrawing(s->e)){   /* never under the weapon's draw (BEFORE-DRAW-69) */
                     /* the draw: the actor's attack strength in OpenMW, min(1, 0.1 + a roll) */
                     float x=.1f+AW_CombatRoll01(&rng);
                     s->attack=0;s->strength=x>1?1:x;s->struck=0;s->shooting=1;
-                    s->swing_time=duration(s,G_ATTACK)/(s->f.speed>0?s->f.speed:1);
+                    swing_clock(s,s->f.speed>0?s->f.speed:1);   /* the release at the shoot group's own key */
                     set_state(s,S_SWING,G_ATTACK);s->f.attacking=1;
                 }
                 return;
@@ -2066,10 +2186,10 @@ static void think(slot_t *s,edict_t *p,float dt) {
        dz>-reach-((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0)){
         if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);
         AW_PathIdle(&s->path,(int)s->e->v.origin[0],(int)s->e->v.origin[1]);
-        if(s->cooldown<=0){
+        if(s->cooldown<=0 && !AW_AnimKitDrawing(s->e)){   /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: not under the draw */
             /* AiCombat: best attack, swing strength, then a cooldown */
             s->attack=(unsigned char)AW_CombatBestAttack(&s->f,&rng);s->strength=AW_CombatRoll01(&rng);
-            s->struck=0;s->shooting=0;s->swing_time=duration(s,G_ATTACK)/(s->f.weapon && s->f.speed>0?s->f.speed:1);
+            s->struck=0;s->shooting=0;swing_clock(s,s->f.weapon && s->f.speed>0?s->f.speed:1);
             voice(s->e,AW_VOICE_SWING);
             set_state(s,S_SWING,G_ATTACK);s->f.attacking=1;
         }
@@ -2193,13 +2313,13 @@ void AW_CombatPhysics(void) {
     for(i=0;i<FIGHTS;i++){
         slot_t *s=&slots[i];
         if(!s->e)continue;
-        if(s->e->free){AW_ItemsHide(s->item);memset(s,0,sizeof(*s));continue;}
+        if(s->e->free){items_hide(s);memset(s,0,sizeof(*s));continue;}
         /* COMBAT-ACTOR-VS-ACTOR-62: a fight against another actor ends when that actor is dead or gone (OpenMW
          * aicombat.cpp: the package ends with its target); the slot is released, the actor calms down */
         if(s->target_num && s->state!=S_DEAD && !s->f.dead && !actor_target(s)){release(s);continue;}
         any=any || !s->target_num;s->state_time+=dt;
         if(s->state==S_SWING){
-            if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){
+            if(!s->struck && s->state_time>=s->swing_time*s->swing_hit){   /* this swing's own clock (swing_clock) */
                 s->struck=1;b0=Sys_FloatTime();
                 if(s->shooting){if(!you.dead && !((int)p->v.flags&FL_NOTARGET))shot_fire(s,p);}   /* the release */
                 else if(s->target_num){slot_t *v=actor_target(s);if(v)npc_strike_actor(s,v);}
@@ -2244,8 +2364,12 @@ void AW_CombatPhysics(void) {
         }
         if(s->state==S_SWING)s->group=G_ATTACK;
         animate(s);
+        /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: a set held out of the hand longer than any draw (the kit stopped driving
+         * the actor mid-draw) goes into it */
+        if(s->items_held && sv.time>=s->items_hold_until){items_drawn(s,1);s->items_held=0;}
         AW_ItemsUpdate(s->e,s->item);
     }
+    sheathes_update(1);                                /* the sets being put away follow their hands */
     shots_update(p,(float)host_frametime);            /* ACTOR-RANGED-COMBAT-MISSING-66: the shots in flight */
     b0=fought?Sys_FloatTime():0;
     /* The player: punch, fatigue return, the knockout clock. */
@@ -2346,10 +2470,12 @@ void AW_CombatServerReset(void) {
     int i;
     for(i=0;i<FIGHTS;i++)if(slots[i].e){stale_dropped++;memset(&slots[i],0,sizeof(slots[i]));}
     enemy=NULL;memset(&retry,0,sizeof(retry));shots_clear();server_resets++;
+    memset(sheathes,0,sizeof(sheathes));   /* the old edicts are gone with the server (never freed again here) */
 }
 /* aw_scene.c: a new map; the old edicts are gone. */
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<FIGHTS;i++)memset(&slots[i],0,sizeof(slots[i]));
+    memset(sheathes,0,sizeof(sheathes));   /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69: the old map's sets are gone with it */
     memset(&pv,0,sizeof(pv));block_shown_until=0;settings_tried=0;
     sounds_warmed=0;            /* the new area's first sheet looks at the fight's sounds again */
     memset(&start_now,0,sizeof(start_now));memset(&start_worst,0,sizeof(start_worst));think_from=0;
@@ -2386,6 +2512,10 @@ static void report(void) {
     {int used=0;for(i=0;i<FIGHTS;i++)used+=slots[i].e!=NULL;
      Con_Printf("Fight slots: %d in use of %d (aw_combat_slots %d, built for %d); refused for no slot %lu; held items "
         "left out for no spare edict %lu\n",used,slot_cap(),slot_cap(),FIGHTS,full_refused,items_left_out);}
+    /* ACTOR-WEAPON-SHOWN-BEFORE-DRAW-69 */
+    {int n=0;for(i=0;i<FIGHTS;i++)n+=sheathes[i].e!=NULL;
+     Con_Printf("Draw and put-away: held out of the hand until the draw's attach key %lu times; put away at the detach "
+        "key %lu (%d now, %lu by the time limit)\n",items_held_count,sheathes_kept,n,sheathes_timed_out);}
     for(i=0;i<FIGHTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
         (long)slots[i].f.health,(long)slots[i].f.health_max,(long)slots[i].f.fatigue,(long)slots[i].f.fatigue_max,
         slots[i].f.dead?"dead":slots[i].f.knocked?"down":"fighting");

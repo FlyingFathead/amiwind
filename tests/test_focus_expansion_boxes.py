@@ -54,10 +54,15 @@ class MissingBoxTests(unittest.TestCase):
         self.assertEqual(focus.missing_boxes(master('f\\not_measured.nif', name='')), [])
         self.assertEqual(focus.missing_boxes(master('EditorMarker.nif')), [])
 
-    def test_containers_need_a_box_unless_organic(self):
+    def test_containers_need_a_box_unless_picked_in_the_world(self):
         self.assertEqual(focus.missing_boxes(master('o\\odd.nif', tag='CONT')), [('C', 'o\\odd.nif', 'thing')])
-        self.assertEqual(focus.missing_boxes(master('o\\odd.nif', tag='CONT', flag=9)), [])
         self.assertEqual(focus.missing_boxes(master('o\\contain_bm_stalhrim_01.nif', tag='CONT')), [])
+        # PLANT-BOX-AIM-69: an organic container opens its window unless a harvest kind covers its model
+        # (FARGOTH-STASH-STUMP-69), so it needs its box as any other that opens; one of a harvest kind (a mushroom) is
+        # picked in the world and needs none (before, every organic container was left out)
+        self.assertEqual(focus.missing_boxes(master('o\\odd.nif', tag='CONT', flag=9)), [('C', 'o\\odd.nif', 'thing')])
+        self.assertEqual(focus.missing_boxes(master('f\\flora_bc_mushroom_01.nif', tag='CONT', flag=9)), [])
+        self.assertEqual(focus.missing_boxes(master('o\\flora_wickwheat_01.nif', tag='CONT', flag=9)), [])
 
     def test_the_build_runs_the_preflight_before_any_stage(self):
         text = (ROOT / 'tools/build.py').read_text(encoding='utf-8')
